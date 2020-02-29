@@ -1,0 +1,68 @@
+code: _LINESEP* (all_op (_LINESEP+ all_op)* _LINESEP*)?
+
+?all_op: operation
+    | operation1
+    | operation2
+
+operation: value "->" value -> implication
+    | ":>" value -> returnn
+
+operation1: value1 "==" value1 -> equals
+    | value1 "<=" value1 -> less_equals
+    | value1 ">=" value1 -> greater_equals
+    | value1 "<" value1 -> less
+    | value1 ">" value1 -> greater
+
+?operation2: value2 "+" value2 -> add
+    | value2 "-" value2 -> sub
+    | value2 "/" value2 -> div
+    | value2 "%" value2 -> mod
+    | value2 "*" value2 -> mul
+    | value2 "**" value2 -> pow
+    | value2 ".." value2 -> number_list
+    | value2 "::" value2 -> map
+    | "-" value2 -> negate
+    | symbol "=" value2 -> assign
+    | symbol "+=" value2 -> add_assign
+    | symbol "-=" value2 -> sub_assign
+    | symbol "/=" value2 -> div_assign
+    | symbol "*=" value2 -> mul_assign
+    | WORD tuple -> func_call
+    | "{" code "}"
+    | symbol
+
+?value: operation
+    | value1
+
+?value1: operation1
+    | value2
+
+?value2: operation2
+    | symbol "=>" value -> func
+    | SIGNED_NUMBER -> number
+    | ESCAPED_STRING -> string
+
+?symbol: WORD -> symbol
+    | tuple
+    | list
+
+?tuple: "(" (value ("," value)*)? ")"
+list: "[" (value ("," value)*)? "]"
+
+%import common.ESCAPED_STRING
+%import common.INT
+%import common.WORD
+%import common.WS
+%import common.CR
+%import common.LF
+%ignore WS
+
+NUMBER: INT | INT "." INT
+SIGNED_NUMBER: ("+"|"-")? NUMBER
+
+COMMENT: "#" /.*/
+NEWLINE: (CR? LF)
+
+_LINESEP: COMMENT NEWLINE
+    | NEWLINE
+    | ";"
