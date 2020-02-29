@@ -60,10 +60,9 @@ class LLVMScope(Interpreter):
         return self.builder.icmp_signed("==", values[0], values[1])
 
     def func_call(self, tree):
-        if len(tree.children[1].children) == 1:
-            args = [self.visit(tree.children[1])]
-        else:
-            args = self.visit_children(tree.children[1])
+        args = self.visit(tree.children[1])
+        if not isinstance(args, tuple):
+            args = (args,)
         func = self.scope[tree.children[0].value]
         return self.builder.call(func, args)
 
