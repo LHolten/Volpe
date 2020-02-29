@@ -1,5 +1,6 @@
 f = x => x + 1
-g = a => a + f(a)
+g = (a, b) => a + b
 
-test = 4
-:> f( g(test) )
+x = 2
+y = 4
+:> f(g(x, y))

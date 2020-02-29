@@ -36,9 +36,12 @@ class LLVMScope(Interpreter):
         if tree.children[0].data == "symbol":
             args = {tree.children[0].children[0].value: func.args[0]}
         else:
-            args = dict(zip([a.children[0].value for a in tree.children], func.args))
+            args = dict(zip([a.children[0].value for a in tree.children[0].children], func.args))
         LLVMScope(builder, self.scope, args, tree.children[1])
         return func
+
+    def tuple(self, tree):
+        return tuple(self.visit_children(tree))
 
     def number(self, tree):
         return ir.Constant(tree.ret, tree.children[0].value)

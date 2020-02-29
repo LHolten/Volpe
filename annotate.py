@@ -64,6 +64,9 @@ class AnnotateScope(Interpreter):
         self.visit(tree.children[1])
         return self.scope[tree.children[0].value].return_type
 
+    def tuple(self, tree):
+        return tuple(self.visit_children(tree))
+
     add = math
     mod = math
     mul = math
