@@ -8,6 +8,7 @@ operation: value "->" value -> implication
     | ":>" value -> returnn
 
 operation1: value1 "==" value1 -> equals
+    | value1 "!=" value1 -> not_equals
     | value1 "<=" value1 -> less_equals
     | value1 ">=" value1 -> greater_equals
     | value1 "<" value1 -> less

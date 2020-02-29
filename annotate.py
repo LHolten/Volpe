@@ -75,6 +75,7 @@ class AnnotateScope(Interpreter):
     pow = math
 
     equals = comp
+    not_equals = comp
     greater = comp
     less = comp
     greater_equals = comp

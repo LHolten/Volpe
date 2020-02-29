@@ -50,6 +50,10 @@ class LLVMScope(Interpreter):
         values = self.visit_children(tree)
         return self.builder.add(values[0], values[1])
 
+    def sub(self, tree):
+        values = self.visit_children(tree)
+        return self.builder.sub(values[0], values[1])
+
     def mod(self, tree):
         values = self.visit_children(tree)
         return self.builder.srem(values[0], values[1])
@@ -61,6 +65,26 @@ class LLVMScope(Interpreter):
     def equals(self, tree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed("==", values[0], values[1])
+
+    def not_equals(self, tree):
+        values = self.visit_children(tree)
+        return self.builder.icmp_signed("!=", values[0], values[1])
+
+    def greater(self, tree):
+        values = self.visit_children(tree)
+        return self.builder.icmp_signed(">", values[0], values[1])
+
+    def less(self, tree):
+        values = self.visit_children(tree)
+        return self.builder.icmp_signed("<", values[0], values[1])
+
+    def greater_equals(self, tree):
+        values = self.visit_children(tree)
+        return self.builder.icmp_signed(">=", values[0], values[1])
+
+    def less_equals(self, tree):
+        values = self.visit_children(tree)
+        return self.builder.icmp_signed("<=", values[0], values[1])
 
     def func_call(self, tree):
         args = self.visit(tree.children[1])
