@@ -52,11 +52,12 @@ list: "[" (value ("," value)*)? "]"
 
 %import common.ESCAPED_STRING
 %import common.INT
-%import common.WORD
 %import common.WS
 %import common.CR
 %import common.LF
 %ignore WS
+
+WORD: /[_a-zA-Z][_a-zA-Z0-9]*/
 
 NUMBER: INT | INT "." INT
 SIGNED_NUMBER: ("+"|"-")? NUMBER
