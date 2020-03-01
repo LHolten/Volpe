@@ -7,7 +7,7 @@ from llvm_builder import LLVMScope
 from util import TypeTree
 
 
-def hylang_llvm(tree: TypeTree):
+def volpe_llvm(tree: TypeTree):
     # print(tree.pretty())
 
     AnnotateScope({}, {}, tree)
@@ -29,10 +29,10 @@ def hylang_llvm(tree: TypeTree):
 
 
 def main():
-    hylang_parser = Lark(open("volpe.lark"), start='code', parser='lalr', tree_class=TypeTree)
-    parsed_tree = hylang_parser.parse(open("test.vlp").read())
+    volpe_parser = Lark(open("volpe.lark"), start='code', parser='lalr', tree_class=TypeTree)
+    parsed_tree = volpe_parser.parse(open("test.vlp").read())
     # print(parsed_tree.pretty())
-    hylang_llvm(parsed_tree)
+    volpe_llvm(parsed_tree)
     # llvm_ir()
 
 
