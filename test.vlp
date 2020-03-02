@@ -1,6 +1,7 @@
 cool_func = x => x + 1
-g = (a, b) => a + b
 
-x = 2
-y = 4
-:> cool_func(g(x, y))
+v = cool_func(2)
+
+g = a => a + v
+
+:> g(3)
