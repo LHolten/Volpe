@@ -1,14 +1,20 @@
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from util import TypeTree, h_bool, Lambda
+from util import TypeTree, h_bool, Lambda, LambdaAnnotation, h_int, h, target_data, h_byte
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, arg_names: tuple, tree: TypeTree):
+    def __init__(self, builder: ir.IRBuilder, arg_names: tuple, env_names: tuple,tree: TypeTree):
         self.builder = builder
-        self.scope = {n: v for n, v in zip(arg_names, builder.function.args)}
-        self.extra_args = self.builder.function.args[len(self.scope):]
+        if len(builder.function.args) > 0:
+            env = builder.function.args[0]
+            # spots = builder.function.args[1]
+            self.scope = {k: builder.load(builder.gep(env, (ir.Constant(h_int, 0,), ir.Constant(h_int, i,)))) for i, k in enumerate(env_names)}
+        else:
+            # self.env = None
+            self.scope = {}
+        self.scope.update(dict(zip(arg_names, builder.function.args[2:])))
 
         if tree.data == "code":
             self.visit_children(tree)
@@ -31,39 +37,51 @@ class LLVMScope(Interpreter):
         else:
             arg_names = (a.children[0].value for a in tree.children[0].children)
 
+        f = tree.ret  # function type
+        assert isinstance(f, LambdaAnnotation)
+
+        env_loc = self.builder.alloca(f.env)  # reserve new env_loc
+        list(self.builder.store(self.scope[k], self.builder.gep(env_loc, (h(0), h(i)))) for i, k in enumerate(f.env_names))
+
+        fnt, env_loc_t, spt = f.elements
         module = self.builder.module
-        f: ir.FunctionType = tree.ret
-        ret = f.return_type
-        args = f.args
-        while isinstance(ret, ir.FunctionType):
-            args = [*args, *ret.args]
-            ret = ret.return_type
-        f = ir.FunctionType(ret, args)
-        func = ir.Function(module, f, str(next(module.func_count)))
+        func = ir.Function(module, fnt.pointee, str(next(module.func_count)))
         block = func.append_basic_block("entry")
         builder = ir.IRBuilder(block)
 
-        LLVMScope(builder, arg_names, tree.children[1])
-        return Lambda(func, ())
+        LLVMScope(builder, arg_names, f.env_names, tree.children[1])
+
+        l = ir.Constant(ir.LiteralStructType((func.type, env_loc.type, h_int)), (func, ir.Undefined, h(f.spots.get_abi_size(target_data))))
+        l = self.builder.insert_value(l, env_loc, 1)
+        l.spot_id = f.spot_id
+
+        return l
 
     def func_call(self, tree):
         args = self.visit(tree.children[1])
         if not isinstance(args, tuple):
             args = (args,)
-        l: Lambda = self.scope[tree.children[0].value]
-        args = (*l.args, *args)
-        if len(args) < len(l.func.args):
-            return Lambda(l.func, args)
 
-        return self.builder.call(l.func, args)
+        l = self.scope[tree.children[0].value]
+        func = self.builder.extract_value(l, 0)
+        env_loc = self.builder.extract_value(l, 1)
+        spot_num = self.builder.extract_value(l, 2)
+
+        spot_loc = self.builder.alloca(ir.LiteralStructType(()), spot_num)  # reserve new env_loc
+
+        args = (env_loc, spot_loc, *args)
+        return self.builder.call(func, args)
 
     def returnn(self, tree):
         value = self.visit(tree.children[0])
-        if isinstance(value, Lambda):
-            args = (*value.args, *self.extra_args)
-            if len(args) < len(value.func.args):
-                value = Lambda(value.func, args)
-            value = self.builder.call(value.func, args)
+
+        if hasattr(value, "spot_id"):
+            new_env_loc = self.builder.gep(self.env, value.spot_id)  # get env_loc reserved by caller
+            env_loc = self.builder.extract_value(value, 1)
+
+            self.builder.store(self.builder.load(env_loc), new_env_loc)
+
+            value = self.builder.insert_value(value, new_env_loc, 1)
 
         self.builder.ret(value)
         return ir.Constant(h_bool, True)

@@ -1,4 +1,7 @@
-add = (x, y) => x + y
-add_3 = add(3)
+f = (a, b) => a + b
 
-:> add_3(4)
+a = f(1, 2)
+
+g = x => f(a, x)
+
+:> g(2)
