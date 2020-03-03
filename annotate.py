@@ -3,7 +3,7 @@ from typing import Dict
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from util import TypeTree, h_bool, h_int
+from util import TypeTree, h_bool, h_int, Lambda
 
 
 def math(self, tree):
@@ -19,9 +19,8 @@ def comp(self, tree):
 
 
 class AnnotateScope(Interpreter):
-    def __init__(self, scope: Dict, args: Dict, tree: TypeTree):
-        self.scope = scope.copy()
-        self.scope.update(args)
+    def __init__(self, scope: Dict, tree: TypeTree):
+        self.scope = scope
         self.ret = None
         if tree.data == "code":
             values = self.visit_children(tree)
@@ -35,15 +34,21 @@ class AnnotateScope(Interpreter):
         return tree.ret
 
     def code(self, tree: TypeTree):
-        return AnnotateScope(self.scope, {}, tree).ret
+        return AnnotateScope(self.scope, tree).ret
 
     def func(self, tree: TypeTree):
         if tree.children[0].data == "symbol":
             args = {tree.children[0].children[0].value: h_int}
+            arg_keys = [tree.children[0].children[0].value]
         else:
             args = {a.children[0].value: h_int for a in tree.children[0].children}
-        AnnotateScope(self.scope, args, tree.children[1])
-        return ir.FunctionType(tree.children[1].ret, args.values())
+            arg_keys = [a.children[0].value for a in tree.children[0].children]
+        new_scope = self.scope.copy()
+        new_scope.update(args)
+        new_scope = {k: v for k, v in new_scope.items() if not isinstance(v, Lambda)}
+        keys, values = zip(*new_scope.items())
+        AnnotateScope(new_scope, tree.children[1])
+        return Lambda(ir.FunctionType(tree.children[1].ret, values), keys, arg_keys)
 
     def symbol(self, tree: TypeTree):
         return self.scope[tree.children[0].value]
@@ -62,7 +67,7 @@ class AnnotateScope(Interpreter):
 
     def func_call(self, tree):
         self.visit(tree.children[1])
-        return self.scope[tree.children[0].value].return_type
+        return self.scope[tree.children[0].value].fntp.return_type
 
     def tuple(self, tree):
         return tuple(self.visit_children(tree))

@@ -3,13 +3,12 @@ from typing import Dict
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from util import TypeTree, h_bool
+from util import TypeTree, h_bool, Lambda
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, scope: Dict, args: Dict, tree: TypeTree):
-        self.scope = scope.copy()
-        self.scope.update(args)
+    def __init__(self, builder: ir.IRBuilder, scope: Dict, tree: TypeTree):
+        self.scope = scope
         self.builder = builder
 
         if tree.data == "code":
@@ -29,16 +28,15 @@ class LLVMScope(Interpreter):
 
     def func(self, tree):
         module = self.builder.module
-        func = ir.Function(module, tree.ret, str(module.func_count))
+        l: Lambda = tree.ret
+        l.func = ir.Function(module, l.fntp, str(module.func_count))
         module.func_count += 1
-        block = func.append_basic_block("entry")
+        block = l.func.append_basic_block("entry")
         builder = ir.IRBuilder(block)
-        if tree.children[0].data == "symbol":
-            args = {tree.children[0].children[0].value: func.args[0]}
-        else:
-            args = dict(zip([a.children[0].value for a in tree.children[0].children], func.args))
-        LLVMScope(builder, self.scope, args, tree.children[1])
-        return func
+
+        l.scope = self.scope.copy()
+        LLVMScope(builder, dict(zip(l.keys, l.func.args)), tree.children[1])
+        return l
 
     def tuple(self, tree):
         return tuple(self.visit_children(tree))
@@ -90,8 +88,10 @@ class LLVMScope(Interpreter):
         args = self.visit(tree.children[1])
         if not isinstance(args, tuple):
             args = (args,)
-        func = self.scope[tree.children[0].value]
-        return self.builder.call(func, args)
+        l: Lambda = self.scope[tree.children[0].value]
+        l.scope.update(dict(zip(l.arg_keys, args)))
+
+        return self.builder.call(l.func, [l.scope[k] for k in l.keys])
 
     def returnn(self, tree):
         self.builder.ret(self.visit(tree.children[0]))
