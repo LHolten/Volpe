@@ -23,7 +23,7 @@ def hylang_llvm(tree: TypeTree):
     func = ir.Function(module, func_type, "main")
     block = func.append_basic_block("entry")
     builder = ir.IRBuilder(block)
-    LLVMScope(builder, (), (), tree)
+    LLVMScope(builder, (), (), (), tree)
 
     print(module)
 

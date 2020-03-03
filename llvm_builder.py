@@ -5,16 +5,14 @@ from util import TypeTree, h_bool, Lambda, LambdaAnnotation, h_int, h, target_da
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, arg_names: tuple, env_names: tuple,tree: TypeTree):
+    def __init__(self, builder: ir.IRBuilder, args: tuple, arg_names: tuple, env_names: tuple, tree: TypeTree):
         self.builder = builder
-        if len(builder.function.args) > 0:
-            env = builder.function.args[0]
-            # spots = builder.function.args[1]
-            self.scope = {k: builder.load(builder.gep(env, (ir.Constant(h_int, 0,), ir.Constant(h_int, i,)))) for i, k in enumerate(env_names)}
+        if len(args) > 0:
+            self.spots = args[1]
+            self.scope = {k: builder.load(builder.gep(args[0], (h(0), h(i)))) for i, k in enumerate(env_names)}
+            self.scope.update(dict(zip(arg_names, args[2])))
         else:
-            # self.env = None
             self.scope = {}
-        self.scope.update(dict(zip(arg_names, builder.function.args[2:])))
 
         if tree.data == "code":
             self.visit_children(tree)
@@ -49,10 +47,14 @@ class LLVMScope(Interpreter):
         block = func.append_basic_block("entry")
         builder = ir.IRBuilder(block)
 
-        LLVMScope(builder, arg_names, f.env_names, tree.children[1])
+        env = builder.bitcast(func.args[0], f.env.as_pointer())
+        spots = builder.bitcast(func.args[1], f.spots.as_pointer())
+        args = func.args[2:]
 
-        l = ir.Constant(ir.LiteralStructType((func.type, env_loc.type, h_int)), (func, ir.Undefined, h(f.spots.get_abi_size(target_data))))
-        l = self.builder.insert_value(l, env_loc, 1)
+        LLVMScope(builder, (env, spots, args), arg_names, f.env_names, tree.children[1])
+
+        l = ir.Constant(ir.LiteralStructType((func.type, h_byte.as_pointer(), h_int)), (func, ir.Undefined, h(f.spots.get_abi_size(target_data))))
+        l = self.builder.insert_value(l, self.builder.bitcast(env_loc, h_byte.as_pointer()), 1)
         l.spot_id = f.spot_id
 
         return l
@@ -65,9 +67,9 @@ class LLVMScope(Interpreter):
         l = self.scope[tree.children[0].value]
         func = self.builder.extract_value(l, 0)
         env_loc = self.builder.extract_value(l, 1)
-        spot_num = self.builder.extract_value(l, 2)
+        spot_size = self.builder.extract_value(l, 2)
 
-        spot_loc = self.builder.alloca(ir.LiteralStructType(()), spot_num)  # reserve new env_loc
+        spot_loc = self.builder.alloca(h_byte, spot_size)  # reserve new env_loc
 
         args = (env_loc, spot_loc, *args)
         return self.builder.call(func, args)
@@ -76,11 +78,14 @@ class LLVMScope(Interpreter):
         value = self.visit(tree.children[0])
 
         if hasattr(value, "spot_id"):
-            new_env_loc = self.builder.gep(self.env, value.spot_id)  # get env_loc reserved by caller
+            print(self.spots.type)
+            new_env_loc = self.builder.gep(self.spots, (h(value.spot_id),))  # get env_loc reserved by caller
             env_loc = self.builder.extract_value(value, 1)
+            env_loc = self.builder.bitcast(env_loc, new_env_loc.type)
 
             self.builder.store(self.builder.load(env_loc), new_env_loc)
 
+            new_env_loc = self.builder.bitcast(new_env_loc, h_byte.as_pointer())
             value = self.builder.insert_value(value, new_env_loc, 1)
 
         self.builder.ret(value)
