@@ -1,3 +1,5 @@
+import itertools
+
 from lark import Lark
 from llvmlite import ir
 
@@ -15,12 +17,12 @@ def hylang_llvm(tree: TypeTree):
     print(tree.pretty())
 
     module = ir.Module("program")
-    module.func_count = 0
+    module.func_count = itertools.count()
     func_type = ir.FunctionType(tree.ret, ())
     func = ir.Function(module, func_type, "main")
     block = func.append_basic_block("entry")
     builder = ir.IRBuilder(block)
-    LLVMScope(builder, {}, tree)
+    LLVMScope(builder, (), tree)
 
     print(module)
 

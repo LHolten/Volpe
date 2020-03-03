@@ -3,7 +3,7 @@ from typing import Dict
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from util import TypeTree, h_bool, h_int, Lambda
+from util import TypeTree, h_bool, h_int
 
 
 def math(self, tree):
@@ -39,16 +39,14 @@ class AnnotateScope(Interpreter):
     def func(self, tree: TypeTree):
         if tree.children[0].data == "symbol":
             args = {tree.children[0].children[0].value: h_int}
-            arg_keys = [tree.children[0].children[0].value]
         else:
             args = {a.children[0].value: h_int for a in tree.children[0].children}
-            arg_keys = [a.children[0].value for a in tree.children[0].children]
         new_scope = self.scope.copy()
         new_scope.update(args)
-        new_scope = {k: v for k, v in new_scope.items() if not isinstance(v, Lambda)}
-        keys, values = zip(*new_scope.items())
         AnnotateScope(new_scope, tree.children[1])
-        return Lambda(ir.FunctionType(tree.children[1].ret, values), keys, arg_keys)
+
+        values = args.values()  # for now all are the same
+        return ir.FunctionType(tree.children[1].ret, values)
 
     def symbol(self, tree: TypeTree):
         return self.scope[tree.children[0].value]
@@ -66,8 +64,14 @@ class AnnotateScope(Interpreter):
         return h_bool
 
     def func_call(self, tree):
-        self.visit(tree.children[1])
-        return self.scope[tree.children[0].value].fntp.return_type
+        args = self.visit(tree.children[1])
+        if not isinstance(args, tuple):
+            args = (args,)
+        func = self.scope[tree.children[0].value]
+        if len(args) < len(func.args):
+            return ir.FunctionType(func.return_type, func.args[len(args):])
+
+        return self.scope[tree.children[0].value].return_type
 
     def tuple(self, tree):
         return tuple(self.visit_children(tree))

@@ -1,7 +1,4 @@
-cool_func = x => x + 1
+add = (x, y) => x + y
+add_3 = add(3)
 
-v = cool_func(2)
-
-g = a => a + v
-
-:> g(3)
+:> add_3(4)

@@ -1,5 +1,6 @@
 from lark import Tree
 from llvmlite import ir
+from llvmlite.ir import Function
 
 h_bool = ir.IntType(1)
 h_int = ir.IntType(32)
@@ -15,9 +16,6 @@ class TypeTree(Tree):
 
 
 class Lambda:
-    def __init__(self, fntp, keys, arg_keys):
-        self.fntp = fntp
-        self.func = None
-        self.keys = keys
-        self.scope = None
-        self.arg_keys = arg_keys  # order of the real arguments
+    def __init__(self, func: Function, args: tuple):
+        self.func = func
+        self.args = args
