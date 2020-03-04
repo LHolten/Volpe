@@ -1,7 +1,9 @@
-cool_func = x => x + 1
+f = (a, b) => a + b
 
-v = cool_func(2)
+g = x => {
+    :> y => f(x, y)
+}
 
-g = a => a + v
+g1 = g(1)
 
-:> g(3)
+:> g1(2)
