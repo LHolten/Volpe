@@ -1,3 +1,5 @@
+from typing import List
+
 import llvmlite.binding as llvm
 from lark import Tree
 from llvmlite import ir
@@ -25,19 +27,28 @@ class TypeTree(Tree):
         return self.data
 
 
-class Lambda:
+class Lambda():
     def __init__(self, loc: ir.PointerType, spot_id: int):
         self.loc = loc
         self.spot_id = spot_id
 
 
 class LambdaAnnotation(ir.LiteralStructType):
-    def __init__(self, return_type, args, env: ir.LiteralStructType, env_names: tuple, spots: ir.LiteralStructType):
-        fnt = ir.FunctionType(return_type, [h_byte.as_pointer(), h_byte.as_pointer(), *args])
-        super().__init__((fnt.as_pointer(), h_byte.as_pointer(), h_int))
+    def __init__(self, return_type, args, env: ir.LiteralStructType, env_names: tuple, spots: List):
+        fnt = ir.FunctionType(return_type, [h_byte.as_pointer(), h_byte.as_pointer(), *args])  # env offset, spot pointer, args
+        super().__init__((fnt.as_pointer(), ir.ArrayType(h_byte, env.get_abi_size(target_data))))
         self.args = args
         self.return_type = return_type
         self.env = env
         self.env_names = env_names
         self.spots = spots
-        self.spot_id = None
+        self.spot_size = 0
+        if spots:
+            self.spot_size = max(s.get_abi_size(target_data) for s in spots)
+
+
+# class Environment(ir.LiteralStructType):
+#     def __init__(self, env):
+#         envs = [e.env for e in env if isinstance(e, LambdaAnnotation)]
+#
+#         super().__init__((ir.LiteralStructType(env), *envs))

@@ -3,7 +3,7 @@ from typing import Dict
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from util import TypeTree, h_bool, h_int, LambdaAnnotation
+from util import TypeTree, h_bool, h_int, LambdaAnnotation, target_data, h_byte
 
 
 def math(self, tree):
@@ -46,31 +46,35 @@ class AnnotateScope(Interpreter):
         new_scope = self.scope.copy()
         new_scope.update(args)
 
-        if len(self.scope) > 0:
-            keys, values = zip(*self.scope.items())
-        else:
-            keys, values = [], []
+        keys = tuple(self.scope.keys())
+        values = tuple(self.scope.values())
         env = ir.LiteralStructType(values)
         annotation = AnnotateScope(new_scope, tree.children[1], env)
-        spots = ir.LiteralStructType(annotation.spots)
 
-        return LambdaAnnotation(tree.children[1].ret, args.values(), env, keys, spots)
+        return LambdaAnnotation(tree.children[1].ret, args.values(), env, keys, annotation.spots)
 
     def func_call(self, tree):
         args = self.visit(tree.children[1])
         if not isinstance(args, tuple):
             args = (args,)
         func = self.scope[tree.children[0].value]
-        assert isinstance(func, LambdaAnnotation)
+        tree.func = func
         assert len(args) == len(func.args)
 
-        return self.scope[tree.children[0].value].return_type
+        value = func.return_type
+
+        if isinstance(value, ir.PointerType):
+            value = LambdaAnnotation(value.pointee.return_type, value.pointee.args[2:], ir.ArrayType(h_byte, func.spot_size), (), [])
+
+        return value
 
     def returnn(self, tree: TypeTree):
         self.ret = self.visit(tree.children[0])
         if isinstance(self.ret, LambdaAnnotation):
-            self.ret.spot_id = len(self.spots)
+            # s.env.get_abi_size(target_data)
             self.spots.append(self.ret.env)
+            self.ret = self.ret.elements[0]
+            # self.spots.append(get_spot_size(self.ret))
         return h_bool
 
     def symbol(self, tree: TypeTree):

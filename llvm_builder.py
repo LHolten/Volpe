@@ -1,3 +1,5 @@
+import itertools
+
 from lark.visitors import Interpreter
 from llvmlite import ir
 
@@ -38,26 +40,28 @@ class LLVMScope(Interpreter):
         f = tree.ret  # function type
         assert isinstance(f, LambdaAnnotation)
 
-        env_loc = self.builder.alloca(f.env)  # reserve new env_loc
-        list(self.builder.store(self.scope[k], self.builder.gep(env_loc, (h(0), h(i)))) for i, k in enumerate(f.env_names))
+        env_struct = ir.Constant(f.env, ir.Undefined)
+        for i, k in enumerate(f.env_names):
+            env_struct = self.builder.insert_value(env_struct, self.scope[k], i)
+        env_struct = self.builder.bitcast(env_struct, ir.ArrayType(h_byte, env_struct.type.get_abi_size(target_data)))
 
-        fnt, env_loc_t, spt = f.elements
+        fnt = f.elements[0]
         module = self.builder.module
         func = ir.Function(module, fnt.pointee, str(next(module.func_count)))
         block = func.append_basic_block("entry")
         builder = ir.IRBuilder(block)
 
         env = builder.bitcast(func.args[0], f.env.as_pointer())
-        spots = builder.bitcast(func.args[1], f.spots.as_pointer())
+        spots = func.args[1]
         args = func.args[2:]
 
         LLVMScope(builder, (env, spots, args), arg_names, f.env_names, tree.children[1])
 
-        l = ir.Constant(ir.LiteralStructType((func.type, h_byte.as_pointer(), h_int)), (func, ir.Undefined, h(f.spots.get_abi_size(target_data))))
-        l = self.builder.insert_value(l, self.builder.bitcast(env_loc, h_byte.as_pointer()), 1)
-        l.spot_id = f.spot_id
+        lamb = ir.Constant(ir.LiteralStructType((fnt, env_struct.type)), ir.Undefined)
+        lamb = self.builder.insert_value(lamb, func, 0)
+        lamb = self.builder.insert_value(lamb, env_struct, 1)
 
-        return l
+        return lamb
 
     def func_call(self, tree):
         args = self.visit(tree.children[1])
@@ -65,27 +69,40 @@ class LLVMScope(Interpreter):
             args = (args,)
 
         l = self.scope[tree.children[0].value]
+        f: LambdaAnnotation = tree.func
+
         func = self.builder.extract_value(l, 0)
-        env_loc = self.builder.extract_value(l, 1)
-        spot_size = self.builder.extract_value(l, 2)
+        env = self.builder.extract_value(l, 1)
 
-        spot_loc = self.builder.alloca(h_byte, spot_size)  # reserve new env_loc
+        env_loc = self.builder.alloca(env.type)
+        self.builder.store(env, env_loc)
+        env_loc_not_type = self.builder.bitcast(env_loc, h_byte.as_pointer())
 
-        args = (env_loc, spot_loc, *args)
-        return self.builder.call(func, args)
+        spot_type = ir.VectorType(h_byte, f.spot_size)
+        spot_loc = self.builder.alloca(spot_type)  # reserve new env_loc
+        spot_loc_not_type = self.builder.bitcast(spot_loc, h_byte.as_pointer())
+
+        args = (env_loc_not_type, spot_loc_not_type, *args)
+        value = self.builder.call(func, args)
+
+        if isinstance(f.return_type, ir.PointerType):  # needs to be better
+            lamb = ir.Constant(ir.LiteralStructType((value.type, spot_type)), ir.Undefined)
+            lamb = self.builder.insert_value(lamb, value, 0)
+            lamb = self.builder.insert_value(lamb, self.builder.load(spot_loc), 1)
+
+            return lamb
+        return value
 
     def returnn(self, tree):
         value = self.visit(tree.children[0])
 
-        if isinstance(value.type, ir.LiteralStructType):
-            new_env_loc = self.builder.gep(self.spots, (h(0), h(0)))  # get env_loc reserved by caller
-            env_loc = self.builder.extract_value(value, 1)
-            env_loc = self.builder.bitcast(env_loc, new_env_loc.type)
+        if isinstance(value.type, ir.LiteralStructType):  # needs to be better
+            env = self.builder.extract_value(value, 1)
+            spots = self.builder.bitcast(self.spots, env.type.as_pointer())
 
-            self.builder.store(self.builder.load(env_loc), new_env_loc)
+            self.builder.store(env, spots)
 
-            new_env_loc = self.builder.bitcast(new_env_loc, h_byte.as_pointer())
-            value = self.builder.insert_value(value, new_env_loc, 1)
+            value = self.builder.extract_value(value, 0)
 
         self.builder.ret(value)
         return ir.Constant(h_bool, True)
