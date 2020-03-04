@@ -53,7 +53,6 @@ class AnnotateScope(Interpreter):
         env = ir.LiteralStructType(values)
         annotation = AnnotateScope(new_scope, tree.children[1], env)
         spots = ir.LiteralStructType(annotation.spots)
-        print(args.keys(), spots)
 
         return LambdaAnnotation(tree.children[1].ret, args.values(), env, keys, spots)
 
