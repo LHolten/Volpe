@@ -113,6 +113,10 @@ class LLVMScope(Interpreter):
         values = self.visit_children(tree)
         return self.builder.sdiv(values[0], values[1])
 
+    def mul(self, tree):
+        values = self.visit_children(tree)
+        return self.builder.extract_value(self.builder.smul_with_overflow(values[0], values[1]), 0)
+
     def equals(self, tree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed("==", values[0], values[1])
