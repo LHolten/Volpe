@@ -77,9 +77,8 @@ class LLVMScope(Interpreter):
     def returnn(self, tree):
         value = self.visit(tree.children[0])
 
-        if hasattr(value, "spot_id"):
-            print(self.spots.type)
-            new_env_loc = self.builder.gep(self.spots, (h(value.spot_id),))  # get env_loc reserved by caller
+        if isinstance(value.type, ir.LiteralStructType):
+            new_env_loc = self.builder.gep(self.spots, (h(0), h(0)))  # get env_loc reserved by caller
             env_loc = self.builder.extract_value(value, 1)
             env_loc = self.builder.bitcast(env_loc, new_env_loc.type)
 
