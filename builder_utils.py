@@ -41,7 +41,7 @@ def scope_size(type_list: List[ir.Type]) -> int:
     for t in type_list:
         total += t.get_abi_size(target_data)
         if isinstance(t, ClosurePointer):
-            total += t.size + t.get_abi_size(target_data) - pint8.get_abi_size(target_data)
+            total += t.size - pint8.get_abi_size(target_data)
 
     return total
 
@@ -51,15 +51,21 @@ def write_environment(b: ir.IRBuilder, ptr: ir.NamedValue, value_list: List[ir.N
 
     for value in value_list:
         ptr = b.bitcast(ptr, value.type.as_pointer())
-        b.store(value, ptr)
         if isinstance(value.type, ClosurePointer):
+            func_ptr = b.extract_value(value, 0)
+            res_size = b.extract_value(value, 1)
             env_size = b.extract_value(value, 2)
             env_pointer = b.extract_value(value, 3)
+
+            b.store(func_ptr, b.gep(ptr, (h(0), h(0))))  # need to store every part manually to not overwrite anything
+            b.store(res_size, b.gep(ptr, (h(0), h(1))))
+            b.store(env_size, b.gep(ptr, (h(0), h(2))))
             ptr = b.gep(ptr, (h(0), h(3)))  # move to where the environment should be copied
             ptr = b.bitcast(ptr, pint8)
             b.call(memcpy, [ptr, env_pointer, env_size, h_b(0)])
             ptr = b.gep(ptr, (env_size,))  # move to the end of the environment
         else:
+            b.store(value, ptr)
             ptr = b.gep(ptr, (h(1),))
 
 

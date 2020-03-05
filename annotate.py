@@ -23,7 +23,7 @@ class AnnotateScope(Interpreter):
     def __init__(self, scope: Dict, tree: TypeTree):
         self.scope = scope
         self.ret = None
-        self.reservation = []
+        self.reservation = 0
 
         if tree.data == "code":
             values = self.visit_children(tree)  # sets self.ret
@@ -55,7 +55,7 @@ class AnnotateScope(Interpreter):
         return_type = tree.children[1].ret
         closure = ClosurePointer(ir.FunctionType(return_type, arg_types).as_pointer())
         closure.size = scope_size(type_list)
-        closure.reservation = max(annotation.reservation) if annotation.reservation else 0
+        closure.reservation = annotation.reservation
 
         return closure
 
@@ -77,7 +77,7 @@ class AnnotateScope(Interpreter):
     def returnn(self, tree: TypeTree):
         t = self.visit(tree.children[0])
         if isinstance(t, ClosurePointer):
-            self.reservation.append(t.size)
+            self.reservation = max(self.reservation, t.size)
             t = Closure.from_closure_pointer(t)
         self.ret = t
         return int1
