@@ -12,18 +12,17 @@ from util import TypeTree
 def volpe_llvm(tree: TypeTree):
     # print(tree.pretty())
 
-    AnnotateScope({}, tree, ir.LiteralStructType(()))
+    AnnotateScope({}, tree)
 
     print(tree.pretty())
 
     module = ir.Module("program")
     module.func_count = itertools.count()
-    env = ir.LiteralStructType(())
     func_type = ir.FunctionType(tree.ret, ())
     func = ir.Function(module, func_type, "main")
     block = func.append_basic_block("entry")
     builder = ir.IRBuilder(block)
-    LLVMScope(builder, (), (), (), tree)
+    LLVMScope(builder, {}, None, tree)
 
     print(module)
 

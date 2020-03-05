@@ -4,7 +4,7 @@ import llvmlite.binding as llvm
 
 
 # All these initializations are required for code generation!
-from util import h_int
+from util import int32
 
 llvm.initialize()
 llvm.initialize_native_target()
@@ -28,7 +28,7 @@ def compile_and_run(llvm_ir, result_type):
     engine.run_static_constructors()
 
     func_ptr = engine.get_function_address("main")
-    if result_type == h_int:
+    if result_type == int32:
         func = CFUNCTYPE(c_int32)(func_ptr)
     else:
         func = CFUNCTYPE(c_bool)(func_ptr)

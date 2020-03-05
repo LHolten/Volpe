@@ -1,20 +1,15 @@
-import itertools
-
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from util import TypeTree, h_bool, Lambda, LambdaAnnotation, h_int, h, target_data, h_byte
+from builder_utils import ClosurePointer, write_environment, read_environment, Closure
+from util import TypeTree, int1, int32, h, int8, pint8, h_b
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, args: tuple, arg_names: tuple, env_names: tuple, tree: TypeTree):
+    def __init__(self, builder: ir.IRBuilder, args: dict, spots, tree: TypeTree):
         self.builder = builder
-        if len(args) > 0:
-            self.spots = args[1]
-            self.scope = {k: builder.load(builder.gep(args[0], (h(0), h(i)))) for i, k in enumerate(env_names)}
-            self.scope.update(dict(zip(arg_names, args[2])))
-        else:
-            self.scope = {}
+        self.scope = args
+        self.spots = spots
 
         if tree.data == "code":
             self.visit_children(tree)
@@ -26,7 +21,7 @@ class LLVMScope(Interpreter):
     def assign(self, tree):
         name = tree.children[0].children[0].value
         self.scope[name] = self.visit(tree.children[1])
-        return ir.Constant(h_bool, True)
+        return ir.Constant(int1, True)
 
     def symbol(self, tree: TypeTree):
         return self.scope[tree.children[0].value]
@@ -37,31 +32,31 @@ class LLVMScope(Interpreter):
         else:
             arg_names = (a.children[0].value for a in tree.children[0].children)
 
-        f = tree.ret  # function type
-        assert isinstance(f, LambdaAnnotation)
+        f = tree.ret
+        assert isinstance(f, ClosurePointer)
 
-        env_struct = ir.Constant(f.env, ir.Undefined)
-        for i, k in enumerate(f.env_names):
-            env_struct = self.builder.insert_value(env_struct, self.scope[k], i)
-        env_struct = self.builder.bitcast(env_struct, ir.ArrayType(h_byte, env_struct.type.get_abi_size(target_data)))
+        values = list(self.scope.values())
+        env_types = list(v.type for v in values)
+        env_names = list(self.scope.keys())
+        environment_ptr = self.builder.alloca(int8, h(f.size))
+        write_environment(self.builder, environment_ptr, values)
 
-        fnt = f.elements[0]
         module = self.builder.module
-        func = ir.Function(module, fnt.pointee, str(next(module.func_count)))
+        func = ir.Function(module, f.func, str(next(module.func_count)))
         block = func.append_basic_block("entry")
         builder = ir.IRBuilder(block)
 
-        env = builder.bitcast(func.args[0], f.env.as_pointer())
+        env = func.args[0]
+        env_values = read_environment(builder, env, env_types)
         spots = func.args[1]
-        args = func.args[2:]
+        args = dict(zip(env_names, env_values))
+        args.update(dict(zip(arg_names, func.args[2:])))
 
-        LLVMScope(builder, (env, spots, args), arg_names, f.env_names, tree.children[1])
+        LLVMScope(builder, args, spots, tree.children[1])
 
-        lamb = ir.Constant(ir.LiteralStructType((fnt, env_struct.type)), ir.Undefined)
-        lamb = self.builder.insert_value(lamb, func, 0)
-        lamb = self.builder.insert_value(lamb, env_struct, 1)
-
-        return lamb
+        closure = ir.Constant(f, [func, f.reservation, f.size, ir.Undefined])
+        closure = self.builder.insert_value(closure, environment_ptr, 3)
+        return closure
 
     def func_call(self, tree):
         args = self.visit(tree.children[1])
@@ -69,43 +64,52 @@ class LLVMScope(Interpreter):
             args = (args,)
 
         l = self.scope[tree.children[0].value]
-        f: LambdaAnnotation = tree.func
+        assert isinstance(l.type, ClosurePointer)
+        b = self.builder
 
-        func = self.builder.extract_value(l, 0)
-        env = self.builder.extract_value(l, 1)
+        func_ptr = b.extract_value(l, 0)
+        res_size = b.extract_value(l, 1)
+        env_size = b.extract_value(l, 2)
+        env_ptr = b.extract_value(l, 3)
 
-        env_loc = self.builder.alloca(env.type)
-        self.builder.store(env, env_loc)
-        env_loc_not_type = self.builder.bitcast(env_loc, h_byte.as_pointer())
+        res_ptr = self.builder.alloca(int8, res_size)
 
-        spot_type = ir.VectorType(h_byte, f.spot_size)
-        spot_loc = self.builder.alloca(spot_type)  # reserve new env_loc
-        spot_loc_not_type = self.builder.bitcast(spot_loc, h_byte.as_pointer())
+        value = self.builder.call(func_ptr, [env_ptr, res_ptr, *args])
 
-        args = (env_loc_not_type, spot_loc_not_type, *args)
-        value = self.builder.call(func, args)
+        if isinstance(value.type, Closure):
+            new_func_ptr = self.builder.extract_value(value, 0)
+            new_res_size = self.builder.extract_value(value, 1)
 
-        if isinstance(f.return_type, ir.PointerType):  # needs to be better
-            lamb = ir.Constant(ir.LiteralStructType((value.type, spot_type)), ir.Undefined)
-            lamb = self.builder.insert_value(lamb, value, 0)
-            lamb = self.builder.insert_value(lamb, self.builder.load(spot_loc), 1)
+            closure = ir.Constant(ClosurePointer.from_closure(value.type, 0), ir.Undefined)
+            closure = self.builder.insert_value(closure, new_func_ptr, 0)
+            closure = self.builder.insert_value(closure, new_res_size, 1)
+            closure = self.builder.insert_value(closure, res_size, 2)
+            closure = self.builder.insert_value(closure, res_ptr, 3)
 
-            return lamb
+            return closure
         return value
 
     def returnn(self, tree):
         value = self.visit(tree.children[0])
 
-        if isinstance(value.type, ir.LiteralStructType):  # needs to be better
-            env = self.builder.extract_value(value, 1)
-            spots = self.builder.bitcast(self.spots, env.type.as_pointer())
+        if isinstance(value.type, ClosurePointer):
+            memcpy = self.builder.module.declare_intrinsic('llvm.memcpy', [pint8, pint8, int32])
 
-            self.builder.store(env, spots)
+            func_ptr = self.builder.extract_value(value, 0)
+            res_size = self.builder.extract_value(value, 1)
+            env_size = self.builder.extract_value(value, 2)
+            env_ptr = self.builder.extract_value(value, 3)
 
-            value = self.builder.extract_value(value, 0)
+            self.builder.call(memcpy, [self.spots, env_ptr, env_size, h_b(0)])
+
+            closure = ir.Constant(Closure.from_closure_pointer(value.type), ir.Undefined)
+            closure = self.builder.insert_value(closure, func_ptr, 0)
+            closure = self.builder.insert_value(closure, res_size, 1)
+
+            value = closure
 
         self.builder.ret(value)
-        return ir.Constant(h_bool, True)
+        return ir.Constant(int1, True)
 
     def tuple(self, tree):
         return tuple(self.visit_children(tree))

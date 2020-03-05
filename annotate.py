@@ -3,7 +3,8 @@ from typing import Dict
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from util import TypeTree, h_bool, h_int, LambdaAnnotation, target_data, h_byte
+from builder_utils import Closure, ClosurePointer, scope_size
+from util import TypeTree, int1, int32, pint8
 
 
 def math(self, tree):
@@ -15,19 +16,19 @@ def math(self, tree):
 def comp(self, tree):
     ret = self.visit_children(tree)
     assert ret[0] == ret[1]
-    return h_bool
+    return int1
 
 
 class AnnotateScope(Interpreter):
-    def __init__(self, scope: Dict, tree: TypeTree, env):
+    def __init__(self, scope: Dict, tree: TypeTree):
         self.scope = scope
         self.ret = None
-        self.env = env
-        self.spots = []
+        self.reservation = []
+
         if tree.data == "code":
             values = self.visit_children(tree)  # sets self.ret
-            assert all([v == h_bool for v in values])
-            tree.ret = self.ret or h_bool
+            assert all([v == int1 for v in values])
+            tree.ret = self.ret or int1
         else:
             self.visit(tree)  # sets tree.ret
 
@@ -38,44 +39,48 @@ class AnnotateScope(Interpreter):
     # def code(self, tree: TypeTree):
     #     return AnnotateScope(self.scope, tree, self.env).ret
 
-    def func(self, tree: TypeTree):
+    def func(self, tree: TypeTree) -> ClosurePointer:
         if tree.children[0].data == "symbol":
-            args = {tree.children[0].children[0].value: h_int}
+            args = {tree.children[0].children[0].value: int32}
         else:
-            args = {a.children[0].value: h_int for a in tree.children[0].children}
+            args = {a.children[0].value: int32 for a in tree.children[0].children}
         new_scope = self.scope.copy()
         new_scope.update(args)
 
-        keys = tuple(self.scope.keys())
-        values = tuple(self.scope.values())
-        env = ir.LiteralStructType(values)
-        annotation = AnnotateScope(new_scope, tree.children[1], env)
+        type_list = list(self.scope.values())
 
-        return LambdaAnnotation(tree.children[1].ret, args.values(), env, keys, annotation.spots)
+        annotation = AnnotateScope(new_scope, tree.children[1])
 
-    def func_call(self, tree):
+        arg_types = [pint8, pint8, *args.values()]
+        return_type = tree.children[1].ret
+        closure = ClosurePointer(ir.FunctionType(return_type, arg_types).as_pointer())
+        closure.size = scope_size(type_list)
+        closure.reservation = max(annotation.reservation) if annotation.reservation else 0
+
+        return closure
+
+    def func_call(self, tree: TypeTree) -> ir.Type:
         args = self.visit(tree.children[1])
         if not isinstance(args, tuple):
             args = (args,)
-        func = self.scope[tree.children[0].value]
-        tree.func = func
-        assert len(args) == len(func.args)
+        closure = self.scope[tree.children[0].value]
+        assert isinstance(closure, ClosurePointer)
+        assert len(args) == len(closure.func.args) - 2
 
-        value = func.return_type
+        t = closure.func.return_type
 
-        if isinstance(value, ir.PointerType):
-            value = LambdaAnnotation(value.pointee.return_type, value.pointee.args[2:], ir.ArrayType(h_byte, func.spot_size), (), [])
+        if isinstance(t, Closure):
+            t = ClosurePointer.from_closure(t, closure.reservation)
 
-        return value
+        return t
 
     def returnn(self, tree: TypeTree):
-        self.ret = self.visit(tree.children[0])
-        if isinstance(self.ret, LambdaAnnotation):
-            # s.env.get_abi_size(target_data)
-            self.spots.append(self.ret.env)
-            self.ret = self.ret.elements[0]
-            # self.spots.append(get_spot_size(self.ret))
-        return h_bool
+        t = self.visit(tree.children[0])
+        if isinstance(t, ClosurePointer):
+            self.reservation.append(t.size)
+            t = Closure.from_closure_pointer(t)
+        self.ret = t
+        return int1
 
     def symbol(self, tree: TypeTree):
         return self.scope[tree.children[0].value]
@@ -83,10 +88,10 @@ class AnnotateScope(Interpreter):
     def assign(self, tree: TypeTree):
         name = tree.children[0].children[0].value
         self.scope[name] = self.visit(tree.children[1])
-        return h_bool
+        return int1
 
     def number(self, tree):
-        return h_int
+        return int32
 
     def tuple(self, tree):
         return tuple(self.visit_children(tree))
