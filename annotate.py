@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 from lark.visitors import Interpreter
 from llvmlite import ir
@@ -17,6 +17,32 @@ def comp(self, tree):
     ret = self.visit_children(tree)
     assert ret[0] == ret[1]
     return int1
+
+
+class Unannotated(Closure):
+    def __init__(self, scope, tree, arg_names, code):
+        super().__init__(ir.FunctionType(ir.VoidType(), []).as_pointer())
+        self.scope = scope
+        self.tree: TypeTree = tree  # this is the one that ultimately needs updating
+        self.arg_names = arg_names
+        self.code = code
+        self.return_of: List[Unannotated] = []
+        self.arg_of: List[(int, Unannotated)] = []
+
+    def update(self, func: ir.FunctionType):
+        super().__init__(func.as_pointer())
+
+        for r in self.return_of:
+            arg_types = r.func.args
+            new_func = ir.FunctionType(self, arg_types)
+            r.update(new_func)
+
+        for i, a in self.arg_of:
+            return_type = a.func.return_type
+            arg_types = list(a.func.args)
+            arg_types[i + 1] = self
+            new_func = ir.FunctionType(return_type, arg_types)
+            a.update(new_func)
 
 
 class AnnotateScope(Interpreter):
@@ -38,31 +64,49 @@ class AnnotateScope(Interpreter):
     # def code(self, tree: TypeTree):
     #     return AnnotateScope(self.scope, tree, self.env).ret
 
-    def func(self, tree: TypeTree) -> Closure:
-        if tree.children[0].data == "symbol":
-            args = {tree.children[0].children[0].value: int32}
-        else:
-            args = {a.children[0].value: int32 for a in tree.children[0].children}
+    def func(self, tree: TypeTree):
         new_scope = self.scope.copy()
-        new_scope.update(args)
 
-        AnnotateScope(new_scope, tree.children[1])
+        if tree.children[0].data == "symbol":
+            arg_names = [tree.children[0].children[0].value]
+        else:
+            arg_names = [a.children[0].value for a in tree.children[0].children]
 
-        arg_types = [pint8, *args.values()]
-        return_type = tree.children[1].ret
-        closure = Closure(ir.FunctionType(return_type, arg_types).as_pointer())
-
-        return closure
+        return Unannotated(new_scope, tree, arg_names, tree.children[1])
 
     def func_call(self, tree: TypeTree) -> ir.Type:
-        args = self.visit(tree.children[1])
-        if not isinstance(args, tuple):
-            args = (args,)
-        closure = self.scope[tree.children[0].value]
-        assert isinstance(closure, Closure)
-        assert len(args) == len(closure.func.args) - 1
+        func_name, arg_tree = tree.children
 
-        return closure.func.return_type
+        arg_types = self.visit(arg_tree)  # these can be Unannotated
+        if not isinstance(arg_types, tuple):
+            arg_types = (arg_types,)
+
+        closure = self.scope[func_name.value]
+
+        for i, a in enumerate(arg_types):
+            if isinstance(a, Unannotated):
+                a.arg_of.append((i, closure))
+
+        assert isinstance(closure, Unannotated)
+
+        scope = closure.scope
+        scope.update(dict(zip(closure.arg_names, arg_types)))
+
+        AnnotateScope(scope, closure.code)
+        # now all arguments should be annotated, as well as the return type
+        return_type = closure.code.ret
+
+        if isinstance(return_type, Unannotated):
+            return_type.return_of.append(closure)
+            # create temp new closure
+            func = ir.FunctionType(ir.VoidType(), [pint8, *arg_types])
+        else:
+            # create actual closure
+            func = ir.FunctionType(return_type, [pint8, *arg_types])
+
+        closure.update(func)
+
+        return return_type
 
     def returnn(self, tree: TypeTree):
         self.ret = self.visit(tree.children[0])
