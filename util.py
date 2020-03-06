@@ -10,6 +10,8 @@ int1 = ir.IntType(1)
 int32 = ir.IntType(32)
 int8 = ir.IntType(8)
 pint8 = int8.as_pointer()
+unknown = ir.VoidType()
+
 target_data = llvm.Target.from_default_triple().create_target_machine().target_data
 
 

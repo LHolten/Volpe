@@ -2,7 +2,7 @@ from lark.visitors import Interpreter
 from llvmlite import ir
 
 from builder_utils import write_environment, read_environment, Closure, free_environment, environment_size
-from util import TypeTree, int1, int32, h, int8, pint8, h_b
+from util import TypeTree, int1
 
 
 class LLVMScope(Interpreter):
