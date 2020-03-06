@@ -2,7 +2,7 @@ from lark.visitors import Interpreter
 from llvmlite import ir
 
 from builder_utils import write_environment, read_environment, Closure, free_environment, environment_size
-from util import TypeTree, int1
+from util import TypeTree, int1, h_b
 
 
 class LLVMScope(Interpreter):
@@ -85,6 +85,13 @@ class LLVMScope(Interpreter):
 
         self.builder.ret(value)
         return ir.Constant(int1, True)
+
+    def implication(self, tree):
+        value = self.visit(tree.children[0])
+        with self.builder.if_then(value):
+            alternative_value = self.visit(tree.children[1])
+
+        return self.builder.select(value, alternative_value, h_b(1))
 
     def tuple(self, tree):
         return tuple(self.visit_children(tree))
