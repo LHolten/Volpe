@@ -3,7 +3,8 @@ from typing import Dict
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from util import TypeTree, h_bool, h_int, LambdaAnnotation
+from builder_utils import Closure
+from util import TypeTree, int1, int32, pint8
 
 
 def math(self, tree):
@@ -15,19 +16,30 @@ def math(self, tree):
 def comp(self, tree):
     ret = self.visit_children(tree)
     assert ret[0] == ret[1]
-    return h_bool
+    return int1
+
+
+class Unannotated(Closure):
+    def __init__(self, scope, arg_names, code):
+        super().__init__(ir.FunctionType(ir.VoidType(), []).as_pointer())
+        self.scope = scope
+        self.arg_names = arg_names
+        self.code = code
+        self.checked = False
+
+    def update(self, func: ir.FunctionType):
+        super().__init__(func.as_pointer())
 
 
 class AnnotateScope(Interpreter):
-    def __init__(self, scope: Dict, tree: TypeTree, env):
+    def __init__(self, scope: Dict, tree: TypeTree):
         self.scope = scope
         self.ret = None
-        self.env = env
-        self.spots = []
+
         if tree.data == "code":
             values = self.visit_children(tree)  # sets self.ret
-            assert all([v == h_bool for v in values])
-            tree.ret = self.ret or h_bool
+            assert all([v == int1 for v in values])
+            tree.ret = self.ret or int1
         else:
             self.visit(tree)  # sets tree.ret
 
@@ -35,43 +47,50 @@ class AnnotateScope(Interpreter):
         tree.ret = getattr(self, tree.data)(tree)
         return tree.ret
 
-    # def code(self, tree: TypeTree):
-    #     return AnnotateScope(self.scope, tree, self.env).ret
+    def code(self, tree: TypeTree):
+        return AnnotateScope(self.scope.copy(), tree).ret
 
     def func(self, tree: TypeTree):
-        if tree.children[0].data == "symbol":
-            args = {tree.children[0].children[0].value: h_int}
-        else:
-            args = {a.children[0].value: h_int for a in tree.children[0].children}
         new_scope = self.scope.copy()
-        new_scope.update(args)
 
-        if len(self.scope) > 0:
-            keys, values = zip(*self.scope.items())
+        if tree.children[0].data == "symbol":
+            arg_names = [tree.children[0].children[0].value]
         else:
-            keys, values = [], []
-        env = ir.LiteralStructType(values)
-        annotation = AnnotateScope(new_scope, tree.children[1], env)
-        spots = ir.LiteralStructType(annotation.spots)
+            arg_names = [a.children[0].value for a in tree.children[0].children]
 
-        return LambdaAnnotation(tree.children[1].ret, args.values(), env, keys, spots)
+        return Unannotated(new_scope, arg_names, tree.children[1])
 
-    def func_call(self, tree):
-        args = self.visit(tree.children[1])
-        if not isinstance(args, tuple):
-            args = (args,)
-        func = self.scope[tree.children[0].value]
-        assert isinstance(func, LambdaAnnotation)
-        assert len(args) == len(func.args)
+    def func_call(self, tree: TypeTree) -> ir.Type:
+        func_name, arg_tree = tree.children
 
-        return self.scope[tree.children[0].value].return_type
+        closure = self.scope[func_name.value]
+        assert isinstance(closure, Unannotated)
+
+        if closure.checked:  # we have already been here
+            return closure.func.return_type
+        closure.checked = True
+
+        arg_types = self.visit(arg_tree)
+        if not isinstance(arg_types, tuple):
+            arg_types = (arg_types,)
+
+        scope = closure.scope
+        scope.update(dict(zip(closure.arg_names, arg_types)))
+
+        AnnotateScope(scope, closure.code)
+        return_type = closure.code.ret
+
+        func = ir.FunctionType(return_type, [pint8, *arg_types])
+
+        closure.update(func)
+
+        return return_type
 
     def returnn(self, tree: TypeTree):
-        self.ret = self.visit(tree.children[0])
-        if isinstance(self.ret, LambdaAnnotation):
-            self.ret.spot_id = len(self.spots)
-            self.spots.append(self.ret.env)
-        return h_bool
+        ret = self.visit(tree.children[0])
+        if not isinstance(ret, Unannotated) or self.ret is None:  # help out type inference
+            self.ret = ret
+        return int1
 
     def symbol(self, tree: TypeTree):
         return self.scope[tree.children[0].value]
@@ -79,10 +98,16 @@ class AnnotateScope(Interpreter):
     def assign(self, tree: TypeTree):
         name = tree.children[0].children[0].value
         self.scope[name] = self.visit(tree.children[1])
-        return h_bool
+        return int1
+
+    def implication(self, tree: TypeTree):
+        ret = self.visit_children(tree)
+        assert ret[0] == int1
+        assert ret[1] == int1
+        return int1
 
     def number(self, tree):
-        return h_int
+        return int32
 
     def tuple(self, tree):
         return tuple(self.visit_children(tree))

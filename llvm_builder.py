@@ -1,30 +1,29 @@
+from typing import Callable
+
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from util import TypeTree, h_bool, Lambda, LambdaAnnotation, h_int, h, target_data, h_byte
+from builder_utils import write_environment, read_environment, Closure, free_environment, environment_size
+from util import TypeTree, int1, h_b
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, args: tuple, arg_names: tuple, env_names: tuple, tree: TypeTree):
+    def __init__(self, builder: ir.IRBuilder, scope: dict, tree: TypeTree, ret: Callable):
         self.builder = builder
-        if len(args) > 0:
-            self.spots = args[1]
-            self.scope = {k: builder.load(builder.gep(args[0], (h(0), h(i)))) for i, k in enumerate(env_names)}
-            self.scope.update(dict(zip(arg_names, args[2])))
-        else:
-            self.scope = {}
+        self.scope = scope
+        self.ret = ret
 
         if tree.data == "code":
             self.visit_children(tree)
             if not builder.block.is_terminated:
-                builder.ret(ir.Constant(tree.ret, 1))
+                ret(ir.Constant(tree.ret, 1))
         else:
-            builder.ret(self.visit(tree))
+            ret(self.visit(tree))
 
     def assign(self, tree):
         name = tree.children[0].children[0].value
         self.scope[name] = self.visit(tree.children[1])
-        return ir.Constant(h_bool, True)
+        return ir.Constant(int1, True)
 
     def symbol(self, tree: TypeTree):
         return self.scope[tree.children[0].value]
@@ -35,60 +34,81 @@ class LLVMScope(Interpreter):
         else:
             arg_names = (a.children[0].value for a in tree.children[0].children)
 
-        f = tree.ret  # function type
-        assert isinstance(f, LambdaAnnotation)
+        f = tree.ret
+        assert isinstance(f, Closure)
 
-        env_loc = self.builder.alloca(f.env)  # reserve new env_loc
-        list(self.builder.store(self.scope[k], self.builder.gep(env_loc, (h(0), h(i)))) for i, k in enumerate(f.env_names))
+        values = list(self.scope.values())
+        env_types = list(v.type for v in values)
+        env_names = list(self.scope.keys())
 
-        fnt, env_loc_t, spt = f.elements
         module = self.builder.module
-        func = ir.Function(module, fnt.pointee, str(next(module.func_count)))
+        env_size = environment_size(self.builder, values)
+        env_ptr = self.builder.call(module.malloc, [env_size])
+        write_environment(self.builder, env_ptr, values)
+
+        func = ir.Function(module, f.func, str(next(module.func_count)))
         block = func.append_basic_block("entry")
         builder = ir.IRBuilder(block)
 
-        env = builder.bitcast(func.args[0], f.env.as_pointer())
-        spots = builder.bitcast(func.args[1], f.spots.as_pointer())
-        args = func.args[2:]
+        env = func.args[0]
+        env_values = read_environment(builder, env, env_types)
+        args = dict(zip(env_names, env_values))
+        args.update(dict(zip(arg_names, func.args[1:])))
 
-        LLVMScope(builder, (env, spots, args), arg_names, f.env_names, tree.children[1])
+        LLVMScope(builder, args, tree.children[1], builder.ret)
 
-        l = ir.Constant(ir.LiteralStructType((func.type, h_byte.as_pointer(), h_int)), (func, ir.Undefined, h(f.spots.get_abi_size(target_data))))
-        l = self.builder.insert_value(l, self.builder.bitcast(env_loc, h_byte.as_pointer()), 1)
-        l.spot_id = f.spot_id
-
-        return l
+        closure = ir.Constant(f, [func, ir.Undefined, ir.Undefined])
+        closure = self.builder.insert_value(closure, env_size, 1)
+        closure = self.builder.insert_value(closure, env_ptr, 2)
+        return closure
 
     def func_call(self, tree):
         args = self.visit(tree.children[1])
         if not isinstance(args, tuple):
             args = (args,)
 
-        l = self.scope[tree.children[0].value]
-        func = self.builder.extract_value(l, 0)
-        env_loc = self.builder.extract_value(l, 1)
-        spot_size = self.builder.extract_value(l, 2)
+        closure = self.scope[tree.children[0].value]
+        assert isinstance(closure.type, Closure)
 
-        spot_loc = self.builder.alloca(h_byte, spot_size)  # reserve new env_loc
+        func_ptr = self.builder.extract_value(closure, 0)
+        env_size = self.builder.extract_value(closure, 1)
+        env_ptr = self.builder.extract_value(closure, 2)
 
-        args = (env_loc, spot_loc, *args)
-        return self.builder.call(func, args)
+        return self.builder.call(func_ptr, [env_ptr, *args])
 
     def returnn(self, tree):
         value = self.visit(tree.children[0])
 
-        if isinstance(value.type, ir.LiteralStructType):
-            new_env_loc = self.builder.gep(self.spots, (h(0), h(0)))  # get env_loc reserved by caller
-            env_loc = self.builder.extract_value(value, 1)
-            env_loc = self.builder.bitcast(env_loc, new_env_loc.type)
+        environment = list(self.scope.values())
+        print(self.scope.keys())
+        if value in environment:
+            print(list(self.scope.keys())[environment.index(value)])
+            environment.remove(value)
+        free_environment(self.builder, environment)
 
-            self.builder.store(self.builder.load(env_loc), new_env_loc)
+        self.ret(value)
+        return ir.Constant(int1, True)
 
-            new_env_loc = self.builder.bitcast(new_env_loc, h_byte.as_pointer())
-            value = self.builder.insert_value(value, new_env_loc, 1)
+    def code(self, tree):
+        new_block = self.builder.function.append_basic_block("block")
+        with self.builder.goto_block(new_block):
+            phi_node = self.builder.phi(tree.ret)
 
-        self.builder.ret(value)
-        return ir.Constant(h_bool, True)
+        def ret(value):
+            phi_node.add_incoming(value, self.builder.block)
+            self.builder.branch(new_block)
+
+        LLVMScope(self.builder, self.scope.copy(), tree, ret)
+
+        self.builder.position_at_end(new_block)
+        return phi_node
+
+    def implication(self, tree):
+        value = self.visit(tree.children[0])
+        with self.builder.if_then(value):
+            alternative_value = self.visit(tree.children[1])
+
+        return self.builder.select(value, alternative_value, h_b(1))
 
     def tuple(self, tree):
         return tuple(self.visit_children(tree))
