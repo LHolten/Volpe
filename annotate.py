@@ -3,7 +3,7 @@ from typing import Dict
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from builder_utils import Closure, ClosurePointer, scope_size
+from builder_utils import Closure
 from util import TypeTree, int1, int32, pint8
 
 
@@ -23,7 +23,6 @@ class AnnotateScope(Interpreter):
     def __init__(self, scope: Dict, tree: TypeTree):
         self.scope = scope
         self.ret = None
-        self.reservation = 0
 
         if tree.data == "code":
             values = self.visit_children(tree)  # sets self.ret
@@ -39,7 +38,7 @@ class AnnotateScope(Interpreter):
     # def code(self, tree: TypeTree):
     #     return AnnotateScope(self.scope, tree, self.env).ret
 
-    def func(self, tree: TypeTree) -> ClosurePointer:
+    def func(self, tree: TypeTree) -> Closure:
         if tree.children[0].data == "symbol":
             args = {tree.children[0].children[0].value: int32}
         else:
@@ -47,15 +46,11 @@ class AnnotateScope(Interpreter):
         new_scope = self.scope.copy()
         new_scope.update(args)
 
-        type_list = list(self.scope.values())
+        AnnotateScope(new_scope, tree.children[1])
 
-        annotation = AnnotateScope(new_scope, tree.children[1])
-
-        arg_types = [pint8, pint8, *args.values()]
+        arg_types = [pint8, *args.values()]
         return_type = tree.children[1].ret
-        closure = ClosurePointer(ir.FunctionType(return_type, arg_types).as_pointer())
-        closure.size = scope_size(type_list)
-        closure.reservation = annotation.reservation
+        closure = Closure(ir.FunctionType(return_type, arg_types).as_pointer())
 
         return closure
 
@@ -64,22 +59,13 @@ class AnnotateScope(Interpreter):
         if not isinstance(args, tuple):
             args = (args,)
         closure = self.scope[tree.children[0].value]
-        assert isinstance(closure, ClosurePointer)
-        assert len(args) == len(closure.func.args) - 2
+        assert isinstance(closure, Closure)
+        assert len(args) == len(closure.func.args) - 1
 
-        t = closure.func.return_type
-
-        if isinstance(t, Closure):
-            t = ClosurePointer.from_closure(t, closure.reservation)
-
-        return t
+        return closure.func.return_type
 
     def returnn(self, tree: TypeTree):
-        t = self.visit(tree.children[0])
-        if isinstance(t, ClosurePointer):
-            self.reservation = max(self.reservation, t.size)
-            t = Closure.from_closure_pointer(t)
-        self.ret = t
+        self.ret = self.visit(tree.children[0])
         return int1
 
     def symbol(self, tree: TypeTree):

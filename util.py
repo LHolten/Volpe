@@ -1,5 +1,3 @@
-from typing import List
-
 import llvmlite.binding as llvm
 from lark import Tree
 from llvmlite import ir

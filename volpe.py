@@ -6,7 +6,7 @@ from llvmlite import ir
 from annotate import AnnotateScope
 from compile import compile_and_run
 from llvm_builder import LLVMScope
-from util import TypeTree
+from util import TypeTree, pint8, int32
 
 
 def volpe_llvm(tree: TypeTree):
@@ -18,11 +18,14 @@ def volpe_llvm(tree: TypeTree):
 
     module = ir.Module("program")
     module.func_count = itertools.count()
+    module.malloc = ir.Function(module, ir.FunctionType(pint8, [int32]), "malloc")
+    module.free = ir.Function(module, ir.FunctionType(ir.VoidType(), [pint8]), "free")
+    module.memcpy = module.declare_intrinsic('llvm.memcpy', [pint8, pint8, int32])
     func_type = ir.FunctionType(tree.ret, ())
     func = ir.Function(module, func_type, "main")
     block = func.append_basic_block("entry")
     builder = ir.IRBuilder(block)
-    LLVMScope(builder, {}, None, tree)
+    LLVMScope(builder, {}, tree)
 
     print(module)
 
