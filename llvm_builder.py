@@ -1,3 +1,5 @@
+from typing import Callable
+
 from lark.visitors import Interpreter
 from llvmlite import ir
 
@@ -6,16 +8,17 @@ from util import TypeTree, int1, h_b
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, args: dict, tree: TypeTree):
+    def __init__(self, builder: ir.IRBuilder, scope: dict, tree: TypeTree, ret: Callable):
         self.builder = builder
-        self.scope = args
+        self.scope = scope
+        self.ret = ret
 
         if tree.data == "code":
             self.visit_children(tree)
             if not builder.block.is_terminated:
-                builder.ret(ir.Constant(tree.ret, 1))
+                ret(ir.Constant(tree.ret, 1))
         else:
-            builder.ret(self.visit(tree))
+            ret(self.visit(tree))
 
     def assign(self, tree):
         name = tree.children[0].children[0].value
@@ -52,7 +55,7 @@ class LLVMScope(Interpreter):
         args = dict(zip(env_names, env_values))
         args.update(dict(zip(arg_names, func.args[1:])))
 
-        LLVMScope(builder, args, tree.children[1])
+        LLVMScope(builder, args, tree.children[1], builder.ret)
 
         closure = ir.Constant(f, [func, ir.Undefined, ir.Undefined])
         closure = self.builder.insert_value(closure, env_size, 1)
@@ -83,8 +86,22 @@ class LLVMScope(Interpreter):
             environment.remove(value)
         free_environment(self.builder, environment)
 
-        self.builder.ret(value)
+        self.ret(value)
         return ir.Constant(int1, True)
+
+    def code(self, tree):
+        new_block = self.builder.function.append_basic_block("block")
+        with self.builder.goto_block(new_block):
+            phi_node = self.builder.phi(tree.ret)
+
+        def ret(value):
+            phi_node.add_incoming(value, self.builder.block)
+            self.builder.branch(new_block)
+
+        LLVMScope(self.builder, self.scope.copy(), tree, ret)
+
+        self.builder.position_at_end(new_block)
+        return phi_node
 
     def implication(self, tree):
         value = self.visit(tree.children[0])
