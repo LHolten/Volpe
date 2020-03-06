@@ -4,7 +4,7 @@ from lark.visitors import Interpreter
 from llvmlite import ir
 
 from builder_utils import write_environment, read_environment, Closure, free_environment, environment_size
-from util import TypeTree, int1, h_b
+from util import TypeTree, int1, h_b, int32
 
 
 class LLVMScope(Interpreter):
@@ -16,7 +16,12 @@ class LLVMScope(Interpreter):
         if tree.data == "code":
             self.visit_children(tree)
             if not builder.block.is_terminated:
-                ret(ir.Constant(tree.ret, 1))
+                if tree.ret == int1:
+                    ret(ir.Constant(tree.ret, 1))
+                elif tree.ret == int32:
+                    ret(ir.Constant(tree.ret, 0))
+                else:
+                    raise NotImplementedError("default return for", tree.ret)
         else:
             ret(self.visit(tree))
 
