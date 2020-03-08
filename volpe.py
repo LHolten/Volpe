@@ -10,7 +10,7 @@ from util import TypeTree, pint8, int32
 
 
 def volpe_llvm(tree: TypeTree):
-    # print(tree.pretty())
+    print(tree.pretty())
 
     AnnotateScope({}, tree)
 
@@ -34,7 +34,7 @@ def volpe_llvm(tree: TypeTree):
 
 
 def main():
-    volpe_parser = Lark(open("volpe.lark"), start='code', parser='lalr', tree_class=TypeTree)
+    volpe_parser = Lark(open("volpe.lark"), start='code', parser='lalr', tree_class=TypeTree, debug=True)
     parsed_tree = volpe_parser.parse(open("test.vlp").read())
     # print(parsed_tree.pretty())
     volpe_llvm(parsed_tree)
