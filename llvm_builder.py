@@ -47,15 +47,19 @@ class LLVMScope(Interpreter):
         write_environment(self.builder, env_ptr, values)
 
         func = ir.Function(module, f.func, str(next(module.func_count)))
-        block = func.append_basic_block("entry")
-        builder = ir.IRBuilder(block)
 
-        env = func.args[0]
-        env_values = read_environment(builder, env, env_types)
-        args = dict(zip(env_names, env_values))
-        args.update(dict(zip(arg_names, func.args[1:])))
+        if f.func.args:
+            block = func.append_basic_block("entry")
+            builder = ir.IRBuilder(block)
 
-        LLVMScope(builder, args, tree.children[1], builder.ret)
+            env = func.args[0]
+            env_values = read_environment(builder, env, env_types)
+            args = dict(zip(env_names, env_values))
+            args.update(dict(zip(arg_names, func.args[1:])))
+
+            LLVMScope(builder, args, tree.children[1], builder.ret)
+        else:
+            print("ignoring function without usage")
 
         closure = ir.Constant(f, [func, ir.Undefined, ir.Undefined])
         closure = self.builder.insert_value(closure, env_size, 1)
