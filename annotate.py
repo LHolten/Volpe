@@ -108,7 +108,9 @@ class AnnotateScope(Interpreter):
 
     def returnn(self, tree: TypeTree):
         ret = self.visit(tree.children[0])
-        if not isinstance(ret, Unannotated) or self.ret is None:  # help out type inference
+        if self.ret is not None:
+            assert self.ret == ret, "different return types encountered in same block"
+        else:
             self.ret = ret
         return int1
 
