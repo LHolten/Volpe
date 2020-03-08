@@ -16,7 +16,7 @@ class LLVMScope(Interpreter):
         if tree.data == "code":
             self.visit_children(tree)
             if not builder.block.is_terminated:
-                assert False, "nothing was returned, but that should already have been checked in annotate"
+                assert False, "you forgot a return statement somewhere"
         else:
             ret(self.visit(tree))
 
