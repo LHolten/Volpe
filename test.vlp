@@ -1,12 +1,6 @@
-true = 1==1
-false = 1==0
+true = 1 == 1
+false = 1 != 1
 
-a = {
-    false -> :> {
-        :> 4
-    }
-    true -> :> 3
-    :> 2
+:> true -> {
+    :> false
 }
-
-:> a

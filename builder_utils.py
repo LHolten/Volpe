@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from typing import List
 
 from llvmlite import ir
@@ -84,3 +85,19 @@ def read_environment(b: ir.IRBuilder, ptr: ir.NamedValue, type_list: List) -> Li
         value_list.append(value)
 
     return value_list
+
+
+@contextmanager
+def options(b: ir.IRBuilder, t: ir.Type, phi) -> ir.Value:
+    new_block = b.function.append_basic_block("block")
+    with b.goto_block(new_block):
+        phi_node = b.phi(t)
+
+    def ret(value):
+        phi_node.add_incoming(value, b.block)
+        b.branch(new_block)
+
+    yield ret
+
+    b.position_at_end(new_block)
+    phi.append(phi_node)
