@@ -14,10 +14,19 @@ class LLVMScope(Interpreter):
         self.ret = ret
 
         if tree.data == "code":
-            for child in tree.children[:-1]:
-                self.visit(child)
-            self.visit_unsafe(tree.children[-1])
-            assert builder.block.is_terminated, "you forgot a return statement somewhere"
+            assert len(tree.children) > 0, "code block needs code"
+
+            def evaluate(children):
+                if len(children) == 1:
+                    self.visit_unsafe(children[0])
+                else:
+                    value = self.visit(children[0])
+                    with self.builder.if_then(value):
+                        evaluate(children[1:])
+                    builder.unreachable()
+
+            evaluate(tree.children)
+            assert builder.block.is_terminated, "you forgot a return statement at the end of a code block"
         else:
             ret(self.visit(tree))
 
