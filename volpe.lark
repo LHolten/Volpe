@@ -12,10 +12,10 @@ code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     | symbol "=>" value1 -> func
 
 ?value2: value3
-    | value2 "||" value3 -> or
+    | value2 "||" value3 -> logic_or
 
 ?value3: value4
-    | value3 "&&" value4 -> and
+    | value3 "&&" value4 -> logic_and
 
 ?value4: value5
     | ":>" value1 -> returnn
@@ -42,8 +42,9 @@ code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
 
 ?value9: value10
     | "-" value9 -> negate
-//    | value2 ".." value2 -> number_list
-//    | value2 "::" value2 -> map
+    | "!" value9 -> logic_not
+    // | value2 ".." value2 -> number_list
+    // | value2 "::" value2 -> map
 
 ?value10: symbol
     | value10 tuple -> func_call
