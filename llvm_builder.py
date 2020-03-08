@@ -3,7 +3,7 @@ from typing import Callable
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from builder_utils import write_environment, read_environment, Closure, free_environment, environment_size
+from builder_utils import write_environment, read_environment, Closure, free_environment, environment_size, options
 from util import TypeTree, int1, h_b
 
 
@@ -47,15 +47,19 @@ class LLVMScope(Interpreter):
         write_environment(self.builder, env_ptr, values)
 
         func = ir.Function(module, f.func, str(next(module.func_count)))
-        block = func.append_basic_block("entry")
-        builder = ir.IRBuilder(block)
 
-        env = func.args[0]
-        env_values = read_environment(builder, env, env_types)
-        args = dict(zip(env_names, env_values))
-        args.update(dict(zip(arg_names, func.args[1:])))
+        if f.func.args:
+            block = func.append_basic_block("entry")
+            builder = ir.IRBuilder(block)
 
-        LLVMScope(builder, args, tree.children[1], builder.ret)
+            env = func.args[0]
+            env_values = read_environment(builder, env, env_types)
+            args = dict(zip(env_names, env_values))
+            args.update(dict(zip(arg_names, func.args[1:])))
+
+            LLVMScope(builder, args, tree.children[1], builder.ret)
+        else:
+            print("ignoring function without usage")
 
         closure = ir.Constant(f, [func, ir.Undefined, ir.Undefined])
         closure = self.builder.insert_value(closure, env_size, 1)
@@ -90,25 +94,23 @@ class LLVMScope(Interpreter):
         return ir.Constant(int1, True)
 
     def code(self, tree):
-        new_block = self.builder.function.append_basic_block("block")
-        with self.builder.goto_block(new_block):
-            phi_node = self.builder.phi(tree.ret)
+        phi = []
 
-        def ret(value):
-            phi_node.add_incoming(value, self.builder.block)
-            self.builder.branch(new_block)
+        with options(self.builder, tree.ret, phi) as ret:
+            LLVMScope(self.builder, self.scope.copy(), tree, ret)
 
-        LLVMScope(self.builder, self.scope.copy(), tree, ret)
-
-        self.builder.position_at_end(new_block)
-        return phi_node
+        return phi[0]
 
     def implication(self, tree):
-        value = self.visit(tree.children[0])
-        with self.builder.if_then(value):
-            alternative_value = self.visit(tree.children[1])
+        phi = []
 
-        return self.builder.select(value, alternative_value, h_b(1))
+        with options(self.builder, tree.ret, phi) as ret:
+            value = self.visit(tree.children[0])
+            with self.builder.if_then(value):
+                ret(self.visit(tree.children[1]))
+            ret(h_b(1))
+
+        return phi[0]
 
     def tuple(self, tree):
         return tuple(self.visit_children(tree))
