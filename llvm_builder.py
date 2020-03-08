@@ -112,6 +112,32 @@ class LLVMScope(Interpreter):
 
         return phi[0]
 
+    def logic_and(self, tree):
+        phi = []
+
+        with options(self.builder, tree.ret, phi) as ret:
+            value = self.visit(tree.children[0])
+            with self.builder.if_then(value):
+                ret(self.visit(tree.children[1]))
+            ret(h_b(0))
+
+        return phi[0]
+
+    def logic_or(self, tree):
+        phi = []
+
+        with options(self.builder, tree.ret, phi) as ret:
+            value = self.visit(tree.children[0])
+            with self.builder.if_then(value):
+                ret(h_b(1))
+            ret(self.visit(tree.children[1]))
+
+        return phi[0]
+
+    def logic_not(self, tree):
+        value = self.visit_children(tree)[0]
+        return self.builder.not_(value)
+
     def tuple(self, tree):
         return tuple(self.visit_children(tree))
 
@@ -137,6 +163,10 @@ class LLVMScope(Interpreter):
     def mul(self, tree):
         values = self.visit_children(tree)
         return self.builder.extract_value(self.builder.smul_with_overflow(values[0], values[1]), 0)
+
+    def negate(self, tree):
+        value = self.visit_children(tree)[0]
+        return self.builder.neg(value)
 
     def equals(self, tree):
         values = self.visit_children(tree)
