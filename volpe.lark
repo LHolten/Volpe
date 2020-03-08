@@ -1,45 +1,53 @@
-code: _LINESEP* (all_op (_LINESEP+ all_op)* _LINESEP*)?
+code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
 
-?all_op: operation
-    | operation1
-    | operation2
+?value: value1
+    | symbol "=" value1 -> assign
+    | symbol "+=" value1 -> add_assign
+    | symbol "-=" value1 -> sub_assign
+    | symbol "/=" value1 -> div_assign
+    | symbol "*=" value1 -> mul_assign
 
-operation: value "->" value -> implication
-    | ":>" value -> returnn
+?value1: value2
+    | value2 "->" value1 -> implication
+    | symbol "=>" value1 -> func
 
-operation1: value1 "==" value1 -> equals
-    | value1 "!=" value1 -> not_equals
-    | value1 "<=" value1 -> less_equals
-    | value1 ">=" value1 -> greater_equals
-    | value1 "<" value1 -> less
-    | value1 ">" value1 -> greater
+?value2: value3
+    | value2 "||" value3 -> or
 
-?operation2: value2 "+" value2 -> add
-    | value2 "-" value2 -> sub
-    | value2 "/" value2 -> div
-    | value2 "%" value2 -> mod
-    | value2 "*" value2 -> mul
-    | value2 "**" value2 -> pow
-    | value2 ".." value2 -> number_list
-    | value2 "::" value2 -> map
-    | "-" value2 -> negate
-    | symbol "=" value2 -> assign
-    | symbol "+=" value2 -> add_assign
-    | symbol "-=" value2 -> sub_assign
-    | symbol "/=" value2 -> div_assign
-    | symbol "*=" value2 -> mul_assign
-    | WORD tuple -> func_call
+?value3: value4
+    | value3 "&&" value4 -> and
+
+?value4: value5
+    | ":>" value1 -> returnn
+
+?value5: value6
+    | value5 "==" value6 -> equals
+    | value5 "!=" value6 -> not_equals
+
+?value6: value7
+    | value6 "<=" value7 -> less_equals
+    | value6 ">=" value7 -> greater_equals
+    | value6 "<" value7 -> less
+    | value6 ">" value7 -> greater
+
+?value7: value8
+    | value7 "+" value8 -> add
+    | value7 "-" value8 -> sub
+
+?value8: value9
+    | value8 "/" value9 -> div
+    | value8 "%" value9 -> mod
+    | value8 "*" value9 -> mul
+    | value8 "**" value9 -> pow
+
+?value9: value10
+    | "-" value9 -> negate
+//    | value2 ".." value2 -> number_list
+//    | value2 "::" value2 -> map
+
+?value10: symbol
+    | value10 tuple -> func_call
     | "{" code "}"
-    | symbol
-
-?value: operation
-    | value1
-
-?value1: operation1
-    | value2
-
-?value2: operation2
-    | symbol "=>" value -> func
     | SIGNED_NUMBER -> number
     | ESCAPED_STRING -> string
 
@@ -47,8 +55,8 @@ operation1: value1 "==" value1 -> equals
     | tuple
     | list
 
-?tuple: "(" (value ("," value)*)? ")"
-list: "[" (value ("," value)*)? "]"
+?tuple: "(" (value1 ("," value1)*)? ")"
+list: "[" (value1 ("," value1)*)? "]"
 
 %import common.ESCAPED_STRING
 %import common.INT

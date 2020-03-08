@@ -38,8 +38,9 @@ class AnnotateScope(Interpreter):
 
         if tree.data == "code":
             values = self.visit_children(tree)  # sets self.ret
-            assert all([v == int1 for v in values])
-            tree.ret = self.ret or int1
+            assert all([v == int1 for v in values]), "some line does not evaluate to a bool"
+            assert self.ret, "nothing was returned"
+            tree.ret = self.ret
         else:
             self.visit(tree)  # sets tree.ret
 
@@ -61,9 +62,9 @@ class AnnotateScope(Interpreter):
         return Unannotated(new_scope, arg_names, tree.children[1])
 
     def func_call(self, tree: TypeTree) -> ir.Type:
-        func_name, arg_tree = tree.children
+        func_tree, arg_tree = tree.children
 
-        closure = self.scope[func_name.value]
+        closure = self.visit(func_tree)
         assert isinstance(closure, Unannotated)
 
         if closure.checked:  # we have already been here
