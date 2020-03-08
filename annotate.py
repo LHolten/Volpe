@@ -7,13 +7,32 @@ from builder_utils import Closure
 from util import TypeTree, int1, int32, pint8
 
 
-def math(self, tree):
+def logic(self, tree: TypeTree):
+    ret = self.visit_children(tree)
+    assert ret[0] == int1
+    assert ret[1] == int1
+    return int1
+
+
+def unary_logic(self, tree: TypeTree):
+    ret = self.visit_children(tree)[0]
+    assert ret == int1
+    return ret
+
+
+def math(self, tree: TypeTree):
     ret = self.visit_children(tree)
     assert ret[0] == ret[1]
     return ret[0]
 
 
-def comp(self, tree):
+def unary_math(self, tree: TypeTree):
+    ret = self.visit_children(tree)[0]
+    assert ret == int32
+    return ret
+
+
+def comp(self, tree: TypeTree):
     ret = self.visit_children(tree)
     assert ret[0] == ret[1]
     return int1
@@ -101,17 +120,16 @@ class AnnotateScope(Interpreter):
         self.scope[name] = self.visit(tree.children[1])
         return int1
 
-    def implication(self, tree: TypeTree):
-        ret = self.visit_children(tree)
-        assert ret[0] == int1
-        assert ret[1] == int1
-        return int1
-
     def number(self, tree):
         return int32
 
     def tuple(self, tree):
         return tuple(self.visit_children(tree))
+
+    implication = logic
+    logic_and = logic
+    logic_or = logic
+    logic_not = unary_logic
 
     add = math
     mod = math
@@ -119,6 +137,7 @@ class AnnotateScope(Interpreter):
     sub = math
     div = math
     pow = math
+    negate = unary_math
 
     equals = comp
     not_equals = comp
