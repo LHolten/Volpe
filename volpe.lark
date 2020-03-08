@@ -49,7 +49,7 @@ code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
 ?value10: symbol
     | value10 tuple -> func_call
     | "{" code "}"
-    | SIGNED_NUMBER -> number
+    | NUMBER -> number
     | ESCAPED_STRING -> string
 
 ?symbol: WORD -> symbol
@@ -69,11 +69,12 @@ list: "[" (value1 ("," value1)*)? "]"
 WORD: /[_a-zA-Z][_a-zA-Z0-9]*/
 
 NUMBER: INT | INT "." INT
-SIGNED_NUMBER: ("+"|"-")? NUMBER
 
+MULTILINE_COMMENT: "#!" /((?!!#).|\n)*/ "!#" " "*
 COMMENT: "#" /.*/
 NEWLINE: (CR? LF)
 
-_LINESEP: COMMENT NEWLINE
+_LINESEP: MULTILINE_COMMENT NEWLINE
+    | COMMENT NEWLINE
     | NEWLINE
     | ";"
