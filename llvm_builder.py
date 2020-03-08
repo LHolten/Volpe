@@ -14,11 +14,20 @@ class LLVMScope(Interpreter):
         self.ret = ret
 
         if tree.data == "code":
-            self.visit_children(tree)
-            if not builder.block.is_terminated:
-                assert False, "you forgot a return statement somewhere"
+            for child in tree.children[:-1]:
+                self.visit(child)
+            self.visit_unsafe(tree.children[-1])
+            assert builder.block.is_terminated, "you forgot a return statement somewhere"
         else:
             ret(self.visit(tree))
+
+    def visit(self, tree):
+        value = getattr(self, tree.data)(tree)
+        assert not self.builder.block.is_terminated, "dead code is not allowed"
+        return value
+
+    def visit_unsafe(self, tree):
+        return getattr(self, tree.data)(tree)
 
     def assign(self, tree):
         name = tree.children[0].children[0].value
@@ -84,14 +93,11 @@ class LLVMScope(Interpreter):
         value = self.visit(tree.children[0])
 
         environment = list(self.scope.values())
-        print(self.scope.keys())
         if value in environment:
-            print(list(self.scope.keys())[environment.index(value)])
             environment.remove(value)
         free_environment(self.builder, environment)
 
         self.ret(value)
-        return ir.Constant(int1, True)
 
     def code(self, tree):
         phi = []
@@ -107,7 +113,7 @@ class LLVMScope(Interpreter):
         with options(self.builder, tree.ret, phi) as ret:
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
-                ret(self.visit(tree.children[1]))
+                ret(self.visit_unsafe(tree.children[1]))
             ret(h_b(1))
 
         return phi[0]
@@ -118,7 +124,7 @@ class LLVMScope(Interpreter):
         with options(self.builder, tree.ret, phi) as ret:
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
-                ret(self.visit(tree.children[1]))
+                ret(self.visit_unsafe(tree.children[1]))
             ret(h_b(0))
 
         return phi[0]
@@ -130,7 +136,7 @@ class LLVMScope(Interpreter):
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
                 ret(h_b(1))
-            ret(self.visit(tree.children[1]))
+            ret(self.visit_unsafe(tree.children[1]))
 
         return phi[0]
 
