@@ -46,7 +46,7 @@ code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
 //    | value2 "::" value2 -> map
 
 ?value10: symbol
-    | WORD tuple -> func_call
+    | value10 tuple -> func_call
     | "{" code "}"
     | SIGNED_NUMBER -> number
     | ESCAPED_STRING -> string

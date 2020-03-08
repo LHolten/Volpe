@@ -67,7 +67,7 @@ class LLVMScope(Interpreter):
         if not isinstance(args, tuple):
             args = (args,)
 
-        closure = self.scope[tree.children[0].value]
+        closure = self.visit(tree.children[0])
         assert isinstance(closure.type, Closure)
 
         func_ptr = self.builder.extract_value(closure, 0)
