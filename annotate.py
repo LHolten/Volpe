@@ -7,15 +7,22 @@ from builder_utils import Closure
 from util import TypeTree, int1, int32, pint8
 
 
-def math(self, tree):
+def math(self, tree: TypeTree):
     ret = self.visit_children(tree)
     assert ret[0] == ret[1]
     return ret[0]
 
 
-def comp(self, tree):
+def comp(self, tree: TypeTree):
     ret = self.visit_children(tree)
     assert ret[0] == ret[1]
+    return int1
+
+
+def logic(self, tree: TypeTree):
+    ret = self.visit_children(tree)
+    assert ret[0] == int1
+    assert ret[1] == int1
     return int1
 
 
@@ -101,12 +108,6 @@ class AnnotateScope(Interpreter):
         self.scope[name] = self.visit(tree.children[1])
         return int1
 
-    def implication(self, tree: TypeTree):
-        ret = self.visit_children(tree)
-        assert ret[0] == int1
-        assert ret[1] == int1
-        return int1
-
     def number(self, tree):
         return int32
 
@@ -126,6 +127,10 @@ class AnnotateScope(Interpreter):
     less = comp
     greater_equals = comp
     less_equals = comp
+
+    implication = logic
+    logic_and = logic
+    logic_or = logic
 
     def __default__(self, tree):
         raise NotImplementedError("annotate", tree.data)
