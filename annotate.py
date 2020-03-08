@@ -39,7 +39,7 @@ class AnnotateScope(Interpreter):
         if tree.data == "code":
             values = self.visit_children(tree)  # sets self.ret
             assert all([v == int1 for v in values]), "some line does not evaluate to a bool"
-            assert self.ret, "nothing was returned"
+            assert self.ret, "void methods should return true"
             tree.ret = self.ret
         else:
             self.visit(tree)  # sets tree.ret
