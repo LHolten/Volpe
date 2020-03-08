@@ -94,8 +94,9 @@ def options(b: ir.IRBuilder, t: ir.Type, phi) -> ir.Value:
         phi_node = b.phi(t)
 
     def ret(value):
-        phi_node.add_incoming(value, b.block)
-        b.branch(new_block)
+        if not b.block.is_terminated:
+            phi_node.add_incoming(value, b.block)
+            b.branch(new_block)
 
     yield ret
 
