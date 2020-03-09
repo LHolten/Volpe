@@ -38,11 +38,12 @@ code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     | value8 "/" value9 -> div
     | value8 "%" value9 -> mod
     | value8 "*" value9 -> mul
-    | value8 "**" value9 -> pow
+    | value8 "**" value9 -> power
 
 ?value9: value10
     | "-" value9 -> negate
     | "!" value9 -> logic_not
+    | "~" value9 -> convert
     // | value2 ".." value2 -> number_list
     // | value2 "::" value2 -> map
 

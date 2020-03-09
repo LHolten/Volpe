@@ -153,6 +153,17 @@ class AnnotateScope(Interpreter):
     def floating(self, tree: TypeTree):
         return flt32
 
+    def convert(self, tree: TypeTree):
+        ret = self.visit_children(tree)[0]
+        if ret == int32:
+            tree.data = tree.data + "_int"
+            return flt32
+        elif ret == flt32:
+            tree.data = tree.data + "_flt"
+            return int32
+        else:
+            raise AssertionError("convertion only work for integers and floats")
+
     def collect_tuple(self, tree: TypeTree):
         return tuple(self.visit_children(tree))
 
