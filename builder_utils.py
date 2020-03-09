@@ -25,7 +25,7 @@ def environment_size(b: ir.IRBuilder, value_list: List) -> int:
     return total
 
 
-def free_environment(b: ir.IRBuilder, value_list: List) -> None:
+def free_environment(b: ir.IRBuilder, value_list: set) -> None:
     for value in value_list:
         if isinstance(value.type, Closure):
             env_ptr = b.extract_value(value, 2)
