@@ -5,7 +5,7 @@ from llvmlite import ir
 
 from builder_utils import write_environment, Closure, free_environment, environment_size, options, \
     read_environment
-from util import TypeTree, int1, make_bool, pint8, int32
+from util import TypeTree, int1, make_bool, pint8, int32, make_flt
 
 
 class LLVMScope(Interpreter):
@@ -235,9 +235,8 @@ class LLVMScope(Interpreter):
         return self.builder.fmul(values[0], values[1])
 
     def negate_flt(self, tree: TypeTree):
-        # Same as int?
         value = self.visit_children(tree)[0]
-        return self.builder.neg(value)
+        return self.builder.fsub(make_flt(0), value)
 
     def equals_flt(self, tree: TypeTree):
         values = self.visit_children(tree)
