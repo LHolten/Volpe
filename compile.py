@@ -1,10 +1,10 @@
-from ctypes import CFUNCTYPE, c_int32, c_bool
+from ctypes import CFUNCTYPE, c_int32, c_bool, c_float
 
 import llvmlite.binding as llvm
 
 
 # All these initializations are required for code generation!
-from util import int32
+from util import int32, flt32
 
 llvm.initialize()
 llvm.initialize_native_target()
@@ -31,6 +31,8 @@ def compile_and_run(llvm_ir, result_type):
     func_ptr = engine.get_function_address("main")
     if result_type == int32:
         func = CFUNCTYPE(c_int32)(func_ptr)
+    elif result_type == flt32:
+        func = CFUNCTYPE(c_float)(func_ptr)
     else:
         func = CFUNCTYPE(c_bool)(func_ptr)
 

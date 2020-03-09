@@ -1,12 +1,20 @@
 step = (x, n) => {
-    x == 1 -> :> n
+    x == 1.0 -> :> n
     new_x = {
-        x % 2 == 0 -> :> x / 2
-        :> 3 * x + 1
+        x % 2.0 == 0.0 -> :> x / 2.0
+        :> 3.0 * x + 1.0
     }
-    :> @(new_x, n + 1)
+    :> @(new_x, n + 1.0)
 }
 
-collatz = x => step(x, 0)
+collatz = x => step(x, 0.0)
 
-:> collatz(7)
+# collatz working even with floats :^)
+collatz(7.0) == 16.0
+
+# nan showcase
+isnan = x => !(x == x)
+
+a = 0.0 / 0.0
+
+:> isnan(a)
