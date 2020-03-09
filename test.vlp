@@ -1,20 +1,26 @@
-step = (x, n) => {
-    x == 1.0 -> :> n
-    new_x = {
-        x % 2.0 == 0.0 -> :> x / 2.0
-        :> 3.0 * x + 1.0
-    }
-    :> @(new_x, n + 1.0)
+factorial = x => {
+    x < 2 -> :> 1
+    :> x * @(x - 1) 
 }
 
-collatz = x => step(x, 0.0)
+recursive_calc_e = (e, n) => {
+    # output result
+    n == 0 -> :> e
 
-# collatz working even with floats :^)
-collatz(7.0) == 16.0
+    # get next term (working backwards)
+    term = 1.0 / ~factorial(n)
 
-# nan showcase
-isnan = x => !(x == x)
+    # add onto result
+    :> @(e + term, n - 1)
+}
 
-a = 0.0 / 0.0
+calculate_e = n => {
+    # asserts that n is positive
+    # also that it is an int (during compilation)
+    n >= 0
+    :> recursive_calc_e(1.0, n)
+}
 
-:> isnan(a)
+e = calculate_e(10)
+
+:> e
