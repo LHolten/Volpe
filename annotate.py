@@ -53,17 +53,25 @@ class Unannotated(Closure):
 class AnnotateScope(Interpreter):
     def __init__(self, scope: Dict, tree: TypeTree, closure: Unannotated, is_func):
         self.scope = scope
-        self.ret = None
+        self.tree = tree
         self.closure = closure
         self.is_func = is_func
 
         if tree.data == "code":
             values = self.visit_children(tree)  # sets self.ret
             assert all([v == int1 for v in values]), "some line does not evaluate to a bool"
-            assert self.ret, "void methods should return true"
-            tree.ret = self.ret
         else:
-            self.visit(tree)  # sets tree.ret
+            self.update_return(self.visit(tree))
+
+        assert self.tree.ret, "void methods should return true"
+
+    def update_return(self, ret):
+        if self.tree.ret is not None:
+            assert self.tree.ret == ret, "different return types encountered in same block"
+        self.tree.ret = ret
+        if self.is_func:
+            func = ir.FunctionType(ret, self.closure.func.args)
+            self.closure.update(func)
 
     def visit(self, tree: TypeTree):
         tree.ret = getattr(self, tree.data)(tree)
@@ -107,14 +115,7 @@ class AnnotateScope(Interpreter):
         return self.closure
 
     def returnn(self, tree: TypeTree):
-        ret = self.visit(tree.children[0])
-        if not isinstance(ret, ir.VoidType):
-            if self.ret is not None:
-                assert self.ret == ret, "different return types encountered in same block"
-            self.ret = ret
-            if self.is_func:
-                func = ir.FunctionType(ret, self.closure.func.args)
-                self.closure.update(func)
+        self.update_return(self.visit(tree.children[0]))
         return int1
 
     def symbol(self, tree: TypeTree):
