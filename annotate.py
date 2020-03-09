@@ -78,7 +78,8 @@ class AnnotateScope(Interpreter):
         return tree.ret
 
     def code(self, tree: TypeTree):
-        return AnnotateScope(self.scope.copy(), tree, self.closure, False).ret
+        AnnotateScope(self.scope.copy(), tree, self.closure, False)
+        return tree.ret
 
     def func(self, tree: TypeTree):
         new_scope = self.scope.copy()
