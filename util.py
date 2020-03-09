@@ -21,6 +21,10 @@ def make_int(n):
     return ir.Constant(int32, n)
 
 
+def make_flt(n):
+    return ir.Constant(flt32, n)
+
+
 def make_bool(n):
     return ir.Constant(int1, n)
 

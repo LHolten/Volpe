@@ -149,57 +149,60 @@ class LLVMScope(Interpreter):
         value = self.visit_children(tree)[0]
         return self.builder.not_(value)
 
-    def tuple(self, tree: TypeTree):
+    def collect_tuple(self, tree: TypeTree):
         return tuple(self.visit_children(tree))
 
-    def number(self, tree: TypeTree):
+    def integer(self, tree: TypeTree):
         return ir.Constant(tree.ret, tree.children[0].value)
 
-    def add(self, tree: TypeTree):
+    def floating(self, tree: TypeTree):
+        return ir.Constant(tree.ret, tree.children[0].value)
+
+    def add_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.add(values[0], values[1])
 
-    def sub(self, tree: TypeTree):
+    def sub_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.sub(values[0], values[1])
 
-    def mod(self, tree: TypeTree):
+    def mod_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.srem(values[0], values[1])
 
-    def div(self, tree: TypeTree):
+    def div_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.sdiv(values[0], values[1])
 
-    def mul(self, tree: TypeTree):
+    def mul_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.extract_value(self.builder.smul_with_overflow(values[0], values[1]), 0)
 
-    def negate(self, tree: TypeTree):
+    def negate_int(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
         return self.builder.neg(value)
 
-    def equals(self, tree: TypeTree):
+    def equals_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed("==", values[0], values[1])
 
-    def not_equals(self, tree: TypeTree):
+    def not_equals_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed("!=", values[0], values[1])
 
-    def greater(self, tree: TypeTree):
+    def greater_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed(">", values[0], values[1])
 
-    def less(self, tree: TypeTree):
+    def less_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed("<", values[0], values[1])
 
-    def greater_equals(self, tree: TypeTree):
+    def greater_equals_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed(">=", values[0], values[1])
 
-    def less_equals(self, tree: TypeTree):
+    def less_equals_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed("<=", values[0], values[1])
 
