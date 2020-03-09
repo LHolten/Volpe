@@ -3,16 +3,18 @@ import itertools
 from lark import Lark
 from llvmlite import ir
 
-from annotate import AnnotateScope
+from annotate import AnnotateScope, Unannotated
 from compile import compile_and_run
-from llvm_builder import LLVMScope
-from util import TypeTree, pint8, int32
+from llvm_builder import LLVMScope, build_function
+from util import TypeTree, pint8, int32, h
 
 
 def volpe_llvm(tree: TypeTree):
     print(tree.pretty())
 
-    AnnotateScope({}, tree)
+    closure = Unannotated({}, [], tree)
+    closure.update(ir.FunctionType(ir.VoidType(), [pint8]))
+    AnnotateScope({}, tree, closure, True)
 
     print(tree.pretty())
 
@@ -21,15 +23,18 @@ def volpe_llvm(tree: TypeTree):
     module.malloc = ir.Function(module, ir.FunctionType(pint8, [int32]), "malloc")
     module.free = ir.Function(module, ir.FunctionType(ir.VoidType(), [pint8]), "free")
     module.memcpy = module.declare_intrinsic('llvm.memcpy', [pint8, pint8, int32])
-    func_type = ir.FunctionType(tree.ret, ())
-    func = ir.Function(module, func_type, "main")
-    block = func.append_basic_block("entry")
-    builder = ir.IRBuilder(block)
-    LLVMScope(builder, {}, tree, builder.ret, set())
+
+    func = ir.Function(module, closure.func, str(next(module.func_count)))
+    build_function(func, [], [], [], tree)
+
+    main_func = ir.Function(module, ir.FunctionType(closure.func.return_type, []), "main")
+    builder = ir.IRBuilder(main_func.append_basic_block("start"))
+    env = builder.call(module.malloc, [h(0)])
+    builder.ret(builder.call(func, [env]))
 
     print(module)
 
-    compile_and_run(str(module), func_type.return_type)
+    compile_and_run(str(module), tree.ret)
     # return scope.visit(tree)
 
 

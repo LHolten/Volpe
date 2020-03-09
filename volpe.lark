@@ -51,6 +51,7 @@ code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     | "{" code "}"
     | NUMBER -> number
     | ESCAPED_STRING -> string
+    | "@" -> this_func
 
 ?symbol: WORD -> symbol
     | tuple
