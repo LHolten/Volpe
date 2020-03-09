@@ -8,9 +8,10 @@ from util import TypeTree, int1, h_b
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, scope: dict, tree: TypeTree, ret: Callable):
+    def __init__(self, builder: ir.IRBuilder, scope: dict, tree: TypeTree, ret: Callable, old_scope: set):
         self.builder = builder
         self.scope = scope
+        self.old_scope = old_scope
         self.ret = ret
 
         if tree.data == "code":
@@ -75,7 +76,7 @@ class LLVMScope(Interpreter):
             args = dict(zip(env_names, env_values))
             args.update(dict(zip(arg_names, func.args[1:])))
 
-            LLVMScope(builder, args, tree.children[1], builder.ret)
+            LLVMScope(builder, args, tree.children[1], builder.ret, set())
         else:
             print("ignoring function without usage")
 
@@ -101,10 +102,8 @@ class LLVMScope(Interpreter):
     def returnn(self, tree):
         value = self.visit(tree.children[0])
 
-        environment = list(self.scope.values())
-        if value in environment:
-            environment.remove(value)
-        free_environment(self.builder, environment)
+        scope = set(self.scope.values()) - {value} - self.old_scope
+        free_environment(self.builder, scope)
 
         self.ret(value)
 
@@ -112,7 +111,7 @@ class LLVMScope(Interpreter):
         phi = []
 
         with options(self.builder, tree.ret, phi) as ret:
-            LLVMScope(self.builder, self.scope.copy(), tree, ret)
+            LLVMScope(self.builder, self.scope.copy(), tree, ret, set(self.scope.values()))
 
         return phi[0]
 
@@ -157,6 +156,7 @@ class LLVMScope(Interpreter):
         return tuple(self.visit_children(tree))
 
     def number(self, tree):
+        print(tree.ret, tree.children[0].value)
         return ir.Constant(tree.ret, tree.children[0].value)
 
     def add(self, tree):

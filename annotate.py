@@ -81,16 +81,14 @@ class AnnotateScope(Interpreter):
         return Unannotated(new_scope, arg_names, tree.children[1])
 
     def func_call(self, tree: TypeTree) -> ir.Type:
-        func_tree, arg_tree = tree.children
+        closure, arg_types = self.visit_children(tree)
 
-        closure = self.visit(func_tree)
         assert isinstance(closure, Unannotated)
 
         if closure.checked:  # we have already been here
             return closure.func.return_type
         closure.checked = True
 
-        arg_types = self.visit(arg_tree)
         if not isinstance(arg_types, tuple):
             arg_types = (arg_types,)
 
