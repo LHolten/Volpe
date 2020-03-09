@@ -4,37 +4,57 @@ from lark.visitors import Interpreter
 from llvmlite import ir
 
 from builder_utils import Closure
-from util import TypeTree, int1, int32, pint8
+from util import TypeTree, int1, int32, pint8, flt32
 
 
 def logic(self, tree: TypeTree):
     ret = self.visit_children(tree)
-    assert ret[0] == int1
-    assert ret[1] == int1
+    assert ret[0] == int1 and ret[1] == int1, "logic operations only work for booleans"
     return int1
 
 
 def unary_logic(self, tree: TypeTree):
     ret = self.visit_children(tree)[0]
-    assert ret == int1
-    return ret
+    assert ret == int1, "unary logic operations only work for booleans"
+    return int1
 
 
 def math(self, tree: TypeTree):
-    ret = self.visit_children(tree)
-    assert ret[0] == ret[1]
-    return ret[0]
+    children = self.visit_children(tree)
+    ret0 = children[0]
+    ret1 = children[1]
+    assert ret0 == ret1, "types need to match for math operations"
+    if ret0 == int32:
+        tree.data = tree.data + "_int"
+    elif ret0 == flt32:
+        tree.data = tree.data + "_flt"
+    else:
+        raise AssertionError("math operations only work for integers and floats")
+    return ret0
 
 
 def unary_math(self, tree: TypeTree):
     ret = self.visit_children(tree)[0]
-    assert ret == int32
+    if ret == int32:
+        tree.data = tree.data + "_int"
+    elif ret == flt32:
+        tree.data = tree.data + "_flt"
+    else:
+        raise AssertionError("unary math operations only work for integers and floats")
     return ret
 
 
 def comp(self, tree: TypeTree):
-    ret = self.visit_children(tree)
-    assert ret[0] == ret[1]
+    children = self.visit_children(tree)
+    ret0 = children[0]
+    ret1 = children[1]
+    assert ret0 == ret1, "types need to match for comparisons"
+    if ret0 == int32:
+        tree.data = tree.data + "_int"
+    elif ret0 == flt32:
+        tree.data = tree.data + "_flt"
+    else:
+        raise AssertionError("comparisons only work for integers and floats")
     return int1
 
 
@@ -127,25 +147,31 @@ class AnnotateScope(Interpreter):
         self.scope[name] = self.visit(tree.children[1])
         return int1
 
-    def number(self, tree):
+    def integer(self, tree: TypeTree):
         return int32
 
-    def tuple(self, tree):
+    def floating(self, tree: TypeTree):
+        return flt32
+
+    def collect_tuple(self, tree: TypeTree):
         return tuple(self.visit_children(tree))
 
+    # Boolean logic
     implication = logic
     logic_and = logic
     logic_or = logic
     logic_not = unary_logic
 
+    # Mathematics
     add = math
     mod = math
     mul = math
     sub = math
     div = math
-    pow = math
+    # power = math
     negate = unary_math
 
+    # Comparison
     equals = comp
     not_equals = comp
     greater = comp
@@ -153,5 +179,5 @@ class AnnotateScope(Interpreter):
     greater_equals = comp
     less_equals = comp
 
-    def __default__(self, tree):
+    def __default__(self, tree: TypeTree):
         raise NotImplementedError("annotate", tree.data)

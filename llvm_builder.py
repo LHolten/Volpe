@@ -5,7 +5,7 @@ from llvmlite import ir
 
 from builder_utils import write_environment, Closure, free_environment, environment_size, options, \
     read_environment
-from util import TypeTree, int1, h_b, pint8, int32
+from util import TypeTree, int1, make_bool, pint8, int32, make_flt
 
 
 class LLVMScope(Interpreter):
@@ -33,15 +33,15 @@ class LLVMScope(Interpreter):
         else:
             ret(self.visit(tree))
 
-    def visit(self, tree):
+    def visit(self, tree: TypeTree):
         value = getattr(self, tree.data)(tree)
         assert not self.builder.block.is_terminated, "dead code is not allowed"
         return value
 
-    def visit_unsafe(self, tree):
+    def visit_unsafe(self, tree: TypeTree):
         return getattr(self, tree.data)(tree)
 
-    def assign(self, tree):
+    def assign(self, tree: TypeTree):
         name = tree.children[0].children[0].value
         self.scope[name] = self.visit(tree.children[1])
         return ir.Constant(int1, True)
@@ -49,7 +49,7 @@ class LLVMScope(Interpreter):
     def symbol(self, tree: TypeTree):
         return self.scope[tree.children[0].value]
 
-    def func(self, tree):
+    def func(self, tree: TypeTree):
         if tree.children[0].data == "symbol":
             arg_names = (tree.children[0].children[0].value,)
         else:
@@ -79,7 +79,7 @@ class LLVMScope(Interpreter):
         closure = self.builder.insert_value(closure, env_ptr, 2)
         return closure
 
-    def func_call(self, tree):
+    def func_call(self, tree: TypeTree):
         args = self.visit(tree.children[1])
         if not isinstance(args, tuple):
             args = (args,)
@@ -96,7 +96,7 @@ class LLVMScope(Interpreter):
     def this_func(self, tree: TypeTree):
         return self.closure
 
-    def returnn(self, tree):
+    def returnn(self, tree: TypeTree):
         value = self.visit(tree.children[0])
 
         scope = set(self.scope.values()) - {value} - self.old_scope
@@ -104,7 +104,7 @@ class LLVMScope(Interpreter):
 
         self.ret(value)
 
-    def code(self, tree):
+    def code(self, tree: TypeTree):
         phi = []
 
         with options(self.builder, tree.ret, phi) as ret:
@@ -112,98 +112,157 @@ class LLVMScope(Interpreter):
 
         return phi[0]
 
-    def implication(self, tree):
+    def implication(self, tree: TypeTree):
         phi = []
 
         with options(self.builder, tree.ret, phi) as ret:
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
                 ret(self.visit_unsafe(tree.children[1]))
-            ret(h_b(1))
+            ret(make_bool(1))
 
         return phi[0]
 
-    def logic_and(self, tree):
+    def logic_and(self, tree: TypeTree):
         phi = []
 
         with options(self.builder, tree.ret, phi) as ret:
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
                 ret(self.visit_unsafe(tree.children[1]))
-            ret(h_b(0))
+            ret(make_bool(0))
 
         return phi[0]
 
-    def logic_or(self, tree):
+    def logic_or(self, tree: TypeTree):
         phi = []
 
         with options(self.builder, tree.ret, phi) as ret:
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
-                ret(h_b(1))
+                ret(make_bool(1))
             ret(self.visit_unsafe(tree.children[1]))
 
         return phi[0]
 
-    def logic_not(self, tree):
+    def logic_not(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
         return self.builder.not_(value)
 
-    def tuple(self, tree):
+    def collect_tuple(self, tree: TypeTree):
         return tuple(self.visit_children(tree))
-
-    def number(self, tree):
+        
+    # Integers
+    def integer(self, tree: TypeTree):
         return ir.Constant(tree.ret, tree.children[0].value)
 
-    def add(self, tree):
+    def add_int(self, tree: TypeTree):
+        # TODO Use overflow bit to raise runtime error
+        # self.builder.extract_value(self.builder.sadd_with_overflow(values[0], values[1]), 0)
         values = self.visit_children(tree)
         return self.builder.add(values[0], values[1])
 
-    def sub(self, tree):
+    def sub_int(self, tree: TypeTree):
+        # TODO Use overflow bit to raise runtime error
+        # self.builder.extract_value(self.builder.ssub_with_overflow(values[0], values[1]), 0)
         values = self.visit_children(tree)
         return self.builder.sub(values[0], values[1])
 
-    def mod(self, tree):
+    def mod_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.srem(values[0], values[1])
 
-    def div(self, tree):
+    def div_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.sdiv(values[0], values[1])
 
-    def mul(self, tree):
+    def mul_int(self, tree: TypeTree):
+        # TODO Use overflow bit to raise runtime error
+        # self.builder.extract_value(self.builder.smul_with_overflow(values[0], values[1]), 0)
         values = self.visit_children(tree)
         return self.builder.extract_value(self.builder.smul_with_overflow(values[0], values[1]), 0)
 
-    def negate(self, tree):
+    def negate_int(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
         return self.builder.neg(value)
 
-    def equals(self, tree):
+    def equals_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed("==", values[0], values[1])
 
-    def not_equals(self, tree):
+    def not_equals_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed("!=", values[0], values[1])
 
-    def greater(self, tree):
+    def greater_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed(">", values[0], values[1])
 
-    def less(self, tree):
+    def less_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed("<", values[0], values[1])
 
-    def greater_equals(self, tree):
+    def greater_equals_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed(">=", values[0], values[1])
 
-    def less_equals(self, tree):
+    def less_equals_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed("<=", values[0], values[1])
 
-    def __default__(self, tree):
+    # Floating point numbers
+    def floating(self, tree: TypeTree):
+        return ir.Constant(tree.ret, float(tree.children[0].value))
+
+    def add_flt(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        return self.builder.fadd(values[0], values[1])
+
+    def sub_flt(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        return self.builder.fsub(values[0], values[1])
+
+    def mod_flt(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        return self.builder.frem(values[0], values[1])
+
+    def div_flt(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        return self.builder.fdiv(values[0], values[1])
+
+    def mul_flt(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        return self.builder.fmul(values[0], values[1])
+
+    def negate_flt(self, tree: TypeTree):
+        value = self.visit_children(tree)[0]
+        return self.builder.fsub(make_flt(0), value)
+
+    def equals_flt(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        return self.builder.fcmp_ordered("==", values[0], values[1])
+
+    def not_equals_flt(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        return self.builder.fcmp_ordered("!=", values[0], values[1])
+
+    def greater_flt(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        return self.builder.fcmp_ordered(">", values[0], values[1])
+
+    def less_flt(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        return self.builder.fcmp_ordered("<", values[0], values[1])
+
+    def greater_equals_flt(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        return self.builder.fcmp_ordered(">=", values[0], values[1])
+
+    def less_equals_flt(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        return self.builder.fcmp_ordered("<=", values[0], values[1])
+
+    def __default__(self, tree: TypeTree):
         raise NotImplementedError("llvm", tree.data)
 
 

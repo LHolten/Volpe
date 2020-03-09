@@ -47,18 +47,19 @@ code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     // | value2 "::" value2 -> map
 
 ?value10: symbol
-    | value10 tuple -> func_call
+    | value10 collect_tuple -> func_call
     | "{" code "}"
-    | NUMBER -> number
+    | INTEGER -> integer
+    | FLOATING -> floating
     | ESCAPED_STRING -> string
     | "@" -> this_func
 
 ?symbol: WORD -> symbol
-    | tuple
-    | list
+    | collect_tuple
+    | collect_list
 
-?tuple: "(" (value1 ("," value1)*)? ")"
-list: "[" (value1 ("," value1)*)? "]"
+?collect_tuple: "(" (value1 ("," value1)*)? ")"
+collect_list: "[" (value1 ("," value1)*)? "]"
 
 %import common.ESCAPED_STRING
 %import common.INT
@@ -69,7 +70,8 @@ list: "[" (value1 ("," value1)*)? "]"
 
 WORD: /[_a-zA-Z][_a-zA-Z0-9]*/
 
-NUMBER: INT | INT "." INT
+INTEGER: INT
+FLOATING: INT "." INT
 
 MULTILINE_COMMENT: "#!" /((?!!#).|\n)*/ "!#" " "*
 COMMENT: "#" /.*/
