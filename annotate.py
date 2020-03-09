@@ -4,7 +4,7 @@ from lark.visitors import Interpreter
 from llvmlite import ir
 
 from builder_utils import Closure
-from util import TypeTree, int1, int32, pint8
+from util import TypeTree, int1, int32, pint8, flt32
 
 
 def logic(self, tree: TypeTree):
@@ -22,8 +22,9 @@ def unary_logic(self, tree: TypeTree):
 
 def math(self, tree: TypeTree):
     ret = self.visit_children(tree)
-    assert ret[0] == ret[1]
-    return ret[0]
+    assert ret[0] == int32
+    assert ret[1] == int32
+    return int32
 
 
 def unary_math(self, tree: TypeTree):
@@ -34,7 +35,8 @@ def unary_math(self, tree: TypeTree):
 
 def comp(self, tree: TypeTree):
     ret = self.visit_children(tree)
-    assert ret[0] == ret[1]
+    assert ret[0] == int32
+    assert ret[1] == int32
     return int1
 
 
@@ -127,10 +129,10 @@ class AnnotateScope(Interpreter):
         self.scope[name] = self.visit(tree.children[1])
         return int1
 
-    def number(self, tree):
+    def number(self, tree: TypeTree):
         return int32
 
-    def tuple(self, tree):
+    def tuple(self, tree: TypeTree):
         return tuple(self.visit_children(tree))
 
     implication = logic
@@ -153,5 +155,5 @@ class AnnotateScope(Interpreter):
     greater_equals = comp
     less_equals = comp
 
-    def __default__(self, tree):
+    def __default__(self, tree: TypeTree):
         raise NotImplementedError("annotate", tree.data)
