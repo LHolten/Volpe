@@ -51,9 +51,11 @@ class Unannotated(Closure):
 
 
 class AnnotateScope(Interpreter):
-    def __init__(self, scope: Dict, tree: TypeTree):
+    def __init__(self, scope: Dict, tree: TypeTree, closure: Unannotated, is_func):
         self.scope = scope
         self.ret = None
+        self.closure = closure
+        self.is_func = is_func
 
         if tree.data == "code":
             values = self.visit_children(tree)  # sets self.ret
@@ -68,7 +70,7 @@ class AnnotateScope(Interpreter):
         return tree.ret
 
     def code(self, tree: TypeTree):
-        return AnnotateScope(self.scope.copy(), tree).ret
+        return AnnotateScope(self.scope.copy(), tree, self.closure, False).ret
 
     def func(self, tree: TypeTree):
         new_scope = self.scope.copy()
@@ -95,21 +97,24 @@ class AnnotateScope(Interpreter):
         scope = closure.scope
         scope.update(dict(zip(closure.arg_names, arg_types)))
 
-        AnnotateScope(scope, closure.code)
-        return_type = closure.code.ret
+        closure.update(ir.FunctionType(ir.VoidType(), [pint8, *arg_types]))
 
-        func = ir.FunctionType(return_type, [pint8, *arg_types])
+        AnnotateScope(scope, closure.code, closure, True)
 
-        closure.update(func)
+        return closure.func.return_type
 
-        return return_type
+    def this_func(self, tree: TypeTree):
+        return self.closure
 
     def returnn(self, tree: TypeTree):
         ret = self.visit(tree.children[0])
-        if self.ret is not None:
-            assert self.ret == ret, "different return types encountered in same block"
-        else:
+        if not isinstance(ret, ir.VoidType):
+            if self.ret is not None:
+                assert self.ret == ret, "different return types encountered in same block"
             self.ret = ret
+            if self.is_func:
+                func = ir.FunctionType(ret, self.closure.func.args)
+                self.closure.update(func)
         return int1
 
     def symbol(self, tree: TypeTree):

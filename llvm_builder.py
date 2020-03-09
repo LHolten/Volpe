@@ -3,16 +3,18 @@ from typing import Callable
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from builder_utils import write_environment, read_environment, Closure, free_environment, environment_size, options
-from util import TypeTree, int1, h_b
+from builder_utils import write_environment, Closure, free_environment, environment_size, options, \
+    read_environment
+from util import TypeTree, int1, h_b, pint8, int32
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, scope: dict, tree: TypeTree, ret: Callable, old_scope: set):
+    def __init__(self, builder: ir.IRBuilder, scope: dict, tree: TypeTree, ret: Callable, old_scope: set, closure: Closure):
         self.builder = builder
         self.scope = scope
         self.old_scope = old_scope
         self.ret = ret
+        self.closure = closure
 
         if tree.data == "code":
             assert len(tree.children) > 0, "code block needs code"
@@ -68,15 +70,7 @@ class LLVMScope(Interpreter):
         func = ir.Function(module, f.func, str(next(module.func_count)))
 
         if f.func.args:
-            block = func.append_basic_block("entry")
-            builder = ir.IRBuilder(block)
-
-            env = func.args[0]
-            env_values = read_environment(builder, env, env_types)
-            args = dict(zip(env_names, env_values))
-            args.update(dict(zip(arg_names, func.args[1:])))
-
-            LLVMScope(builder, args, tree.children[1], builder.ret, set())
+            build_function(func, env_names, env_types, arg_names, tree.children[1])
         else:
             print("ignoring function without usage")
 
@@ -99,6 +93,9 @@ class LLVMScope(Interpreter):
 
         return self.builder.call(func_ptr, [env_ptr, *args])
 
+    def this_func(self, tree: TypeTree):
+        return self.closure
+
     def returnn(self, tree):
         value = self.visit(tree.children[0])
 
@@ -111,7 +108,7 @@ class LLVMScope(Interpreter):
         phi = []
 
         with options(self.builder, tree.ret, phi) as ret:
-            LLVMScope(self.builder, self.scope.copy(), tree, ret, set(self.scope.values()))
+            LLVMScope(self.builder, self.scope.copy(), tree, ret, set(self.scope.values()), self.closure)
 
         return phi[0]
 
@@ -156,7 +153,6 @@ class LLVMScope(Interpreter):
         return tuple(self.visit_children(tree))
 
     def number(self, tree):
-        print(tree.ret, tree.children[0].value)
         return ir.Constant(tree.ret, tree.children[0].value)
 
     def add(self, tree):
@@ -209,3 +205,20 @@ class LLVMScope(Interpreter):
 
     def __default__(self, tree):
         raise NotImplementedError("llvm", tree.data)
+
+
+def build_function(func: ir.Function, env_names, env_types, arg_names, code):
+    block = func.append_basic_block("entry")
+    builder = ir.IRBuilder(block)
+
+    env = func.args[0]
+    env_values = read_environment(builder, env, env_types)
+    args = dict(zip(env_names, env_values))
+    args.update(dict(zip(arg_names, func.args[1:])))
+
+    this_env_size = environment_size(builder, env_values)
+    closure = ir.Constant(Closure(func.type), [func, ir.Undefined, ir.Undefined])
+    closure = builder.insert_value(closure, this_env_size, 1)
+    closure = builder.insert_value(closure, env, 2)
+
+    LLVMScope(builder, args, code, builder.ret, set(), closure)
