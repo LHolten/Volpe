@@ -6,7 +6,7 @@ from llvmlite import ir
 from annotate import AnnotateScope, Unannotated
 from compile import compile_and_run
 from llvm_builder import LLVMScope, build_function
-from util import TypeTree, pint8, int32, h
+from util import TypeTree, pint8, int32, make_int
 
 
 def volpe_llvm(tree: TypeTree):
@@ -29,7 +29,7 @@ def volpe_llvm(tree: TypeTree):
 
     main_func = ir.Function(module, ir.FunctionType(closure.func.return_type, []), "main")
     builder = ir.IRBuilder(main_func.append_basic_block("start"))
-    env = builder.call(module.malloc, [h(0)])
+    env = builder.call(module.malloc, [make_int(0)])
     builder.ret(builder.call(func, [env]))
 
     print(module)

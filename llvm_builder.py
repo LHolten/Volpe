@@ -5,7 +5,7 @@ from llvmlite import ir
 
 from builder_utils import write_environment, Closure, free_environment, environment_size, options, \
     read_environment
-from util import TypeTree, int1, h_b, pint8, int32
+from util import TypeTree, int1, make_bool, pint8, int32
 
 
 class LLVMScope(Interpreter):
@@ -119,7 +119,7 @@ class LLVMScope(Interpreter):
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
                 ret(self.visit_unsafe(tree.children[1]))
-            ret(h_b(1))
+            ret(make_bool(1))
 
         return phi[0]
 
@@ -130,7 +130,7 @@ class LLVMScope(Interpreter):
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
                 ret(self.visit_unsafe(tree.children[1]))
-            ret(h_b(0))
+            ret(make_bool(0))
 
         return phi[0]
 
@@ -140,7 +140,7 @@ class LLVMScope(Interpreter):
         with options(self.builder, tree.ret, phi) as ret:
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
-                ret(h_b(1))
+                ret(make_bool(1))
             ret(self.visit_unsafe(tree.children[1]))
 
         return phi[0]
