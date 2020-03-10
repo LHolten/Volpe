@@ -7,8 +7,9 @@ from llvmlite import ir
 
 from annotate import AnnotateScope, Unannotated
 from compile import compile_and_run
-from llvm_builder import LLVMScope, build_function
-from util import TypeTree, pint8, int32, make_int
+from builder import LLVMScope, build_function
+from volpe_types import pint8, int32, make_int
+from tree import TypeTree
 
 
 def volpe_llvm(tree: TypeTree, verbose=False):

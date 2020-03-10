@@ -1,5 +1,4 @@
 import llvmlite.binding as llvm
-from lark import Tree
 from llvmlite import ir
 
 llvm.initialize()
@@ -29,10 +28,5 @@ def make_bool(n):
     return ir.Constant(int1, n)
 
 
-class TypeTree(Tree):
-    ret = None
-
-    def _pretty_label(self):
-        if self.ret is not None:
-            return f'{self.data}: {self.ret}'
-        return self.data
+class VolpeTuple(ir.LiteralStructType):
+    pass

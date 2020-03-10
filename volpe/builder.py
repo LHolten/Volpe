@@ -4,8 +4,9 @@ from lark.visitors import Interpreter
 from llvmlite import ir
 
 from builder_utils import write_environment, Closure, free_environment, environment_size, options, \
-    read_environment
-from util import TypeTree, int1, make_bool, pint8, int32, make_flt, flt32
+    read_environment, tuple_assign
+from volpe_types import int1, make_bool, pint8, int32, make_flt, flt32
+from tree import TypeTree
 
 
 class LLVMScope(Interpreter):
@@ -42,8 +43,7 @@ class LLVMScope(Interpreter):
         return getattr(self, tree.data)(tree)
 
     def assign(self, tree: TypeTree):
-        name = tree.children[0].children[0].value
-        self.scope[name] = self.visit(tree.children[1])
+        tuple_assign(self.scope, self.builder, tree.children[0], self.visit(tree.children[1]))
         return ir.Constant(int1, True)
 
     def symbol(self, tree: TypeTree):
@@ -150,7 +150,10 @@ class LLVMScope(Interpreter):
         return self.builder.not_(value)
 
     def collect_tuple(self, tree: TypeTree):
-        return tuple(self.visit_children(tree))
+        value = ir.Constant(tree.ret, ir.Undefined)
+        for i, v in enumerate(self.visit_children(tree)):
+            value = self.builder.insert_value(value, v, i)
+        return value
         
     # Integers
     def integer(self, tree: TypeTree):

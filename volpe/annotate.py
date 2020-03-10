@@ -3,8 +3,10 @@ from typing import Dict
 from lark.visitors import Interpreter
 from llvmlite import ir
 
+from annotate_utils import tuple_assign
 from builder_utils import Closure
-from util import TypeTree, int1, int32, pint8, flt32
+from volpe_types import int1, int32, pint8, flt32, VolpeTuple
+from tree import TypeTree
 
 
 def logic(self, tree: TypeTree):
@@ -143,8 +145,7 @@ class AnnotateScope(Interpreter):
         return self.scope[tree.children[0].value]
 
     def assign(self, tree: TypeTree):
-        name = tree.children[0].children[0].value
-        self.scope[name] = self.visit(tree.children[1])
+        tuple_assign(self.scope, tree.children[0], self.visit(tree.children[1]))
         return int1
 
     def integer(self, tree: TypeTree):
@@ -165,7 +166,7 @@ class AnnotateScope(Interpreter):
             raise AssertionError("convertion only work for integers and floats")
 
     def collect_tuple(self, tree: TypeTree):
-        return tuple(self.visit_children(tree))
+        return VolpeTuple(self.visit_children(tree))
 
     # Boolean logic
     implication = logic

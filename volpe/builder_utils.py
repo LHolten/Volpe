@@ -1,9 +1,10 @@
 from contextlib import contextmanager
-from typing import List
+from typing import List, Dict
 
 from llvmlite import ir
 
-from util import make_int, pint8, int32, target_data, make_bool
+from tree import TypeTree
+from volpe_types import make_int, pint8, int32, target_data, make_bool, VolpeTuple
 
 
 class Closure(ir.LiteralStructType):
@@ -102,3 +103,11 @@ def options(b: ir.IRBuilder, t: ir.Type, phi) -> ir.Value:
 
     b.position_at_end(new_block)
     phi.append(phi_node)
+
+
+def tuple_assign(scope: Dict, b: ir.IRBuilder, tree: TypeTree, value):
+    if tree.data == "collect_tuple":
+        for i, child in enumerate(tree.children):
+            tuple_assign(scope, b, child, b.extract_value(value, i))
+    else:
+        scope[tree.children[0].value] = value

@@ -14,6 +14,7 @@ import os
 from sys import version_info
 from docopt import docopt
 
+
 def install():
     path_to_volpe = os.path.abspath(os.path.dirname(__file__))
     # print("PATH:\n", os.environ["PATH"])
@@ -45,6 +46,7 @@ def install():
 
         print("Please restart this console for changes to take effect.")
 
+
 def compile_and_run(file_path, verbose=False):
     from run_volpe import run
 
@@ -52,6 +54,7 @@ def compile_and_run(file_path, verbose=False):
     assert os.path.exists(file_path), f"Could not find file: {file_path}"
 
     run(file_path, verbose=verbose)
+
 
 if __name__ == '__main__':
     assert version_info >= (3, 7, 0), "You need Python 3.7 or higher."
@@ -62,6 +65,3 @@ if __name__ == '__main__':
         install()
     else:
         compile_and_run(args["<file_path>"], args["--verbose"])
-
-
-    
