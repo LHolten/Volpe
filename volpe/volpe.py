@@ -1,5 +1,7 @@
 import itertools
 
+from os import path
+
 from lark import Lark
 from llvmlite import ir
 
@@ -9,14 +11,16 @@ from llvm_builder import LLVMScope, build_function
 from util import TypeTree, pint8, int32, make_int
 
 
-def volpe_llvm(tree: TypeTree):
-    print(tree.pretty())
+def volpe_llvm(tree: TypeTree, verbose=False):
+    if verbose:
+        print(tree.pretty())
 
     closure = Unannotated({}, [], tree)
     closure.update(ir.FunctionType(ir.VoidType(), [pint8]))
     AnnotateScope({}, tree, closure, True)
 
-    print(tree.pretty())
+    if verbose:
+        print(tree.pretty())
 
     module = ir.Module("program")
     module.func_count = itertools.count()
@@ -32,19 +36,20 @@ def volpe_llvm(tree: TypeTree):
     env = builder.call(module.malloc, [make_int(0)])
     builder.ret(builder.call(func, [env]))
 
-    print(module)
+    if verbose:
+        print(module)
 
     compile_and_run(str(module), tree.ret)
     # return scope.visit(tree)
 
 
-def main():
-    volpe_parser = Lark(open("volpe.lark"), start='code', parser='lalr', tree_class=TypeTree, debug=True)
-    parsed_tree = volpe_parser.parse(open("test.vlp").read())
+def run(file_path, verbose=False):
+    base_path = path.dirname(__file__)
+    path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
+    with open(path_to_lark) as lark_file:
+        volpe_parser = Lark(lark_file, start='code', parser='lalr', tree_class=TypeTree, debug=verbose)
+    with open(file_path) as vlp_file:
+        parsed_tree = volpe_parser.parse(vlp_file.read())
     # print(parsed_tree.pretty())
-    volpe_llvm(parsed_tree)
+    volpe_llvm(parsed_tree, verbose)
     # llvm_ir()
-
-
-if __name__ == '__main__':
-    main()
