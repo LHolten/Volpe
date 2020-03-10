@@ -1,3 +1,2 @@
-docopt
 lark-parser
 llvmlite
