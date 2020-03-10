@@ -4,7 +4,7 @@
 
 1. You need Python 3.7.0 or higher. [Install here.](https://www.python.org/downloads/)
 2. You need pip, the Python package manager. It should come pre-installed with Python.
-3. Install the needed packages by running `python volpe install` from the root directory.
+3. Install the needed packages by running `pip install -r requirements.txt` from the root directory.
 
 ## How to use
 
