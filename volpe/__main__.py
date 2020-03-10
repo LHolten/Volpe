@@ -15,6 +15,9 @@ from docopt import docopt
 
 
 if __name__ == '__main__':
+    from sys import version_info
+    assert version_info >= (3, 7, 0), "You need Python 3.7 or higher."
+
     args = docopt(__doc__)
 
     # Install requirements.txt
