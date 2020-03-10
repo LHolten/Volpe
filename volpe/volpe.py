@@ -27,6 +27,7 @@ def install():
         import winreg
         reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Environment')
         path = winreg.QueryValueEx(reg_key, 'Path')[0]
+        # Add Volpe path to user path.
         path_with_volpe = path + os.pathsep + path_to_volpe
         print("setting local user PATH...")
         os.system(f'SETX Path "{path_with_volpe}"')
