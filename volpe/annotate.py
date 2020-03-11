@@ -3,8 +3,7 @@ from typing import Dict
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from annotate_utils import tuple_assign
-from builder_utils import Closure
+from annotate_utils import tuple_assign, Unannotated
 from volpe_types import int1, int32, pint8, flt32, VolpeTuple
 from tree import TypeTree
 
@@ -58,18 +57,6 @@ def comp(self, tree: TypeTree):
     else:
         raise AssertionError("comparisons only work for integers and floats")
     return int1
-
-
-class Unannotated(Closure):
-    def __init__(self, scope, arg_names, code):
-        super().__init__(ir.FunctionType(ir.VoidType(), []).as_pointer())
-        self.scope = scope
-        self.arg_names = arg_names
-        self.code = code
-        self.checked = False
-
-    def update(self, func: ir.FunctionType):
-        super().__init__(func.as_pointer())
 
 
 class AnnotateScope(Interpreter):

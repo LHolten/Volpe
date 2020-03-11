@@ -3,15 +3,15 @@ from typing import Callable
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from annotate import Unannotated
-from builder_utils import write_environment, Closure, free_environment, environment_size, options, \
-    read_environment, tuple_assign
-from volpe_types import int1, make_bool, pint8, int32, make_flt, flt32
+from annotate_utils import Unannotated
+from builder_utils import write_environment, Closure, free_environment, options, \
+    read_environment, tuple_assign, build_func
 from tree import TypeTree
+from volpe_types import int1, make_bool, make_flt, flt32, copy_func, free_func
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, scope: dict, tree: TypeTree, ret: Callable, old_scope: set, closure: Closure):
+    def __init__(self, builder: ir.IRBuilder, scope: dict, tree: TypeTree, ret: Callable, old_scope: set, closure):
         self.builder = builder
         self.scope = scope
         self.old_scope = old_scope
@@ -54,25 +54,45 @@ class LLVMScope(Interpreter):
         f = tree.ret
         assert isinstance(f, Unannotated)
 
+        module = self.builder.module
         env_values = list(self.scope.values())
         env_types = list(v.type for v in env_values)
         env_names = list(self.scope.keys())
 
-        module = self.builder.module
-        env_size = environment_size(self.builder, env_values)
-        env_ptr = self.builder.call(module.malloc, [env_size])
-        write_environment(self.builder, env_ptr, env_values)
+        func_name = str(next(module.func_count))
 
-        func = ir.Function(module, f.func, str(next(module.func_count)))
+        c_func = ir.Function(module, copy_func, func_name + ".copy")
+        with build_func(c_func) as (b, args):
+            new_values = read_environment(b, args[0], env_types)
+            new_ptr = write_environment(b, new_values)
+            b.ret(new_ptr)
 
-        if f.checked:
-            build_function(func, env_names, env_types, tree.children[:-1], tree.children[-1])
-        else:
-            print("ignoring function without usage")
+        f_func = ir.Function(module, free_func, func_name + ".free")
+        with build_func(f_func) as (b, args):
+            new_values = read_environment(b, args[0], env_types)
+            free_environment(b, set(new_values))
+            b.call(b.module.free, args)
+            b.ret_void()
 
-        closure = ir.Constant(f, [func, ir.Undefined, ir.Undefined])
-        closure = self.builder.insert_value(closure, env_size, 1)
-        closure = self.builder.insert_value(closure, env_ptr, 2)
+        func = ir.Function(module, f.func, func_name)
+        with build_func(func) as (b, args):
+            if f.checked:
+                new_values = read_environment(b, args[0], env_types)
+                new_scope = dict(zip(env_names, new_values))
+                for a, t in zip(tree.children[:-1], args[1:]):
+                    tuple_assign(new_scope, b, a, t)
+
+                closure = ir.Constant(f, [func, c_func, f_func, ir.Undefined])
+                closure = b.insert_value(closure, args[0], 3)
+
+                LLVMScope(b, new_scope, tree.children[-1], b.ret, set(new_values), closure)
+            else:
+                b.ret_void()
+                print("ignoring function without usage")
+
+        closure = ir.Constant(f, [func, c_func, f_func, ir.Undefined])
+        env_ptr = write_environment(self.builder, env_values)
+        closure = self.builder.insert_value(closure, env_ptr, 3)
         return closure
 
     def func_call(self, tree: TypeTree):
@@ -81,11 +101,10 @@ class LLVMScope(Interpreter):
 
         assert isinstance(closure.type, Closure)
 
-        func_ptr = self.builder.extract_value(closure, 0)
-        env_size = self.builder.extract_value(closure, 1)
-        env_ptr = self.builder.extract_value(closure, 2)
+        func = self.builder.extract_value(closure, 0)
+        env_ptr = self.builder.extract_value(closure, 3)
 
-        return self.builder.call(func_ptr, [env_ptr, *args])
+        return self.builder.call(func, [env_ptr, *args])
 
     def this_func(self, tree: TypeTree):
         return self.closure
@@ -270,21 +289,3 @@ class LLVMScope(Interpreter):
 
     def __default__(self, tree: TypeTree):
         raise NotImplementedError("llvm", tree.data)
-
-
-def build_function(func: ir.Function, env_names, env_types, arg_names, code):
-    block = func.append_basic_block("entry")
-    builder = ir.IRBuilder(block)
-
-    env = func.args[0]
-    env_values = read_environment(builder, env, env_types)
-    args = dict(zip(env_names, env_values))
-    for a, t in zip(arg_names, func.args[1:]):
-        tuple_assign(args, builder, a, t)
-
-    this_env_size = environment_size(builder, env_values)
-    closure = ir.Constant(Closure(func.type), [func, ir.Undefined, ir.Undefined])
-    closure = builder.insert_value(closure, this_env_size, 1)
-    closure = builder.insert_value(closure, env, 2)
-
-    LLVMScope(builder, args, code, builder.ret, set(), closure)

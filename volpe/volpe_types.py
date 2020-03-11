@@ -12,6 +12,8 @@ pint8 = int8.as_pointer()
 flt32 = ir.FloatType()
 flt64 = ir.DoubleType()
 unknown = ir.VoidType()
+copy_func = ir.FunctionType(pint8, [pint8])
+free_func = ir.FunctionType(unknown, [pint8])
 
 target_data = llvm.Target.from_default_triple().create_target_machine().target_data
 

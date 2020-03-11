@@ -4,85 +4,48 @@ from typing import List, Dict
 from llvmlite import ir
 
 from tree import TypeTree
-from volpe_types import make_int, pint8, int32, target_data, make_bool, VolpeTuple
+from volpe_types import make_int, pint8, int32, target_data, make_bool, VolpeTuple, copy_func, free_func
 
 
 class Closure(ir.LiteralStructType):
-    def __init__(self, func_ptr: ir.PointerType):
-        super().__init__([func_ptr, int32, pint8])
-        self.func: ir.FunctionType = func_ptr.pointee
+    def __init__(self, func: ir.FunctionType):
+        super().__init__([func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
+        self.func: ir.FunctionType = func
 
 
-def environment_size(b: ir.IRBuilder, value_list: List) -> int:
-    total = make_int(0)
+def free_environment(b: ir.IRBuilder, value_set: set) -> None:
+    for value in value_set:
+        free(b, value)
 
-    for value in value_list:
+
+def free(b, value):
+    if isinstance(value.type, Closure):
+        f_func = b.extract_value(value, 2)
+        env_ptr = b.extract_value(value, 3)
+        b.call(f_func, [env_ptr])
+
+
+def write_environment(b: ir.IRBuilder, value_list: List):
+    env_type = ir.LiteralStructType([value.type for value in value_list])
+    untyped_ptr = b.call(b.module.malloc, [make_int(env_type.get_abi_size(target_data))])
+    ptr = b.bitcast(untyped_ptr, env_type.as_pointer())
+
+    for i, value in enumerate(value_list):
         if isinstance(value.type, Closure):
-            total = b.add(total, make_int(value.type.get_abi_size(target_data) - pint8.get_abi_size(target_data)))
-            total = b.add(total, b.extract_value(value, 1))
-        else:
-            total = b.add(total, make_int(value.type.get_abi_size(target_data)))
+            env_copy = b.call(b.extract_value(value, 1), [b.extract_value(value, 3)])
+            value = b.insert_value(value, env_copy, 3)
+        b.store(value, b.gep(ptr, [make_int(0), make_int(i)]))
 
-    return total
-
-
-def free_environment(b: ir.IRBuilder, value_list: set) -> None:
-    for value in value_list:
-        if isinstance(value.type, Closure):
-            env_ptr = b.extract_value(value, 2)
-            b.call(b.module.free, [env_ptr])
+    return untyped_ptr
 
 
-def write_environment(b: ir.IRBuilder, ptr: ir.NamedValue, value_list: List) -> None:
-    for value in value_list:
-        if isinstance(value.type, Closure):
-            func_ptr = b.extract_value(value, 0)
-            env_size = b.extract_value(value, 1)
-            env_pointer = b.extract_value(value, 2)
+def read_environment(b: ir.IRBuilder, untyped_ptr: ir.NamedValue, type_list: List) -> List[ir.NamedValue]:
+    env_type = ir.LiteralStructType(type_list)
+    ptr = b.bitcast(untyped_ptr, env_type.as_pointer())
 
-            # need to store every part manually to not overwrite anything
-            ptr = b.bitcast(ptr, value.type.elements[0].as_pointer())
-            b.store(func_ptr, ptr)
-            ptr = b.gep(ptr, (make_int(1),))
-            ptr = b.bitcast(ptr, value.type.elements[1].as_pointer())
-            b.store(env_size, ptr)
-            ptr = b.gep(ptr, (make_int(1),))
-            env_ptr = b.bitcast(ptr, pint8)
-            ptr = b.gep(env_ptr, (env_size,))
-
-            b.call(b.module.memcpy, [env_ptr, env_pointer, env_size, make_bool(0)])
-        else:
-            ptr = b.bitcast(ptr, value.type.as_pointer())
-            b.store(value, ptr)
-            ptr = b.gep(ptr, (make_int(1),))
-
-
-def read_environment(b: ir.IRBuilder, ptr: ir.NamedValue, type_list: List) -> List[ir.NamedValue]:
     value_list = []
-
-    for t in type_list:
-        if isinstance(t, Closure):
-            ptr = b.bitcast(ptr, t.elements[0].as_pointer())
-            func_ptr = b.load(ptr)
-            ptr = b.gep(ptr, (make_int(1),))
-            ptr = b.bitcast(ptr, t.elements[1].as_pointer())
-            env_size = b.load(ptr)
-            ptr = b.gep(ptr, (make_int(1),))
-            env_ptr = b.bitcast(ptr, pint8)
-            ptr = b.gep(env_ptr, (env_size,))
-
-            env_pointer = b.call(b.module.malloc, [env_size])
-            b.call(b.module.memcpy, [env_pointer, env_ptr, env_size, make_bool(0)])
-
-            value = ir.Constant(t, ir.Undefined)
-            value = b.insert_value(value, func_ptr, 0)
-            value = b.insert_value(value, env_size, 1)
-            value = b.insert_value(value, env_pointer, 2)
-        else:
-            ptr = b.bitcast(ptr, t.as_pointer())
-            value = b.load(ptr)
-            ptr = b.gep(ptr, (make_int(1),))
-
+    for i, t in enumerate(type_list):
+        value = b.load(b.gep(ptr, [make_int(0), make_int(i)]))
         value_list.append(value)
 
     return value_list
@@ -105,9 +68,19 @@ def options(b: ir.IRBuilder, t: ir.Type, phi) -> ir.Value:
     phi.append(phi_node)
 
 
+@contextmanager
+def build_func(func: ir.Function):
+    block = func.append_basic_block("entry")
+    builder = ir.IRBuilder(block)
+
+    yield builder, func.args
+
+
 def tuple_assign(scope: Dict, b: ir.IRBuilder, tree: TypeTree, value):
     if tree.data == "shape":
         for i, child in enumerate(tree.children):
             tuple_assign(scope, b, child, b.extract_value(value, i))
     else:
+        if tree.children[0].value in scope:
+            free(b, scope[tree.children[0].value])
         scope[tree.children[0].value] = value
