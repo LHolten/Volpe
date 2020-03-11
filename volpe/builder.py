@@ -5,7 +5,7 @@ from llvmlite import ir
 
 from annotate_utils import Unannotated
 from builder_utils import write_environment, Closure, free_environment, options, \
-    read_environment, tuple_assign, build_func
+    read_environment, tuple_assign, build_func, copy
 from tree import TypeTree
 from volpe_types import int1, make_bool, make_flt, flt32, copy_func, free_func
 
@@ -33,7 +33,12 @@ class LLVMScope(Interpreter):
             evaluate(tree.children)
             assert builder.block.is_terminated, "you forgot a return statement at the end of a code block"
         else:
-            ret(self.visit(tree))
+            value = self.visit(tree)
+
+            scope = set(self.scope.values()) - self.old_scope
+            free_environment(self.builder, scope)
+
+            ret(value)
 
     def visit(self, tree: TypeTree):
         value = getattr(self, tree.data)(tree)
@@ -97,7 +102,7 @@ class LLVMScope(Interpreter):
 
     def func_call(self, tree: TypeTree):
         closure = self.visit(tree.children[0])
-        args = [self.visit(child) for child in tree.children[1:]]
+        args = [copy(self.builder, self.visit(child)) for child in tree.children[1:]]
 
         assert isinstance(closure.type, Closure)
 

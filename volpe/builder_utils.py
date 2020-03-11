@@ -23,6 +23,19 @@ def free(b, value):
         f_func = b.extract_value(value, 2)
         env_ptr = b.extract_value(value, 3)
         b.call(f_func, [env_ptr])
+    if isinstance(value.type, VolpeTuple):
+        for i in range(len(value.type.elements)):
+            free(b, b.extract_value(value, i))
+
+
+def copy(b, value):
+    if isinstance(value.type, Closure):
+        env_copy = b.call(b.extract_value(value, 1), [b.extract_value(value, 3)])
+        value = b.insert_value(value, env_copy, 3)
+    if isinstance(value.type, VolpeTuple):
+        for i in range(len(value.type.elements)):
+            value = b.insert_value(value, copy(b, b.extract_value(value, i)), i)
+    return value
 
 
 def write_environment(b: ir.IRBuilder, value_list: List):
@@ -31,10 +44,7 @@ def write_environment(b: ir.IRBuilder, value_list: List):
     ptr = b.bitcast(untyped_ptr, env_type.as_pointer())
 
     for i, value in enumerate(value_list):
-        if isinstance(value.type, Closure):
-            env_copy = b.call(b.extract_value(value, 1), [b.extract_value(value, 3)])
-            value = b.insert_value(value, env_copy, 3)
-        b.store(value, b.gep(ptr, [make_int(0), make_int(i)]))
+        b.store(copy(b, value), b.gep(ptr, [make_int(0), make_int(i)]))
 
     return untyped_ptr
 
