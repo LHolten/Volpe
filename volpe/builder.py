@@ -49,7 +49,10 @@ class LLVMScope(Interpreter):
         return getattr(self, tree.data)(tree)
 
     def assign(self, tree: TypeTree):
-        tuple_assign(self.scope, self.builder, tree.children[0], self.visit(tree.children[1]))
+        value = self.visit(tree.children[1])
+        if value in self.scope.values():
+            value = copy(self.builder, value)
+        tuple_assign(self.scope, self.builder, tree.children[0], value)
         return ir.Constant(int1, True)
 
     def symbol(self, tree: TypeTree):
@@ -102,7 +105,10 @@ class LLVMScope(Interpreter):
 
     def func_call(self, tree: TypeTree):
         closure = self.visit(tree.children[0])
-        args = [copy(self.builder, self.visit(child)) for child in tree.children[1:]]
+        args = [self.visit(child) for child in tree.children[1:]]
+        for i, a in enumerate(args):
+            if a in self.scope.values():
+                args[i] = copy(self.builder, a)
 
         assert isinstance(closure.type, Closure)
 
