@@ -48,7 +48,7 @@ def run(file_path, verbose=False):
     base_path = path.dirname(__file__)
     path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
     with open(path_to_lark) as lark_file:
-        volpe_parser = Lark(lark_file, start='code', parser='lalr', tree_class=TypeTree, debug=verbose)
+        volpe_parser = Lark(lark_file, start='code', parser='earley', tree_class=TypeTree)
     with open(file_path) as vlp_file:
         parsed_tree = volpe_parser.parse(vlp_file.read())
     # print(parsed_tree.pretty())

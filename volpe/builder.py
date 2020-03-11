@@ -3,6 +3,7 @@ from typing import Callable
 from lark.visitors import Interpreter
 from llvmlite import ir
 
+from annotate import Unannotated
 from builder_utils import write_environment, Closure, free_environment, environment_size, options, \
     read_environment, tuple_assign
 from volpe_types import int1, make_bool, pint8, int32, make_flt, flt32
@@ -50,27 +51,22 @@ class LLVMScope(Interpreter):
         return self.scope[tree.children[0].value]
 
     def func(self, tree: TypeTree):
-        if tree.children[0].data == "symbol":
-            arg_names = (tree.children[0].children[0].value,)
-        else:
-            arg_names = (a.children[0].value for a in tree.children[0].children)
-
         f = tree.ret
-        assert isinstance(f, Closure)
+        assert isinstance(f, Unannotated)
 
-        values = list(self.scope.values())
-        env_types = list(v.type for v in values)
+        env_values = list(self.scope.values())
+        env_types = list(v.type for v in env_values)
         env_names = list(self.scope.keys())
 
         module = self.builder.module
-        env_size = environment_size(self.builder, values)
+        env_size = environment_size(self.builder, env_values)
         env_ptr = self.builder.call(module.malloc, [env_size])
-        write_environment(self.builder, env_ptr, values)
+        write_environment(self.builder, env_ptr, env_values)
 
         func = ir.Function(module, f.func, str(next(module.func_count)))
 
-        if f.func.args:
-            build_function(func, env_names, env_types, arg_names, tree.children[1])
+        if f.checked:
+            build_function(func, env_names, env_types, tree.children[:-1], tree.children[-1])
         else:
             print("ignoring function without usage")
 
@@ -80,11 +76,9 @@ class LLVMScope(Interpreter):
         return closure
 
     def func_call(self, tree: TypeTree):
-        args = self.visit(tree.children[1])
-        if not isinstance(args, tuple):
-            args = (args,)
-
         closure = self.visit(tree.children[0])
+        args = [self.visit(child) for child in tree.children[1:]]
+
         assert isinstance(closure.type, Closure)
 
         func_ptr = self.builder.extract_value(closure, 0)
@@ -285,7 +279,8 @@ def build_function(func: ir.Function, env_names, env_types, arg_names, code):
     env = func.args[0]
     env_values = read_environment(builder, env, env_types)
     args = dict(zip(env_names, env_values))
-    args.update(dict(zip(arg_names, func.args[1:])))
+    for a, t in zip(arg_names, func.args[1:]):
+        tuple_assign(args, builder, a, t)
 
     this_env_size = environment_size(builder, env_values)
     closure = ir.Constant(Closure(func.type), [func, ir.Undefined, ir.Undefined])

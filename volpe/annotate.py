@@ -106,27 +106,22 @@ class AnnotateScope(Interpreter):
     def func(self, tree: TypeTree):
         new_scope = self.scope.copy()
 
-        if tree.children[0].data == "symbol":
-            arg_names = [tree.children[0].children[0].value]
-        else:
-            arg_names = [a.children[0].value for a in tree.children[0].children]
-
-        return Unannotated(new_scope, arg_names, tree.children[1])
+        return Unannotated(new_scope, tree.children[:-1], tree.children[-1])
 
     def func_call(self, tree: TypeTree) -> ir.Type:
-        closure, arg_types = self.visit_children(tree)
+        closure = self.visit(tree.children[0])
+        arg_types = [self.visit(child) for child in tree.children[1:]]
 
         assert isinstance(closure, Unannotated)
+        assert len(closure.arg_names) == len(arg_types), "func call with wrong number of arguments"
 
         if closure.checked:  # we have already been here
             return closure.func.return_type
         closure.checked = True
 
-        if not isinstance(arg_types, tuple):
-            arg_types = (arg_types,)
-
         scope = closure.scope
-        scope.update(dict(zip(closure.arg_names, arg_types)))
+        for a, t in zip(closure.arg_names, arg_types):
+            tuple_assign(scope, a, t)
 
         closure.update(ir.FunctionType(ir.VoidType(), [pint8, *arg_types]))
 

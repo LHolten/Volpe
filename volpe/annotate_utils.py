@@ -5,7 +5,7 @@ from volpe_types import VolpeTuple
 
 
 def tuple_assign(scope: Dict, tree: TypeTree, value_type):
-    if tree.data == "collect_tuple":
+    if tree.data == "shape":
         assert isinstance(value_type, VolpeTuple), "can only destructure tuples"
         assert len(tree.children) == len(value_type.elements)
 

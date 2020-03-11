@@ -106,7 +106,7 @@ def options(b: ir.IRBuilder, t: ir.Type, phi) -> ir.Value:
 
 
 def tuple_assign(scope: Dict, b: ir.IRBuilder, tree: TypeTree, value):
-    if tree.data == "collect_tuple":
+    if tree.data == "shape":
         for i, child in enumerate(tree.children):
             tuple_assign(scope, b, child, b.extract_value(value, i))
     else:

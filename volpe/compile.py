@@ -4,7 +4,7 @@ import llvmlite.binding as llvm
 
 
 # All these initializations are required for code generation!
-from volpe_types import int32, flt32
+from volpe_types import int32, flt32, VolpeTuple
 
 llvm.initialize()
 llvm.initialize_native_target()
@@ -33,6 +33,8 @@ def compile_and_run(llvm_ir, result_type):
         func = CFUNCTYPE(c_int32)(func_ptr)
     elif result_type == flt32:
         func = CFUNCTYPE(c_float)(func_ptr)
+    # elif isinstance(result_type, VolpeTuple):
+    #     c_type =
     else:
         func = CFUNCTYPE(c_bool)(func_ptr)
 

@@ -1,15 +1,16 @@
 code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
 
 ?value: value1
-    | symbol "=" value1 -> assign
-    | symbol "+=" value1 -> add_assign
-    | symbol "-=" value1 -> sub_assign
-    | symbol "/=" value1 -> div_assign
-    | symbol "*=" value1 -> mul_assign
+    | shape "=" value1 -> assign
+    | shape "+=" value1 -> add_assign
+    | shape "-=" value1 -> sub_assign
+    | shape "/=" value1 -> div_assign
+    | shape "*=" value1 -> mul_assign
 
 ?value1: value2
     | value2 "->" value1 -> implication
-    | symbol "=>" value1 -> func
+    | "(" (shape ("," shape)*)? ")" "=>" value1 -> func
+    | token "=>" value1 -> func
 
 ?value2: value3
     | value2 "||" value3 -> logic_or
@@ -47,29 +48,30 @@ code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     // | value2 ".." value2 -> number_list
     // | value2 "::" value2 -> map
 
-?value10: symbol
-    | value10 collect_tuple -> func_call
+?value10: func
     | "{" code "}"
+    | "(" value1 ")"
+    | "(" value1 "," value1 ("," value1)* ")" -> collect_tuple
+    // | "[" (value1 ("," value1)*)? "]" -> collect_list
     | INTEGER -> integer
     | FLOATING -> floating
-    | ESCAPED_STRING -> string
+    // | ESCAPED_STRING -> string
+
+func: CNAME -> symbol
+    | func "(" (value1 ("," value1)*)? ")" -> func_call
     | "@" -> this_func
 
-?symbol: WORD -> symbol
-    | collect_tuple
-    | collect_list
-
-?collect_tuple: "(" (value1 ("," value1)*)? ")"
-collect_list: "[" (value1 ("," value1)*)? "]"
+?shape: token
+    | "(" shape "," shape ("," shape)* ")"
+token: CNAME
 
 %import common.ESCAPED_STRING
 %import common.INT
-%import common.WS
 %import common.CR
 %import common.LF
+%import common.CNAME
 %ignore WS
-
-WORD: /[_a-zA-Z][_a-zA-Z0-9]*/
+WS: /[ \t\f]/+
 
 INTEGER: INT
 FLOATING: INT "." INT
