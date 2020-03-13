@@ -5,13 +5,13 @@ from os import path
 from lark import Lark
 from llvmlite import ir
 
-from annotate import AnnotateScope
-from annotate_utils import Unannotated
-from builder import LLVMScope
-from builder_utils import build_func, Closure
-from compile import compile_and_run
-from volpe_types import pint8, int32, make_int
-from tree import TypeTree
+from volpe.annotate import AnnotateScope
+from volpe.annotate_utils import Unannotated
+from volpe.builder import LLVMScope
+from volpe.builder_utils import build_func, Closure
+from volpe.compile import compile_and_run
+from volpe.volpe_types import pint8, int32, make_int
+from volpe.tree import TypeTree
 
 
 def volpe_llvm(tree: TypeTree, verbose=False):

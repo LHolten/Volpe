@@ -3,11 +3,11 @@ from typing import Callable
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from annotate_utils import Unannotated
-from builder_utils import write_environment, Closure, free_environment, options, \
+from volpe.annotate_utils import Unannotated
+from volpe.builder_utils import write_environment, Closure, free_environment, options, \
     read_environment, tuple_assign, build_func, copy
-from tree import TypeTree
-from volpe_types import int1, make_bool, make_flt, flt32, copy_func, free_func
+from volpe.tree import TypeTree
+from volpe.volpe_types import int1, make_bool, make_flt, flt32, copy_func, free_func
 
 
 class LLVMScope(Interpreter):

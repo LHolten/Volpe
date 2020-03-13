@@ -64,7 +64,7 @@ def install():
 
 
 def compile_and_run(file_path, verbose=False):
-    from run_volpe import run
+    from volpe.run_volpe import run
 
     assert file_path.split(".")[-1] == "vlp", "Volpe files have the file ending .vlp"
     assert os.path.exists(file_path), f"Could not find file: {file_path}"

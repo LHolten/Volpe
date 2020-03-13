@@ -2,9 +2,9 @@ from typing import Dict
 
 from llvmlite import ir
 
-from builder_utils import Closure
-from tree import TypeTree
-from volpe_types import VolpeTuple
+from volpe.builder_utils import Closure
+from volpe.tree import TypeTree
+from volpe.volpe_types import VolpeTuple
 
 
 class Unannotated(Closure):

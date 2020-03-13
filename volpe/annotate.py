@@ -3,9 +3,9 @@ from typing import Dict
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from annotate_utils import tuple_assign, Unannotated
-from volpe_types import int1, int32, pint8, flt32, VolpeTuple
-from tree import TypeTree
+from volpe.annotate_utils import tuple_assign, Unannotated
+from volpe.volpe_types import int1, int32, pint8, flt32, VolpeTuple
+from volpe.tree import TypeTree
 
 
 def logic(self, tree: TypeTree):
