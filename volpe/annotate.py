@@ -45,6 +45,20 @@ def unary_math(self, tree: TypeTree):
     return ret
 
 
+def math_assign(self, tree: TypeTree):
+    symbol = tree.children[0]
+    symbol.data = "symbol"
+    expression = tree.children[1]
+
+    # Make the current node an assign.
+    operation = tree.data.replace("_assign", "")
+    tree.data = "assign"
+
+    # Make a child node with the math operation.
+    tree.children[1] = TypeTree(operation, [symbol, expression])
+
+    return self.visit(tree)
+
 def comp(self, tree: TypeTree):
     children = self.visit_children(tree)
     ret0 = children[0]
@@ -164,6 +178,11 @@ class AnnotateScope(Interpreter):
     div = math
     # power = math
     negate = unary_math
+    add_assign = math_assign
+    sub_assign = math_assign
+    mul_assign = math_assign
+    div_assign = math_assign
+    mod_assign = math_assign
 
     # Comparison
     equals = comp

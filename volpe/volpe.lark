@@ -2,10 +2,12 @@ code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
 
 ?value: value1
     | shape "=" value1 -> assign
-    | shape "+=" value1 -> add_assign
-    | shape "-=" value1 -> sub_assign
-    | shape "/=" value1 -> div_assign
-    | shape "*=" value1 -> mul_assign
+    | token "+=" value1 -> add_assign
+    | token "-=" value1 -> sub_assign
+    | token "/=" value1 -> div_assign
+    | token "*=" value1 -> mul_assign
+    // | token "%=" value1 -> mod_assign
+    // | toekn "**=" value1 -> power_assign
 
 ?value1: value2
     | value2 "->" value1 -> implication
@@ -39,7 +41,7 @@ code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     | value8 "/" value9 -> div
     | value8 "%" value9 -> mod
     | value8 "*" value9 -> mul
-    | value8 "**" value9 -> power
+    // | value8 "**" value9 -> power
 
 ?value9: value10
     | "-" value9 -> negate
