@@ -19,29 +19,38 @@ def install():
     # Look up user path in registry.
     import winreg
     reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Environment')
-    path = winreg.QueryValueEx(reg_key, 'Path')[0]
+    path = winreg.QueryValueEx(reg_key, "Path")[0]
 
-    path_to_volpe = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+    path_to_volpe = os.path.abspath(os.path.dirname(__file__))
+    path_to_volpe_root = os.path.dirname(path_to_volpe)
 
-    if path_to_volpe in path:
-        print("Volpe already on PATH")
+    # Update the .bat file
+    print("updating batch file with volpe directory")
+    with open(os.path.join(path_to_volpe_root, "volpe.bat"), "w") as OPATH:
+        OPATH.writelines(["@echo off\n", f"python {path_to_volpe} %*"])
+    print("=====")
+
+    if path_to_volpe_root in path:
+        print("Volpe already on PATH.")
         
         if not path_to_volpe in os.environ["PATH"]:
             print("Please restart this console for changes to take effect.")
 
     else:
         # Add Volpe path to user path.
-        print(f"adding {path_to_volpe} to user PATH")
-        path_with_volpe = path + os.pathsep + path_to_volpe
-        print("setting local user PATH")
+        print(f"Adding {path_to_volpe_root} to user PATH.")
+        path_with_volpe = path + os.pathsep + path_to_volpe_root
+        print("Setting local user PATH.")
         os.system(f'SETX Path "{path_with_volpe}"')
         
         print("=====")
         print("Please restart this console for changes to take effect.")
 
+    
+
 
 def compile_and_run(file_path, verbose=False):
-    from volpe.run_volpe import run
+    from run_volpe import run
 
     assert file_path.split(".")[-1] == "vlp", "Volpe files have the file ending .vlp"
     assert os.path.exists(file_path), f"Could not find file: {file_path}"

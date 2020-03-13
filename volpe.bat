@@ -1,3 +1,3 @@
 @echo off
-cd /D "%~dp0"
-python volpe/__main__.py %*
+rem this will be overwritten once you run volpe add-path
+python volpe %*

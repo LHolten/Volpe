@@ -4,7 +4,7 @@ import llvmlite.binding as llvm
 
 
 # All these initializations are required for code generation!
-from volpe.volpe_types import int32, flt32, VolpeTuple
+from volpe_types import int32, flt32, VolpeTuple
 
 llvm.initialize()
 llvm.initialize_native_target()

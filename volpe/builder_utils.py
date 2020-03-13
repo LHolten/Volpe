@@ -3,8 +3,8 @@ from typing import List, Dict
 
 from llvmlite import ir
 
-from volpe.tree import TypeTree
-from volpe.volpe_types import make_int, pint8, int32, target_data, make_bool, VolpeTuple, copy_func, free_func
+from tree import TypeTree
+from volpe_types import make_int, pint8, int32, target_data, make_bool, VolpeTuple, copy_func, free_func
 
 
 class Closure(ir.LiteralStructType):
