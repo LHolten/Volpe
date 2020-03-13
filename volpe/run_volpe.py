@@ -20,6 +20,7 @@ def volpe_llvm(tree: TypeTree, verbose=False):
 
     closure = Unannotated({}, [], tree)
     closure.update(ir.FunctionType(ir.VoidType(), [pint8]))
+    closure.checked = True
     AnnotateScope({}, tree, closure, True)
 
     if verbose:
@@ -34,7 +35,7 @@ def volpe_llvm(tree: TypeTree, verbose=False):
     func = ir.Function(module, closure.func, "actual_main")
 
     with build_func(func) as (b, args):
-        closure_value = ir.Constant(Closure(func.type), [func, ir.Undefined, ir.Undefined, ir.Undefined])
+        closure_value = ir.Constant(closure, [func, ir.Undefined, ir.Undefined, ir.Undefined])
 
         LLVMScope(b, {}, tree, b.ret, set(), closure_value)
 
