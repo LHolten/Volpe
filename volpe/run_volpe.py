@@ -10,7 +10,7 @@ from annotate_utils import Unannotated
 from builder import LLVMScope
 from builder_utils import build_func, Closure
 from compile import compile_and_run
-from volpe_types import pint8, int32, make_int
+from volpe_types import pint8, int32, make_int, VolpeTuple, target_data
 from tree import TypeTree
 
 
@@ -39,9 +39,18 @@ def volpe_llvm(tree: TypeTree, verbose=False):
 
         LLVMScope(b, {}, tree, b.ret, set(), closure_value)
 
-    main_func = ir.Function(module, ir.FunctionType(closure.func.return_type, []), "main")
+    return_type = closure.func.return_type
+    if isinstance(return_type, VolpeTuple):
+        return_type = return_type.as_pointer()
+
+    main_func = ir.Function(module, ir.FunctionType(return_type, []), "main")
     with build_func(main_func) as (b, _):
+        b: ir.IRBuilder
         res = b.call(func, [ir.Constant(pint8, ir.Undefined)])
+        if isinstance(res.type, VolpeTuple):
+            ptr = b.bitcast(b.call(module.malloc, [make_int(res.type.get_abi_size(target_data))]), return_type)
+            b.store(res, ptr)
+            res = ptr
         b.ret(res)
 
     if verbose:

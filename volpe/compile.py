@@ -1,4 +1,4 @@
-from ctypes import CFUNCTYPE, c_int32, c_bool, c_float
+from ctypes import *
 
 import llvmlite.binding as llvm
 
@@ -33,10 +33,19 @@ def compile_and_run(llvm_ir, result_type):
         func = CFUNCTYPE(c_int32)(func_ptr)
     elif result_type == flt32:
         func = CFUNCTYPE(c_float)(func_ptr)
-    # elif isinstance(result_type, VolpeTuple):
-    #     c_type =
+    elif isinstance(result_type, VolpeTuple):
+        class CTuple(Structure):
+            _fields_ = [("elem" + str(i), c_int32) for i in range(len(result_type.elements))]
+
+            def __repr__(self):
+                return ", ".join([str(getattr(self, "elem" + str(i))) for i in range(len(result_type.elements))])
+
+        func = CFUNCTYPE(POINTER(CTuple))(func_ptr)
     else:
         func = CFUNCTYPE(c_bool)(func_ptr)
 
     res = func()
-    print("main() =", res)
+    if hasattr(res, "contents"):
+        print("main() =", res.contents)
+    else:
+        print("main() =", res)
