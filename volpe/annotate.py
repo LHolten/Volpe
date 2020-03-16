@@ -3,8 +3,8 @@ from typing import Dict
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from annotate_utils import tuple_assign, Unannotated
-from volpe_types import int1, int32, pint8, flt32, VolpeTuple
+from annotate_utils import tuple_assign
+from volpe_types import int1, int32, pint8, flt32, VolpeTuple, Closure
 from tree import TypeTree
 
 
@@ -59,6 +59,7 @@ def math_assign(self, tree: TypeTree):
 
     return self.visit(tree)
 
+
 def comp(self, tree: TypeTree):
     children = self.visit_children(tree)
     ret0 = children[0]
@@ -74,7 +75,7 @@ def comp(self, tree: TypeTree):
 
 
 class AnnotateScope(Interpreter):
-    def __init__(self, scope: Dict, tree: TypeTree, closure: Unannotated, is_func):
+    def __init__(self, scope: Dict, tree: TypeTree, closure: Closure, is_func):
         self.scope = scope
         self.tree = tree
         self.closure = closure
@@ -107,13 +108,13 @@ class AnnotateScope(Interpreter):
     def func(self, tree: TypeTree):
         new_scope = self.scope.copy()
 
-        return Unannotated(new_scope, tree.children[:-1], tree.children[-1])
+        return Closure(new_scope, tree.children[:-1], tree.children[-1])
 
     def func_call(self, tree: TypeTree) -> ir.Type:
         closure = self.visit(tree.children[0])
         arg_types = [self.visit(child) for child in tree.children[1:]]
 
-        assert isinstance(closure, Unannotated)
+        assert isinstance(closure, Closure)
         assert len(closure.arg_names) == len(arg_types), "func call with wrong number of arguments"
 
         if closure.checked:  # we have already been here

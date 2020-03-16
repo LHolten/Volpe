@@ -21,7 +21,6 @@ def compile_and_run(llvm_ir, result_type):
     target = llvm.Target.from_default_triple()
     target_machine = target.create_target_machine()
     # And an execution engine with an empty backing module
-    llvm.load_library_permanently("msvcrt.dll")
     mod = llvm.parse_assembly(llvm_ir)
     mod.verify()
     engine = llvm.create_mcjit_compiler(mod, target_machine)

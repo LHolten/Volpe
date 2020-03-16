@@ -4,13 +4,7 @@ from typing import List, Dict
 from llvmlite import ir
 
 from tree import TypeTree
-from volpe_types import make_int, pint8, int32, target_data, make_bool, VolpeTuple, copy_func, free_func
-
-
-class Closure(ir.LiteralStructType):
-    def __init__(self, func: ir.FunctionType):
-        super().__init__([func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
-        self.func: ir.FunctionType = func
+from volpe_types import int32, target_data, VolpeTuple, Closure
 
 
 def free_environment(b: ir.IRBuilder, value_set: set) -> None:
@@ -28,23 +22,27 @@ def free(b, value):
             free(b, b.extract_value(value, i))
 
 
-def copy(b, value):
-    if isinstance(value.type, Closure):
-        env_copy = b.call(b.extract_value(value, 1), [b.extract_value(value, 3)])
-        value = b.insert_value(value, env_copy, 3)
-    if isinstance(value.type, VolpeTuple):
+def copy(b, value, scope):
+    if value in scope:
+        if isinstance(value.type, Closure):
+            env_copy = b.call(b.extract_value(value, 1), [b.extract_value(value, 3)])
+            value = b.insert_value(value, env_copy, 3)
+        if isinstance(value.type, VolpeTuple):
+            for i in range(len(value.type.elements)):
+                value = b.insert_value(value, copy(b, b.extract_value(value, i), [value]), i)
+    elif isinstance(value.type, VolpeTuple):
         for i in range(len(value.type.elements)):
-            value = b.insert_value(value, copy(b, b.extract_value(value, i)), i)
+            value = b.insert_value(value, copy(b, b.extract_value(value, i), scope), i)
     return value
 
 
 def write_environment(b: ir.IRBuilder, value_list: List):
     env_type = ir.LiteralStructType([value.type for value in value_list])
-    untyped_ptr = b.call(b.module.malloc, [make_int(env_type.get_abi_size(target_data))])
+    untyped_ptr = b.call(b.module.malloc, [int32(env_type.get_abi_size(target_data))])
     ptr = b.bitcast(untyped_ptr, env_type.as_pointer())
 
     for i, value in enumerate(value_list):
-        b.store(copy(b, value), b.gep(ptr, [make_int(0), make_int(i)]))
+        b.store(copy(b, value, [value]), b.gep(ptr, [int32(0), int32(i)]))
 
     return untyped_ptr
 
@@ -55,7 +53,7 @@ def read_environment(b: ir.IRBuilder, untyped_ptr: ir.NamedValue, type_list: Lis
 
     value_list = []
     for i, t in enumerate(type_list):
-        value = b.load(b.gep(ptr, [make_int(0), make_int(i)]))
+        value = b.load(b.gep(ptr, [int32(0), int32(i)]))
         value_list.append(value)
 
     return value_list

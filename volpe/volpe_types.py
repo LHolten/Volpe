@@ -1,3 +1,5 @@
+from typing import Dict
+
 import llvmlite.binding as llvm
 from llvmlite import ir
 
@@ -14,21 +16,24 @@ flt64 = ir.DoubleType()
 unknown = ir.VoidType()
 copy_func = ir.FunctionType(pint8, [pint8])
 free_func = ir.FunctionType(unknown, [pint8])
+unknown_func = ir.FunctionType(ir.VoidType(), [])
 
 target_data = llvm.Target.from_default_triple().create_target_machine().target_data
 
 
-def make_int(n):
-    return ir.Constant(int32, n)
-
-
-def make_flt(n):
-    return ir.Constant(flt32, n)
-
-
-def make_bool(n):
-    return ir.Constant(int1, n)
-
-
 class VolpeTuple(ir.LiteralStructType):
     pass
+
+
+class Closure(ir.LiteralStructType):
+    def __init__(self, scope: Dict, arg_names, code):
+        super().__init__([unknown_func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
+        self.func = unknown_func
+        self.scope = scope
+        self.arg_names = arg_names
+        self.code = code
+        self.checked = False
+
+    def update(self, func: ir.FunctionType):
+        super().__init__([func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
+        self.func = func

@@ -1,24 +1,22 @@
 import itertools
-
 from os import path
 
 from lark import Lark
 from llvmlite import ir
 
 from annotate import AnnotateScope
-from annotate_utils import Unannotated
 from builder import LLVMScope
-from builder_utils import build_func, Closure
+from builder_utils import build_func
 from compile import compile_and_run
-from volpe_types import pint8, int32, make_int, VolpeTuple, target_data
 from tree import TypeTree
+from volpe_types import pint8, int32, VolpeTuple, target_data, Closure
 
 
 def volpe_llvm(tree: TypeTree, verbose=False):
     if verbose:
         print(tree.pretty())
 
-    closure = Unannotated({}, [], tree)
+    closure = Closure({}, [], tree)
     closure.update(ir.FunctionType(ir.VoidType(), [pint8]))
     closure.checked = True
     AnnotateScope({}, tree, closure, True)
@@ -48,7 +46,7 @@ def volpe_llvm(tree: TypeTree, verbose=False):
         b: ir.IRBuilder
         res = b.call(func, [ir.Constant(pint8, ir.Undefined)])
         if isinstance(res.type, VolpeTuple):
-            ptr = b.bitcast(b.call(module.malloc, [make_int(res.type.get_abi_size(target_data))]), return_type)
+            ptr = b.bitcast(b.call(module.malloc, [int32(res.type.get_abi_size(target_data))]), return_type)
             b.store(res, ptr)
             res = ptr
         b.ret(res)

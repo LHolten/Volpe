@@ -3,11 +3,10 @@ from typing import Callable
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from annotate_utils import Unannotated
-from builder_utils import write_environment, Closure, free_environment, options, \
+from builder_utils import write_environment, free_environment, options, \
     read_environment, tuple_assign, build_func, copy
 from tree import TypeTree
-from volpe_types import int1, make_bool, make_flt, flt32, copy_func, free_func
+from volpe_types import int1, int1, flt32, flt32, copy_func, free_func, Closure, Closure
 
 
 class LLVMScope(Interpreter):
@@ -49,9 +48,7 @@ class LLVMScope(Interpreter):
         return getattr(self, tree.data)(tree)
 
     def assign(self, tree: TypeTree):
-        value = self.visit(tree.children[1])
-        if value in self.scope.values():
-            value = copy(self.builder, value)
+        value = copy(self.builder, self.visit(tree.children[1]), self.scope.values())
         tuple_assign(self.scope, self.builder, tree.children[0], value)
         return ir.Constant(int1, True)
 
@@ -60,7 +57,7 @@ class LLVMScope(Interpreter):
 
     def func(self, tree: TypeTree):
         f = tree.ret
-        assert isinstance(f, Unannotated)
+        assert isinstance(f, Closure)
 
         module = self.builder.module
         env_values = list(self.scope.values())
@@ -90,7 +87,7 @@ class LLVMScope(Interpreter):
                 for a, t in zip(tree.children[:-1], args[1:]):
                     tuple_assign(new_scope, b, a, t)
 
-                closure = ir.Constant(f, [func, c_func, f_func, ir.Undefined])
+                closure = f([func, c_func, f_func, ir.Undefined])
                 closure = b.insert_value(closure, args[0], 3)
 
                 LLVMScope(b, new_scope, tree.children[-1], b.ret, set(new_values), closure)
@@ -98,17 +95,14 @@ class LLVMScope(Interpreter):
                 b.ret_void()
                 print("ignoring function without usage")
 
-        closure = ir.Constant(f, [func, c_func, f_func, ir.Undefined])
+        closure = f([func, c_func, f_func, ir.Undefined])
         env_ptr = write_environment(self.builder, env_values)
         closure = self.builder.insert_value(closure, env_ptr, 3)
         return closure
 
     def func_call(self, tree: TypeTree):
         closure = self.visit(tree.children[0])
-        args = [self.visit(child) for child in tree.children[1:]]
-        for i, a in enumerate(args):
-            if a in self.scope.values():
-                args[i] = copy(self.builder, a)
+        args = [copy(self.builder, self.visit(child), self.scope.values()) for child in tree.children[1:]]
 
         assert isinstance(closure.type, Closure)
 
@@ -143,7 +137,7 @@ class LLVMScope(Interpreter):
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
                 ret(self.visit_unsafe(tree.children[1]))
-            ret(make_bool(1))
+            ret(int1(1))
 
         return phi[0]
 
@@ -154,7 +148,7 @@ class LLVMScope(Interpreter):
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
                 ret(self.visit_unsafe(tree.children[1]))
-            ret(make_bool(0))
+            ret(int1(0))
 
         return phi[0]
 
@@ -164,7 +158,7 @@ class LLVMScope(Interpreter):
         with options(self.builder, tree.ret, phi) as ret:
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
-                ret(make_bool(1))
+                ret(int1(1))
             ret(self.visit_unsafe(tree.children[1]))
 
         return phi[0]
@@ -267,7 +261,7 @@ class LLVMScope(Interpreter):
 
     def negate_flt(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
-        return self.builder.fsub(make_flt(0), value)
+        return self.builder.fsub(flt32(0), value)
 
     # FLOAT TO INT DISABLED
     # def convert_flt(self, tree: TypeTree):
