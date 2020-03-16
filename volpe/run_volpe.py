@@ -10,16 +10,19 @@ from builder import LLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
 from tree import TypeTree
-from volpe_types import pint8, int32, VolpeTuple, target_data, Closure
+from volpe_types import pint8, int32, VolpeTuple, target_data, Closure, copy_func, free_func
 
 
 def volpe_llvm(tree: TypeTree, verbose=False):
     if verbose:
         print(tree.pretty())
 
-    closure = Closure({}, [], tree)
-    closure.checked = True
-    AnnotateScope({}, tree, func_ret(closure, []))
+    def scope(name):
+        raise AssertionError("not in scope: " + name)
+
+    func_type = Closure(scope, {}, [], tree)
+    func_type.checked = True
+    AnnotateScope(tree, func_type.get_scope, {}, func_ret(func_type, []))
 
     if verbose:
         print(tree.pretty())
@@ -30,21 +33,28 @@ def volpe_llvm(tree: TypeTree, verbose=False):
     module.free = ir.Function(module, ir.FunctionType(ir.VoidType(), [pint8]), "free")
     module.memcpy = module.declare_intrinsic('llvm.memcpy', [pint8, pint8, int32])
 
-    func = ir.Function(module, closure.func, "actual_main")
+    func = ir.Function(module, func_type.func, "actual_main")
+    c_func = ir.Function(module, copy_func, "actual_main.copy")
+    f_func = ir.Function(module, free_func, "actual_main.free")
+    closure = func_type([func, c_func, f_func, ir.Undefined])
 
     with build_func(func) as (b, args):
-        closure_value = ir.Constant(closure, [func, ir.Undefined, ir.Undefined, ir.Undefined])
+        LLVMScope(b, tree, {"@": closure}, b.ret)
 
-        LLVMScope(b, {}, tree, b.ret, set(), closure_value)
+    with build_func(c_func) as (b, args):
+        b.ret(pint8(ir.Undefined))
 
-    return_type = closure.func.return_type
+    with build_func(f_func) as (b, args):
+        b.ret_void()
+
+    return_type = func_type.func.return_type
     if isinstance(return_type, VolpeTuple):
         return_type = return_type.as_pointer()
 
     main_func = ir.Function(module, ir.FunctionType(return_type, []), "main")
     with build_func(main_func) as (b, _):
         b: ir.IRBuilder
-        res = b.call(func, [ir.Constant(pint8, ir.Undefined)])
+        res = b.call(func, [pint8(ir.Undefined)])
         if isinstance(res.type, VolpeTuple):
             ptr = b.bitcast(b.call(module.malloc, [int32(res.type.get_abi_size(target_data))]), return_type)
             b.store(res, ptr)
@@ -54,7 +64,7 @@ def volpe_llvm(tree: TypeTree, verbose=False):
     if verbose:
         print(module)
 
-    compile_and_run(str(module), tree.ret)
+    compile_and_run(str(module), tree.return_type)
     # return scope.visit(tree)
 
 

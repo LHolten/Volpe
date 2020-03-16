@@ -1,15 +1,10 @@
 from contextlib import contextmanager
-from typing import List, Dict
+from typing import List, Dict, Iterable
 
 from llvmlite import ir
 
 from tree import TypeTree
 from volpe_types import int32, target_data, VolpeTuple, Closure
-
-
-def free_environment(b: ir.IRBuilder, value_set: set) -> None:
-    for value in value_set:
-        free(b, value)
 
 
 def free(b, value):
@@ -22,17 +17,13 @@ def free(b, value):
             free(b, b.extract_value(value, i))
 
 
-def copy(b, value, scope):
-    if value in scope:
-        if isinstance(value.type, Closure):
-            env_copy = b.call(b.extract_value(value, 1), [b.extract_value(value, 3)])
-            value = b.insert_value(value, env_copy, 3)
-        if isinstance(value.type, VolpeTuple):
-            for i in range(len(value.type.elements)):
-                value = b.insert_value(value, copy(b, b.extract_value(value, i), [value]), i)
-    elif isinstance(value.type, VolpeTuple):
+def copy(b, value):
+    if isinstance(value.type, Closure):
+        env_copy = b.call(b.extract_value(value, 1), [b.extract_value(value, 3)])
+        value = b.insert_value(value, env_copy, 3)
+    if isinstance(value.type, VolpeTuple):
         for i in range(len(value.type.elements)):
-            value = b.insert_value(value, copy(b, b.extract_value(value, i), scope), i)
+            value = b.insert_value(value, copy(b, b.extract_value(value, i)), i)
     return value
 
 
@@ -42,7 +33,7 @@ def write_environment(b: ir.IRBuilder, value_list: List):
     ptr = b.bitcast(untyped_ptr, env_type.as_pointer())
 
     for i, value in enumerate(value_list):
-        b.store(copy(b, value, [value]), b.gep(ptr, [int32(0), int32(i)]))
+        b.store(value, b.gep(ptr, [int32(0), int32(i)]))
 
     return untyped_ptr
 
@@ -57,6 +48,14 @@ def read_environment(b: ir.IRBuilder, untyped_ptr: ir.NamedValue, type_list: Lis
         value_list.append(value)
 
     return value_list
+
+
+def copy_environment(b: ir.IRBuilder, value_list: Iterable) -> list:
+    return [copy(b, value) for value in value_list]
+
+
+def free_environment(b: ir.IRBuilder, value_list: Iterable) -> None:
+    [free(b, value) for value in value_list]
 
 
 @contextmanager
@@ -84,11 +83,12 @@ def build_func(func: ir.Function):
     yield builder, func.args
 
 
-def tuple_assign(scope: Dict, b: ir.IRBuilder, tree: TypeTree, value):
-    if tree.data == "shape":
-        for i, child in enumerate(tree.children):
-            tuple_assign(scope, b, child, b.extract_value(value, i))
+def tuple_assign(b: ir.IRBuilder, scope: Dict, shape: TypeTree, value):
+    if shape.data == "shape":
+        for i, child in enumerate(shape.children):
+            tuple_assign(b, scope, child, b.extract_value(value, i))
     else:
-        if tree.children[0].value in scope:
-            free(b, scope[tree.children[0].value])
-        scope[tree.children[0].value] = value
+        name = shape.children[0].value
+        if name in scope:
+            free(b, scope[name])
+        scope[name] = value

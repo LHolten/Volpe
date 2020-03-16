@@ -85,12 +85,10 @@ def tuple_assign(scope: Dict, tree: TypeTree, value_type):
 
 def func_ret(closure, arg_types):
     def ret(value_type):
-        if closure.block.ret is not None:
-            assert closure.block.ret == value_type, "different return types encountered in same block"
+        if closure.block.return_type is not None:
+            assert closure.block.return_type == value_type, "different return types encountered in same block"
         else:
-            closure.block.ret = value_type
-            closure.update(ir.FunctionType(value_type, [pint8, *arg_types]))
+            closure.block.return_type = value_type
+        closure.update(ir.FunctionType(value_type, [pint8, *arg_types]))
 
     return ret
-
-

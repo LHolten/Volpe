@@ -1,4 +1,4 @@
-from typing import Dict, Callable
+from typing import Callable
 
 from lark.visitors import Interpreter
 
@@ -8,35 +8,42 @@ from volpe_types import int1, int32, flt32, VolpeTuple, Closure
 
 
 class AnnotateScope(Interpreter):
-    def __init__(self, scope: Dict, tree: TypeTree, ret: Callable):
+    def __init__(self, tree: TypeTree, scope: Callable, local_scope: dict, ret: Callable):
         self.scope = scope
+        self.local_scope = local_scope
         self.ret = ret
 
         if tree.data == "block":
-            values = self.visit_children(tree)  # sets tree.ret
+            values = self.visit_children(tree)  # sets tree.return_type
             assert all([v == int1 for v in values]), "some line does not evaluate to a bool"
         else:
             ret(self.visit(tree))
 
-        assert tree.ret, "void methods should return true"
+        assert tree.return_type, "void methods should return true"
+
+    def get_scope(self, name):
+        if name in self.local_scope:
+            return self.local_scope[name]
+        else:
+            return self.scope(name)
 
     def visit(self, tree: TypeTree):
-        tree.ret = getattr(self, tree.data)(tree)
-        return tree.ret
+        tree.return_type = getattr(self, tree.data)(tree)
+        return tree.return_type
 
     def block(self, tree: TypeTree):
         def ret(value_type):
-            if tree.ret is not None:
-                assert tree.ret == value_type, "different return types encountered in same block"
+            if tree.return_type is not None:
+                assert tree.return_type == value_type, "different return types encountered in same block"
             else:
-                tree.ret = value_type
+                tree.return_type = value_type
 
-        AnnotateScope(self.scope.copy(), tree, ret)
+        AnnotateScope(tree, self.get_scope, dict(), ret)
 
-        return tree.ret
+        return tree.return_type
 
     def func(self, tree: TypeTree):
-        return Closure(self.scope.copy(), tree.children[:-1], tree.children[-1])
+        return Closure(self.scope, self.local_scope, tree.children[:-1], tree.children[-1])
 
     def func_call(self, tree: TypeTree):
         closure = self.visit(tree.children[0])
@@ -49,26 +56,27 @@ class AnnotateScope(Interpreter):
             return closure.func.return_type
         closure.checked = True
 
-        scope = closure.outside_scope
+        args = dict()
         for a, t in zip(closure.arg_names, arg_types):
-            tuple_assign(scope, a, t)
+            tuple_assign(args, a, t)
+        args["@"] = closure
 
-        AnnotateScope(scope, closure.block, func_ret(closure, arg_types))
+        AnnotateScope(closure.block, closure.get_scope, args, func_ret(closure, arg_types))
 
         return closure.func.return_type
 
     def this_func(self, tree: TypeTree):
-        return self.closure
+        return self.get_scope("@")
 
     def returnn(self, tree: TypeTree):
         self.ret(self.visit(tree.children[0]))
         return int1
 
     def symbol(self, tree: TypeTree):
-        return self.scope[tree.children[0].value]
+        return self.get_scope(tree.children[0].value)
 
     def assign(self, tree: TypeTree):
-        tuple_assign(self.scope, tree.children[0], self.visit(tree.children[1]))
+        tuple_assign(self.local_scope, tree.children[0], self.visit(tree.children[1]))
         return int1
 
     def integer(self, tree: TypeTree):

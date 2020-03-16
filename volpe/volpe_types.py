@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Callable
 
 import llvmlite.binding as llvm
 from llvmlite import ir
@@ -26,15 +26,23 @@ class VolpeTuple(ir.LiteralStructType):
 
 
 class Closure(ir.LiteralStructType):
-    def __init__(self, outside_scope: Dict, arg_names, block):
+    def __init__(self, scope: Callable, local_scope: dict, arg_names, block):
         super().__init__([unknown_func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
         self.func = unknown_func
-        self.outside_scope = outside_scope
         self.outside_used = set()
-        self.scope = dict()
         self.arg_names = arg_names
         self.block = block
         self.checked = False
+
+        frozen_scope = local_scope.copy()
+
+        def get_scope(name):
+            self.outside_used.add(name)
+            if name in frozen_scope:
+                return frozen_scope[name]
+            else:
+                return scope(name)
+        self.get_scope = get_scope
 
     def update(self, func: ir.FunctionType):
         super().__init__([func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
