@@ -17,7 +17,7 @@ class LLVMScope(Interpreter):
         self.ret = ret
         self.closure = closure
 
-        if tree.data == "code":
+        if tree.data == "block":
             assert len(tree.children) > 0, "code block needs code"
 
             def evaluate(children):
@@ -122,7 +122,7 @@ class LLVMScope(Interpreter):
 
         self.ret(value)
 
-    def code(self, tree: TypeTree):
+    def block(self, tree: TypeTree):
         phi = []
 
         with options(self.builder, tree.ret, phi) as ret:

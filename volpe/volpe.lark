@@ -1,4 +1,4 @@
-code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
+block: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
 
 ?value: value1
     | shape "=" value1 -> assign
@@ -51,7 +51,7 @@ code: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     // | value2 "::" value2 -> map
 
 ?value10: func
-    | "{" code "}"
+    | "{" block "}"
     | "(" value1 ")"
     | "[" (value1 ("," value1)*)? "]" -> collect_tuple
     | INTEGER -> integer

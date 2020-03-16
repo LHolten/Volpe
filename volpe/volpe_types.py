@@ -16,7 +16,7 @@ flt64 = ir.DoubleType()
 unknown = ir.VoidType()
 copy_func = ir.FunctionType(pint8, [pint8])
 free_func = ir.FunctionType(unknown, [pint8])
-unknown_func = ir.FunctionType(ir.VoidType(), [])
+unknown_func = ir.FunctionType(unknown, [])
 
 target_data = llvm.Target.from_default_triple().create_target_machine().target_data
 
@@ -26,12 +26,14 @@ class VolpeTuple(ir.LiteralStructType):
 
 
 class Closure(ir.LiteralStructType):
-    def __init__(self, scope: Dict, arg_names, code):
+    def __init__(self, outside_scope: Dict, arg_names, block):
         super().__init__([unknown_func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
         self.func = unknown_func
-        self.scope = scope
+        self.outside_scope = outside_scope
+        self.outside_used = set()
+        self.scope = dict()
         self.arg_names = arg_names
-        self.code = code
+        self.block = block
         self.checked = False
 
     def update(self, func: ir.FunctionType):

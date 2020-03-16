@@ -5,6 +5,7 @@ from lark import Lark
 from llvmlite import ir
 
 from annotate import AnnotateScope
+from annotate_utils import func_ret
 from builder import LLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
@@ -17,9 +18,8 @@ def volpe_llvm(tree: TypeTree, verbose=False):
         print(tree.pretty())
 
     closure = Closure({}, [], tree)
-    closure.update(ir.FunctionType(ir.VoidType(), [pint8]))
     closure.checked = True
-    AnnotateScope({}, tree, closure, True)
+    AnnotateScope({}, tree, func_ret(closure, []))
 
     if verbose:
         print(tree.pretty())
@@ -62,7 +62,7 @@ def run(file_path, verbose=False):
     base_path = path.dirname(__file__)
     path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
     with open(path_to_lark) as lark_file:
-        volpe_parser = Lark(lark_file, start='code', parser='earley', tree_class=TypeTree)
+        volpe_parser = Lark(lark_file, start='block', parser='earley', tree_class=TypeTree)
     with open(file_path) as vlp_file:
         parsed_tree = volpe_parser.parse(vlp_file.read())
     # print(parsed_tree.pretty())
