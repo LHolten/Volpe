@@ -4,7 +4,7 @@ import llvmlite.binding as llvm
 
 
 # All these initializations are required for code generation!
-from volpe_types import int32, flt32, VolpeTuple
+from volpe_types import int1, int32, flt32, VolpeTuple
 
 llvm.initialize()
 llvm.initialize_native_target()
@@ -28,23 +28,30 @@ def compile_and_run(llvm_ir, result_type):
     engine.run_static_constructors()
 
     func_ptr = engine.get_function_address("main")
-    if result_type == int32:
-        func = CFUNCTYPE(c_int32)(func_ptr)
-    elif result_type == flt32:
-        func = CFUNCTYPE(c_float)(func_ptr)
-    elif isinstance(result_type, VolpeTuple):
-        class CTuple(Structure):
-            _fields_ = [("elem" + str(i), c_int32) for i in range(len(result_type.elements))]
 
-            def __repr__(self):
-                return ", ".join([str(getattr(self, "elem" + str(i))) for i in range(len(result_type.elements))])
-
-        func = CFUNCTYPE(POINTER(CTuple))(func_ptr)
-    else:
-        func = CFUNCTYPE(c_bool)(func_ptr)
-
+    func = CFUNCTYPE(determine_c_type(result_type))(func_ptr)
     res = func()
     if hasattr(res, "contents"):
         print("main() =", res.contents)
     else:
         print("main() =", res)
+
+
+def determine_c_type(volpe_type, depth=0):
+    # Interpret result type.
+    if isinstance(volpe_type, VolpeTuple):
+        elems = volpe_type.elements
+        class CTuple(Structure):
+            _fields_ = [(f"elem{i}", determine_c_type(elem, depth+1)) for i, elem in enumerate(elems)]
+            def __repr__(self):
+                return "[" + ", ".join([str(getattr(self, tup[0])) for tup in self._fields_]) + "]"
+        
+        return POINTER(CTuple) if depth == 0 else CTuple
+    elif volpe_type == int1:
+        return c_bool
+    elif volpe_type == int32:
+        return c_int32
+    elif volpe_type == flt32:
+        return c_float
+    else:
+        return None
