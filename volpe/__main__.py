@@ -25,23 +25,24 @@ def install():
     path_to_volpe_root = os.path.dirname(path_to_volpe)
 
     # Update the .bat file
-    print("updating batch file with volpe directory")
+    print("Updating batch file with volpe directory.")
     with open(os.path.join(path_to_volpe_root, "volpe.bat"), "w") as OPATH:
         OPATH.writelines(["@echo off\n", f"python {path_to_volpe} %*"])
     print("=====")
 
     if path_to_volpe_root in path:
-        print("Volpe already on PATH.")
+        print("Volpe is already on PATH.")
         
-        if not path_to_volpe in os.environ["PATH"]:
+        if not path_to_volpe_root in os.environ["PATH"]:
+            print("=====")
             print("Please restart this console for changes to take effect.")
 
     else:
         # Add Volpe path to user path.
         print(f"Adding {path_to_volpe_root} to user PATH.")
-        path_with_volpe = path + os.pathsep + path_to_volpe_root
+        path_including_volpe = path + os.pathsep + path_to_volpe_root
         print("Setting local user PATH.")
-        os.system(f'SETX Path "{path_with_volpe}"')
+        os.system(f'SETX Path "{path_including_volpe}"')
         
         print("=====")
         print("Please restart this console for changes to take effect.")
