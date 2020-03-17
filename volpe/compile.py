@@ -4,7 +4,7 @@ import llvmlite.binding as llvm
 
 
 # All these initializations are required for code generation!
-from volpe_types import int1, int32, flt32, VolpeTuple
+from volpe_types import int1, int32, flt32, VolpeTuple, Closure
 
 llvm.initialize()
 llvm.initialize_native_target()
@@ -47,6 +47,12 @@ def determine_c_type(volpe_type, depth=0):
                 return "[" + ", ".join([str(getattr(self, tup[0])) for tup in self._fields_]) + "]"
         
         return POINTER(CTuple) if depth == 0 else CTuple
+    if isinstance(volpe_type, Closure):
+        class CFunc(Structure):
+            _fields_ = [("func", POINTER(None)), ("c_func", POINTER(None)), ("f_func", POINTER(None)), ("env", POINTER(None))]
+            def __repr__(self):
+                return "*function*"
+        return CFunc
     elif volpe_type == int1:
         return c_bool
     elif volpe_type == int32:
