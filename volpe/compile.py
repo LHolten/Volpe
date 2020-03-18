@@ -4,7 +4,7 @@ import llvmlite.binding as llvm
 
 
 # All these initializations are required for code generation!
-from volpe_types import int1, int32, flt32, VolpeTuple, Closure
+from volpe_types import int1, int32, flt32, flt64, VolpeTuple, Closure
 
 llvm.initialize()
 llvm.initialize_native_target()
@@ -59,5 +59,7 @@ def determine_c_type(volpe_type, depth=0):
         return c_int32
     elif volpe_type == flt32:
         return c_float
+    elif volpe_type == flt64:
+        return c_double
     else:
         return None

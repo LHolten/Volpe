@@ -6,14 +6,15 @@ from llvmlite import ir
 from builder_utils import write_environment, free_environment, options, \
     read_environment, tuple_assign, build_func, copy, copy_environment
 from tree import TypeTree
-from volpe_types import int1, flt32, copy_func, free_func, Closure
+from volpe_types import int1, flt32, flt64, copy_func, free_func, Closure
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: dict, ret: Callable):
+    def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: dict, ret: Callable, fast=False):
         self.builder = builder
         self.scope = scope
         self.ret = ret
+        self.fast = fast
 
         if tree.data == "block":
             assert len(tree.children) > 0, "code block needs code"
@@ -73,7 +74,7 @@ class LLVMScope(Interpreter):
                     tuple_assign(b, new_scope, shape, value)
                 new_scope["@"] = b.insert_value(closure, b.call(c_func, [args[0]]), 3)
 
-                LLVMScope(b, tree.children[-1], new_scope, b.ret)
+                LLVMScope(b, tree.children[-1], new_scope, b.ret, fast=self.fast)
             else:
                 b.ret_void()
                 print("ignoring function without usage")
@@ -118,7 +119,7 @@ class LLVMScope(Interpreter):
         new_scope = dict(zip(self.scope.keys(), copy_environment(self.builder, self.scope.values())))
 
         with options(self.builder, tree.return_type, phi) as ret:
-            LLVMScope(self.builder, tree, new_scope, ret)
+            LLVMScope(self.builder, tree, new_scope, ret, fast=self.fast)
 
         return phi[0]
 
@@ -193,7 +194,7 @@ class LLVMScope(Interpreter):
         # TODO Use overflow bit to raise runtime error
         # self.builder.extract_value(self.builder.smul_with_overflow(values[0], values[1]), 0)
         values = self.visit_children(tree)
-        return self.builder.extract_value(self.builder.smul_with_overflow(values[0], values[1]), 0)
+        return self.builder.mul(values[0], values[1])
 
     def negate_int(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
@@ -201,7 +202,9 @@ class LLVMScope(Interpreter):
 
     def convert_int(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
-        return self.builder.sitofp(value, flt32)
+        if self.fast:
+            return self.builder.sitofp(value, flt32)
+        return self.builder.sitofp(value, flt64)
 
     def equals_int(self, tree: TypeTree):
         values = self.visit_children(tree)
@@ -253,7 +256,9 @@ class LLVMScope(Interpreter):
 
     def negate_flt(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
-        return self.builder.fsub(flt32(0), value)
+        if self.fast:
+            return self.builder.fsub(flt32(0), value)
+        return self.builder.fsub(flt64(0), value)
 
     # FLOAT TO INT DISABLED
     # def convert_flt(self, tree: TypeTree):

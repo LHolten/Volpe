@@ -4,14 +4,15 @@ from lark.visitors import Interpreter
 
 from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, math_assign, comp, func_ret
 from tree import TypeTree
-from volpe_types import int1, int32, flt32, VolpeTuple, Closure
+from volpe_types import int1, int32, flt32, flt64, VolpeTuple, Closure
 
 
 class AnnotateScope(Interpreter):
-    def __init__(self, tree: TypeTree, scope: Callable, local_scope: dict, ret: Callable):
+    def __init__(self, tree: TypeTree, scope: Callable, local_scope: dict, ret: Callable, fast=False):
         self.scope = scope
         self.local_scope = local_scope
         self.ret = ret
+        self.fast = fast
 
         if tree.data == "block":
             values = self.visit_children(tree)  # sets tree.return_type
@@ -38,7 +39,7 @@ class AnnotateScope(Interpreter):
             else:
                 tree.return_type = value_type
 
-        AnnotateScope(tree, self.get_scope, dict(), ret)
+        AnnotateScope(tree, self.get_scope, dict(), ret, fast=self.fast)
 
         return tree.return_type
 
@@ -61,7 +62,7 @@ class AnnotateScope(Interpreter):
             tuple_assign(args, a, t)
         args["@"] = closure
 
-        AnnotateScope(closure.block, closure.get_scope, args, func_ret(closure, arg_types))
+        AnnotateScope(closure.block, closure.get_scope, args, func_ret(closure, arg_types), fast=self.fast)
 
         return closure.func.return_type
 
@@ -83,18 +84,23 @@ class AnnotateScope(Interpreter):
         return int32
 
     def floating(self, tree: TypeTree):
-        return flt32
+        if self.fast:
+            return flt32
+        return flt64
 
     def convert(self, tree: TypeTree):
         ret = self.visit_children(tree)[0]
         if ret == int32:
             tree.data = tree.data + "_int"
-            return flt32
-        elif ret == flt32:
+            if self.fast:
+                return flt32
+            return flt64
+        elif ret == flt32 or ret == flt64:
             tree.data = tree.data + "_flt"
             return int32
         else:
-            raise AssertionError("convertion only work for integers and floats")
+            # raise AssertionError("conversion only works for integers and floats")
+            raise AssertionError("conversion only works for integers") # floats disabled
 
     def collect_tuple(self, tree: TypeTree):
         return VolpeTuple(self.visit_children(tree))
