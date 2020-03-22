@@ -1,11 +1,21 @@
+# a jungle of random tests
+
+# testing compound assignment operators
 a = 3
 a += 2
 a /= 5
 
 b = 2.5
 b *= 4.0
-b -= ~a
+b -= a.5  # conversion
 
-f = () => a
+f = () => ~b  # conversion
 
-:> [b, 1 > 0, !(~5 == 5.0), [1.0, 2, [3.0, 4]], 1.0 / 3.0, f(), f, [f]]
+c = [1.0, 2, [3.0, 4]]  # tuples
+
+[d, _, e] = c  # tuple decomposition
+
+g = (-2)..2  # ranges
+
+# printing various types, float precision
+:> [b, 1 > 0, !(5 == ~5.0), [1.0, 2, [3.0, 4]], 1.0 / 3.0, f(), f, [f], g[1]]
