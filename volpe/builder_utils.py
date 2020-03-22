@@ -4,7 +4,7 @@ from typing import List, Dict, Iterable
 from llvmlite import ir
 
 from tree import TypeTree
-from volpe_types import int32, target_data, VolpeTuple, Closure
+from volpe_types import int32, target_data, VolpeTuple, Closure, copy_func, free_func, VolpeList
 
 
 def free(b, value):
@@ -15,6 +15,8 @@ def free(b, value):
     if isinstance(value.type, VolpeTuple):
         for i in range(len(value.type.elements)):
             free(b, b.extract_value(value, i))
+    if isinstance(value.type, VolpeList):
+        free(b, b.extract_value(value, 0))
 
 
 def copy(b, value):
@@ -24,6 +26,9 @@ def copy(b, value):
     if isinstance(value.type, VolpeTuple):
         for i in range(len(value.type.elements)):
             value = b.insert_value(value, copy(b, b.extract_value(value, i)), i)
+    if isinstance(value.type, VolpeList):
+        closure = b.extract_value(value, 0)
+        value = b.insert_value(value, copy(b, closure), 0)
     return value
 
 
@@ -59,7 +64,7 @@ def free_environment(b: ir.IRBuilder, value_list: Iterable) -> None:
 
 
 @contextmanager
-def options(b: ir.IRBuilder, t: ir.Type, phi) -> ir.Value:
+def options(b: ir.IRBuilder, t: ir.Type) -> ir.Value:
     new_block = b.function.append_basic_block("block")
     with b.goto_block(new_block):
         phi_node = b.phi(t)
@@ -69,10 +74,9 @@ def options(b: ir.IRBuilder, t: ir.Type, phi) -> ir.Value:
             phi_node.add_incoming(value, b.block)
             b.branch(new_block)
 
-    yield ret
+    yield ret, phi_node
 
     b.position_at_end(new_block)
-    phi.append(phi_node)
 
 
 @contextmanager
@@ -81,6 +85,35 @@ def build_func(func: ir.Function):
     builder = ir.IRBuilder(block)
 
     yield builder, func.args
+
+
+@contextmanager
+def build_closure(module, closure_type, env_types):
+    func_name = str(next(module.func_count))
+    func = ir.Function(module, closure_type.func, func_name)
+    c_func = ir.Function(module, copy_func, func_name + ".copy")
+    f_func = ir.Function(module, free_func, func_name + ".free")
+    closure = closure_type([func, c_func, f_func, ir.Undefined])
+
+    with build_func(func) as (b, args):
+        yield b, args, closure, c_func
+
+    with build_func(c_func) as (b, args):
+        b.ret(write_environment(b, copy_environment(b, read_environment(b, args[0], env_types))))
+
+    with build_func(f_func) as (b, args):
+        free_environment(b, read_environment(b, args[0], env_types))
+        b.call(b.module.free, args)
+        b.ret_void()
+
+
+def closure_call(b, closure, args):
+    func = b.extract_value(closure, 0)
+    env_ptr = b.extract_value(closure, 3)
+
+    value = b.call(func, [env_ptr, *args])
+    free(b, closure)
+    return value
 
 
 def tuple_assign(b: ir.IRBuilder, scope: Dict, shape: TypeTree, value):

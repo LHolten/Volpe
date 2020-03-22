@@ -4,9 +4,9 @@ from lark.visitors import Interpreter
 from llvmlite import ir
 
 from builder_utils import write_environment, free_environment, options, \
-    read_environment, tuple_assign, build_func, copy, copy_environment
+    read_environment, tuple_assign, copy, copy_environment, build_closure, closure_call, free
 from tree import TypeTree
-from volpe_types import int1, flt32, flt64, copy_func, free_func, Closure
+from volpe_types import int1, flt32, flt64, Closure, int32
 
 
 class LLVMScope(Interpreter):
@@ -51,22 +51,16 @@ class LLVMScope(Interpreter):
         return copy(self.builder, self.scope[tree.children[0].value])
 
     def func(self, tree: TypeTree):
-        func_type = tree.return_type
-        assert isinstance(func_type, Closure)
+        closure_type = tree.return_type
+        assert isinstance(closure_type, Closure)
 
         module = self.builder.module
-        env_names = list(func_type.outside_used)
+        env_names = list(closure_type.outside_used)
         env_values = [self.scope[name] for name in env_names]
         env_types = [value.type for value in env_values]
 
-        func_name = str(next(module.func_count))
-        func = ir.Function(module, func_type.func, func_name)
-        c_func = ir.Function(module, copy_func, func_name + ".copy")
-        f_func = ir.Function(module, free_func, func_name + ".free")
-        closure = func_type([func, c_func, f_func, ir.Undefined])
-
-        with build_func(func) as (b, args):
-            if func_type.checked:
+        with build_closure(module, closure_type, env_types) as (b, args, closure, c_func):
+            if closure_type.checked:
                 new_values = copy_environment(b, read_environment(b, args[0], env_types))
 
                 new_scope = dict(zip(env_names, new_values))
@@ -79,14 +73,6 @@ class LLVMScope(Interpreter):
                 b.ret_void()
                 print("ignoring function without usage")
 
-        with build_func(c_func) as (b, args):
-            b.ret(write_environment(b, copy_environment(b, read_environment(b, args[0], env_types))))
-
-        with build_func(f_func) as (b, args):
-            free_environment(b, read_environment(b, args[0], env_types))
-            b.call(b.module.free, args)
-            b.ret_void()
-
         env_ptr = write_environment(self.builder, copy_environment(self.builder, env_values))
         return self.builder.insert_value(closure, env_ptr, 3)
 
@@ -95,15 +81,7 @@ class LLVMScope(Interpreter):
         closure = values[0]
         args = values[1:]
 
-        assert isinstance(closure.type, Closure)
-
-        func = self.builder.extract_value(closure, 0)
-        f_func = self.builder.extract_value(closure, 2)
-        env_ptr = self.builder.extract_value(closure, 3)
-
-        value = self.builder.call(func, [env_ptr, *args])
-        self.builder.call(f_func, [env_ptr])
-        return value
+        return closure_call(self.builder, closure, args)
 
     def this_func(self, tree: TypeTree):
         return copy(self.builder, self.scope["@"])
@@ -114,47 +92,71 @@ class LLVMScope(Interpreter):
         self.ret(value)
 
     def block(self, tree: TypeTree):
-        phi = []
-
         new_scope = dict(zip(self.scope.keys(), copy_environment(self.builder, self.scope.values())))
-
-        with options(self.builder, tree.return_type, phi) as ret:
+        with options(self.builder, tree.return_type) as (ret, phi):
             LLVMScope(self.builder, tree, new_scope, ret, fast=self.fast)
+        return phi
 
-        return phi[0]
+    def number_list(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        closure_type = tree.return_type.closure
+        module = self.builder.module
+        env_types = [int32]
+
+        with build_closure(module, closure_type, env_types) as (b, args, closure, c_func):
+            start = read_environment(b, args[0], env_types)[0]
+            b.ret(b.add(start, args[1]))
+
+        env_ptr = write_environment(self.builder, [values[0]])
+        list_value = tree.return_type(ir.Undefined)
+        list_value = self.builder.insert_value(list_value, self.builder.insert_value(closure, env_ptr, 3), 0)
+        return self.builder.insert_value(list_value, self.builder.sub(values[1], values[0]), 1)
+
+    def list_index(self, tree: TypeTree):
+        list_value, i = self.visit_children(tree)
+        closure = self.builder.extract_value(list_value, 0)
+        length = self.builder.extract_value(list_value, 1)
+
+        before_end = self.builder.icmp_signed("<", i, length)
+        more_than_0 = self.builder.icmp_signed(">=", i, int32(0))
+        in_range = self.builder.and_(before_end, more_than_0)
+        with self.builder.if_then(self.builder.not_(in_range)):
+            self.builder.unreachable()
+
+        return closure_call(self.builder, closure, [i])
+
+    def list_size(self, tree: TypeTree):
+        list_value = self.visit_children(tree)[0]
+        length = self.builder.extract_value(list_value, 1)
+        free(self.builder, list_value)
+        return length
 
     def implication(self, tree: TypeTree):
-        phi = []
-
-        with options(self.builder, tree.return_type, phi) as ret:
+        with options(self.builder, tree.return_type) as (ret, phi):
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
                 ret(self.visit_unsafe(tree.children[1]))
-            ret(int1(1))
+            ret(int1(True))
 
-        return phi[0]
+        return phi
 
     def logic_and(self, tree: TypeTree):
-        phi = []
-
-        with options(self.builder, tree.return_type, phi) as ret:
+        with options(self.builder, tree.return_type) as (ret, phi):
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
                 ret(self.visit_unsafe(tree.children[1]))
-            ret(int1(0))
+            ret(int1(False))
 
-        return phi[0]
+        return phi
 
     def logic_or(self, tree: TypeTree):
-        phi = []
-
-        with options(self.builder, tree.return_type, phi) as ret:
+        with options(self.builder, tree.return_type) as (ret, phi):
             value = self.visit(tree.children[0])
             with self.builder.if_then(value):
-                ret(int1(1))
+                ret(int1(True))
             ret(self.visit_unsafe(tree.children[1]))
 
-        return phi[0]
+        return phi
 
     def logic_not(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
@@ -168,7 +170,7 @@ class LLVMScope(Interpreter):
         
     # Integers
     def integer(self, tree: TypeTree):
-        return tree.return_type(tree.children[0].value)
+        return tree.return_type(int(tree.children[0].value))
 
     def add_int(self, tree: TypeTree):
         # TODO Use overflow bit to raise runtime error
@@ -201,10 +203,13 @@ class LLVMScope(Interpreter):
         return self.builder.neg(value)
 
     def convert_int(self, tree: TypeTree):
-        value = self.visit_children(tree)[0]
+        value = self.visit(tree.children[0])
         if self.fast:
-            return self.builder.sitofp(value, flt32)
-        return self.builder.sitofp(value, flt64)
+            float_value = self.builder.sitofp(value, flt32)
+        else:
+            float_value = self.builder.sitofp(value, flt64)
+        decimals = tree.return_type(float("0." + tree.children[1].value))
+        return self.builder.fadd(float_value, decimals)
 
     def equals_int(self, tree: TypeTree):
         values = self.visit_children(tree)
@@ -260,10 +265,9 @@ class LLVMScope(Interpreter):
             return self.builder.fsub(flt32(0), value)
         return self.builder.fsub(flt64(0), value)
 
-    # FLOAT TO INT DISABLED
-    # def convert_flt(self, tree: TypeTree):
-    #     value = self.visit_children(tree)[0]
-    #     return self.builder.fptosi(value, int32)
+    def convert_flt(self, tree: TypeTree):
+        value = self.visit_children(tree)[0]
+        return self.builder.fptosi(value, int32)
 
     def equals_flt(self, tree: TypeTree):
         values = self.visit_children(tree)

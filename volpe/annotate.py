@@ -1,10 +1,11 @@
 from typing import Callable
 
 from lark.visitors import Interpreter
+from llvmlite import ir
 
 from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, math_assign, comp, func_ret
 from tree import TypeTree
-from volpe_types import int1, int32, flt32, flt64, VolpeTuple, Closure
+from volpe_types import int1, int32, flt32, flt64, VolpeTuple, Closure, VolpeList, pint8
 
 
 class AnnotateScope(Interpreter):
@@ -83,24 +84,37 @@ class AnnotateScope(Interpreter):
     def integer(self, tree: TypeTree):
         return int32
 
-    def floating(self, tree: TypeTree):
+    def number_list(self, tree: TypeTree):
+        ret = self.visit_children(tree)
+        assert ret[0] == int32
+        assert ret[1] == int32
+        closure = Closure(self.scope, self.local_scope, None, None)
+        closure.update(ir.FunctionType(int32, [pint8, int32]))
+        return VolpeList(closure)
+
+    def list_index(self, tree: TypeTree):
+        ret = self.visit_children(tree)
+        assert isinstance(ret[0], VolpeList)
+        assert ret[1] == int32
+        return ret[0].closure.func.return_type
+
+    def list_size(self, tree: TypeTree):
+        ret = self.visit_children(tree)[0]
+        assert isinstance(ret, VolpeList)
+        return int32
+
+    def convert_int(self, tree: TypeTree):
+        assert self.visit(tree.children[0]) == int32
         if self.fast:
             return flt32
         return flt64
 
-    def convert(self, tree: TypeTree):
-        ret = self.visit_children(tree)[0]
-        if ret == int32:
-            tree.data = tree.data + "_int"
-            if self.fast:
-                return flt32
-            return flt64
-        elif ret == flt32 or ret == flt64:
-            tree.data = tree.data + "_flt"
-            return int32
+    def convert_flt(self, tree: TypeTree):
+        if self.fast:
+            assert self.visit(tree.children[0]) == flt32
         else:
-            # raise AssertionError("conversion only works for integers and floats")
-            raise AssertionError("conversion only works for integers") # floats disabled
+            assert self.visit(tree.children[0]) == flt64
+        return int32
 
     def collect_tuple(self, tree: TypeTree):
         return VolpeTuple(self.visit_children(tree))

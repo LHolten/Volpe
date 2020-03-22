@@ -25,6 +25,12 @@ class VolpeTuple(ir.LiteralStructType):
     pass
 
 
+class VolpeList(ir.LiteralStructType):
+    def __init__(self, closure):
+        super().__init__([closure, int32])
+        self.closure = closure
+
+
 class Closure(ir.LiteralStructType):
     def __init__(self, scope: Callable, local_scope: dict, arg_names, block):
         super().__init__([unknown_func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
