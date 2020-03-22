@@ -1,10 +1,11 @@
 from typing import Callable
 
 from lark.visitors import Interpreter
+from llvmlite import ir
 
 from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, math_assign, comp, func_ret
 from tree import TypeTree
-from volpe_types import int1, int32, flt32, VolpeTuple, Closure
+from volpe_types import int1, int32, flt32, VolpeTuple, Closure, VolpeList, pint8
 
 
 class AnnotateScope(Interpreter):
@@ -80,6 +81,25 @@ class AnnotateScope(Interpreter):
         return int1
 
     def integer(self, tree: TypeTree):
+        return int32
+
+    def number_list(self, tree: TypeTree):
+        ret = self.visit_children(tree)
+        assert ret[0] == int32
+        assert ret[1] == int32
+        closure = Closure(self.scope, self.local_scope, None, None)
+        closure.update(ir.FunctionType(int32, [pint8, int32]))
+        return VolpeList(closure)
+
+    def list_index(self, tree: TypeTree):
+        ret = self.visit_children(tree)
+        assert isinstance(ret[0], VolpeList)
+        assert ret[1] == int32
+        return ret[0].closure.func.return_type
+
+    def list_size(self, tree: TypeTree):
+        ret = self.visit_children(tree)[0]
+        assert isinstance(ret, VolpeList)
         return int32
 
     def convert_int(self, tree: TypeTree):
