@@ -82,19 +82,13 @@ class AnnotateScope(Interpreter):
     def integer(self, tree: TypeTree):
         return int32
 
-    def floating(self, tree: TypeTree):
+    def convert_int(self, tree: TypeTree):
+        assert self.visit(tree.children[0]) == int32
         return flt32
 
-    def convert(self, tree: TypeTree):
-        ret = self.visit_children(tree)[0]
-        if ret == int32:
-            tree.data = tree.data + "_int"
-            return flt32
-        elif ret == flt32:
-            tree.data = tree.data + "_flt"
-            return int32
-        else:
-            raise AssertionError("convertion only work for integers and floats")
+    def convert_flt(self, tree: TypeTree):
+        assert self.visit(tree.children[0]) == flt32
+        return int32
 
     def collect_tuple(self, tree: TypeTree):
         return VolpeTuple(self.visit_children(tree))

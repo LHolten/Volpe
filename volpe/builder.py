@@ -6,7 +6,7 @@ from llvmlite import ir
 from builder_utils import write_environment, free_environment, options, \
     read_environment, tuple_assign, build_func, copy, copy_environment
 from tree import TypeTree
-from volpe_types import int1, flt32, copy_func, free_func, Closure
+from volpe_types import int1, flt32, copy_func, free_func, Closure, int32
 
 
 class LLVMScope(Interpreter):
@@ -167,7 +167,7 @@ class LLVMScope(Interpreter):
         
     # Integers
     def integer(self, tree: TypeTree):
-        return tree.return_type(tree.children[0].value)
+        return tree.return_type(int(tree.children[0].value))
 
     def add_int(self, tree: TypeTree):
         # TODO Use overflow bit to raise runtime error
@@ -200,8 +200,10 @@ class LLVMScope(Interpreter):
         return self.builder.neg(value)
 
     def convert_int(self, tree: TypeTree):
-        value = self.visit_children(tree)[0]
-        return self.builder.sitofp(value, flt32)
+        value = self.visit(tree.children[0])
+        float_value = self.builder.sitofp(value, flt32)
+        decimals = tree.return_type(float("0." + tree.children[1].value))
+        return self.builder.fadd(float_value, decimals)
 
     def equals_int(self, tree: TypeTree):
         values = self.visit_children(tree)
@@ -255,10 +257,9 @@ class LLVMScope(Interpreter):
         value = self.visit_children(tree)[0]
         return self.builder.fsub(flt32(0), value)
 
-    # FLOAT TO INT DISABLED
-    # def convert_flt(self, tree: TypeTree):
-    #     value = self.visit_children(tree)[0]
-    #     return self.builder.fptosi(value, int32)
+    def convert_flt(self, tree: TypeTree):
+        value = self.visit_children(tree)[0]
+        return self.builder.fptosi(value, int32)
 
     def equals_flt(self, tree: TypeTree):
         values = self.visit_children(tree)

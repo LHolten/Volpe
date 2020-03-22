@@ -47,7 +47,8 @@ block: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
 ?value9: value10
     | "-" value9 -> negate
     | "!" value9 -> logic_not
-    | "~" value9 -> convert
+    | "~" value9 -> convert_flt
+    | value10 "." INTEGER -> convert_int
     // | value2 ".." value2 -> number_list
     // | value2 "::" value2 -> map
 
@@ -56,7 +57,6 @@ block: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     | "(" value1 ")"
     | "[" (value1 ("," value1)*)? "]" -> collect_tuple
     | INTEGER -> integer
-    | FLOATING -> floating
     // | ESCAPED_STRING -> string
 
 func: CNAME -> symbol
