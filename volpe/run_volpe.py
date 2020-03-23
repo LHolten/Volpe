@@ -10,7 +10,7 @@ from builder import LLVMScope, FastLLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
 from tree import TypeTree
-from volpe_types import pint8, int32, VolpeTuple, target_data, Closure, copy_func, free_func
+from volpe_types import pint8, int32, VolpeTuple, target_data, VolpeClosure, copy_func, free_func
 
 
 def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
@@ -20,7 +20,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
     def scope(name):
         raise AssertionError("not in scope: " + name)
 
-    func_type = Closure(scope, {}, [], tree)
+    func_type = VolpeClosure(scope, {}, [], tree)
     func_type.checked = True
 
     if fast:

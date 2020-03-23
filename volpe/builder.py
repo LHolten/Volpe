@@ -6,7 +6,7 @@ from llvmlite import ir
 from builder_utils import write_environment, free_environment, options, \
     read_environment, tuple_assign, copy, copy_environment, build_closure, closure_call, free
 from tree import TypeTree
-from volpe_types import int1, flt32, flt64, Closure, int32
+from volpe_types import int1, flt32, flt64, VolpeClosure, int32, target_data
 
 
 class LLVMScope(Interpreter):
@@ -53,7 +53,7 @@ class LLVMScope(Interpreter):
 
     def func(self, tree: TypeTree):
         closure_type = tree.return_type
-        assert isinstance(closure_type, Closure)
+        assert isinstance(closure_type, VolpeClosure)
 
         module = self.builder.module
         env_names = list(closure_type.outside_used)
@@ -103,7 +103,7 @@ class LLVMScope(Interpreter):
             self.__class__(self.builder, tree, new_scope, ret)
         return phi
 
-    def number_list(self, tree: TypeTree):
+    def number_iter(self, tree: TypeTree):
         values = self.visit_children(tree)
         closure_type = tree.return_type.closure
         module = self.builder.module
@@ -120,7 +120,7 @@ class LLVMScope(Interpreter):
 
     def list_index(self, tree: TypeTree):
         list_value, i = self.visit_children(tree)
-        closure = self.builder.extract_value(list_value, 0)
+        pointer = self.builder.extract_value(list_value, 0)
         length = self.builder.extract_value(list_value, 1)
 
         before_end = self.builder.icmp_signed("<", i, length)
@@ -129,7 +129,7 @@ class LLVMScope(Interpreter):
         with self.builder.if_then(self.builder.not_(in_range)):
             self.builder.unreachable()
 
-        res = closure_call(self.builder, closure, [i])
+        res = self.builder.load(self.builder.gep(pointer, [i]))
         free(self.builder, list_value)
         return res
 
@@ -155,6 +155,27 @@ class LLVMScope(Interpreter):
         list_value = tree.return_type(ir.Undefined)
         list_value = self.builder.insert_value(list_value, self.builder.insert_value(closure, env_ptr, 3), 0)
         return self.builder.insert_value(list_value, self.builder.extract_value(values[0], 1), 1)
+
+    def make_list(self, tree: TypeTree):
+        iter_value = self.visit_children(tree)[0]
+        closure = self.builder.extract_value(iter_value, 0)
+        length = self.builder.extract_value(iter_value, 1)
+        data_size = int32(tree.return_type.element_type.get_abi_size(target_data))
+        pointer = self.builder.call(self.builder.module.malloc, [self.builder.mul(data_size, length)])
+        pointer = self.builder.bitcast(pointer, tree.return_type.element_type.as_pointer())
+
+        with options(self.builder, int32) as (ret, phi):
+            ret(int32(0))
+
+        with self.builder.if_then(self.builder.icmp_signed("<", phi, length)):
+            self.builder.store(closure_call(self.builder, closure, [phi]), self.builder.gep(pointer, [phi]))
+            ret(self.builder.add(phi, int32(1)))
+
+        free(self.builder, closure)
+
+        list_value = tree.return_type(ir.Undefined)
+        list_value = self.builder.insert_value(list_value, pointer, 0)
+        return self.builder.insert_value(list_value, length, 1)
 
     def implication(self, tree: TypeTree):
         with options(self.builder, tree.return_type) as (ret, phi):

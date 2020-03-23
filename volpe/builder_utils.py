@@ -4,31 +4,37 @@ from typing import List, Dict, Iterable
 from llvmlite import ir
 
 from tree import TypeTree
-from volpe_types import int32, target_data, VolpeTuple, Closure, copy_func, free_func, VolpeList
+from volpe_types import int32, target_data, VolpeTuple, VolpeClosure, copy_func, free_func, VolpeIterator, VolpeList, \
+    pint8, int1
 
 
 def free(b, value):
-    if isinstance(value.type, Closure):
+    if isinstance(value.type, VolpeClosure):
         f_func = b.extract_value(value, 2)
         env_ptr = b.extract_value(value, 3)
         b.call(f_func, [env_ptr])
     if isinstance(value.type, VolpeTuple):
         for i in range(len(value.type.elements)):
             free(b, b.extract_value(value, i))
-    if isinstance(value.type, VolpeList):
+    if isinstance(value.type, VolpeIterator):
         free(b, b.extract_value(value, 0))
+    if isinstance(value.type, VolpeList):
+        free_list(b, value)
 
 
 def copy(b, value):
-    if isinstance(value.type, Closure):
+    if isinstance(value.type, VolpeClosure):
         env_copy = b.call(b.extract_value(value, 1), [b.extract_value(value, 3)])
         value = b.insert_value(value, env_copy, 3)
     if isinstance(value.type, VolpeTuple):
         for i in range(len(value.type.elements)):
             value = b.insert_value(value, copy(b, b.extract_value(value, i)), i)
-    if isinstance(value.type, VolpeList):
+    if isinstance(value.type, VolpeIterator):
         closure = b.extract_value(value, 0)
         value = b.insert_value(value, copy(b, closure), 0)
+    if isinstance(value.type, VolpeList):
+        value = copy_list(b, value)
+
     return value
 
 
@@ -61,6 +67,37 @@ def copy_environment(b: ir.IRBuilder, value_list: Iterable) -> list:
 
 def free_environment(b: ir.IRBuilder, value_list: Iterable) -> None:
     [free(b, value) for value in value_list]
+
+
+def copy_list(b: ir.IRBuilder, list_value):
+    data_size = int32(list_value.type.element_type.get_abi_size(target_data))
+    pointer = b.extract_value(list_value, 0)
+    length = b.extract_value(list_value, 1)
+    new_pointer = b.call(b.module.malloc, [b.mul(data_size, length)])
+    new_pointer = b.bitcast(new_pointer, list_value.type.element_type.as_pointer())
+
+    with options(b, int32) as (ret, phi):
+        ret(int32(0))
+
+    with b.if_then(b.icmp_signed("<", phi, length)):
+        b.store(copy(b, b.load(b.gep(pointer, [phi]))), b.gep(new_pointer, [phi]))
+        ret(b.add(phi, int32(1)))
+
+    return b.insert_value(list_value, new_pointer, 0)
+
+
+def free_list(b: ir.IRBuilder, list_value):
+    pointer = b.bitcast(b.extract_value(list_value, 0), pint8)
+    length = b.extract_value(list_value, 1)
+
+    with options(b, int32) as (ret, phi):
+        ret(int32(0))
+
+    with b.if_then(b.icmp_signed("<", phi, length)):
+        free(b, b.load(b.gep(pointer, [phi])))
+        ret(b.add(phi, int32(1)))
+
+    b.call(b.module.free, [pointer])
 
 
 @contextmanager

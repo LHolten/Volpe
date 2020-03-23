@@ -10,13 +10,14 @@ block: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     // | token "**=" value0 -> power_assign
 
 ?value0: value1
-    | value0 "::" value1 -> map
+    | value1 "::" value0 -> map
 
 ?value1: value2
     | value2 "->" value1 -> implication
     | "(" (shape ("," shape)*)? ")" "=>" value1 -> func
     | shape "=>" value1 -> func
     | "$" value1 -> func
+    | "&" value0 -> make_list
 
 ?value2: value3
     | value2 "||" value3 -> logic_or
@@ -25,7 +26,7 @@ block: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     | value3 "&&" value4 -> logic_and
 
 ?value4: value5
-    | ":>" value1 -> return_n
+    | ":>" value0 -> return_n
 
 ?value5: value6
     | value5 "==" value6 -> equals
@@ -45,7 +46,7 @@ block: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     | value8 "/" value9 -> div
     | value8 "%" value9 -> mod
     | value8 "*" value9 -> mul
-    | value9 ".." value9 -> number_list
+    | value9 ".." value9 -> number_iter
     // | value8 "**" value9 -> power
 
 ?value9: value10

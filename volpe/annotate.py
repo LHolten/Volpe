@@ -5,7 +5,8 @@ from llvmlite import ir
 
 from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, math_assign, comp, func_ret, closure_call
 from tree import TypeTree
-from volpe_types import int1, int32, flt32, flt64, VolpeTuple, Closure, VolpeList, pint8
+from volpe_types import int1, int32, flt32, flt64, VolpeTuple, VolpeClosure, VolpeIterator, pint8, VolpeList
+
 
 class AnnotateScope(Interpreter):
     flt = flt64
@@ -46,13 +47,13 @@ class AnnotateScope(Interpreter):
         return tree.return_type
 
     def func(self, tree: TypeTree):
-        return Closure(self.scope, self.local_scope, tree.children[:-1], tree.children[-1])
+        return VolpeClosure(self.scope, self.local_scope, tree.children[:-1], tree.children[-1])
 
     def func_call(self, tree: TypeTree):
         closure = self.visit(tree.children[0])
         arg_types = [self.visit(child) for child in tree.children[1:]]
 
-        assert isinstance(closure, Closure)
+        assert isinstance(closure, VolpeClosure)
 
         closure_call(self, closure, arg_types)
 
@@ -72,40 +73,46 @@ class AnnotateScope(Interpreter):
         tuple_assign(self.local_scope, tree.children[0], self.visit(tree.children[1]))
         return int1
 
-    def integer(self, tree: TypeTree):
+    @staticmethod
+    def integer(tree: TypeTree):
         return int32
 
-    def number_list(self, tree: TypeTree):
+    def number_iter(self, tree: TypeTree):
         ret = self.visit_children(tree)
         assert ret[0] == int32
         assert ret[1] == int32
-        closure = Closure(self.scope, self.local_scope, None, None)
+        closure = VolpeClosure(self.scope, self.local_scope, None, None)
         closure.update(ir.FunctionType(int32, [pint8, int32]))
-        return VolpeList(closure)
+        return VolpeIterator(closure)
 
     def list_index(self, tree: TypeTree):
         ret = self.visit_children(tree)
         assert isinstance(ret[0], VolpeList)
         assert ret[1] == int32
-        return ret[0].closure.func.return_type
+        return ret[0].element_type
 
     def list_size(self, tree: TypeTree):
         ret = self.visit_children(tree)[0]
-        assert isinstance(ret, VolpeList)
+        assert isinstance(ret, VolpeList) or isinstance(ret, VolpeIterator)
         return int32
 
     def map(self, tree: TypeTree):
-        list_value, closure = self.visit_children(tree)
-        assert isinstance(list_value, VolpeList)
-        assert isinstance(closure, Closure)
+        iter_value, closure = self.visit_children(tree)
+        assert isinstance(iter_value, VolpeIterator)
+        assert isinstance(closure, VolpeClosure)
 
-        arg_types = [list_value.closure.func.return_type]
+        arg_types = [iter_value.closure.func.return_type]
 
         closure_call(self, closure, arg_types)
 
-        new_closure = Closure(self.scope, self.local_scope, None, None)
+        new_closure = VolpeClosure(self.scope, self.local_scope, None, None)
         new_closure.update(ir.FunctionType(closure.func.return_type, [pint8, int32]))
-        return VolpeList(new_closure)
+        return VolpeIterator(new_closure)
+
+    def make_list(self, tree: TypeTree):
+        ret = self.visit_children(tree)[0]
+        assert isinstance(ret, VolpeIterator)
+        return VolpeList(ret.closure.func.return_type)
 
     def convert_int(self, tree: TypeTree):
         assert self.visit(tree.children[0]) == int32
