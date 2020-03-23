@@ -84,12 +84,14 @@ class LLVMScope(Interpreter):
         closure = values[0]
         args = values[1:]
 
-        return closure_call(self.builder, closure, args)
+        res = closure_call(self.builder, closure, args)
+        free(self.builder, closure)
+        return res
 
     def this_func(self, tree: TypeTree):
         return copy(self.builder, self.scope["@"])
 
-    def returnn(self, tree: TypeTree):
+    def return_n(self, tree: TypeTree):
         value = self.visit(tree.children[0])
         free_environment(self.builder, self.scope.values())
         self.ret(value)
@@ -127,13 +129,32 @@ class LLVMScope(Interpreter):
         with self.builder.if_then(self.builder.not_(in_range)):
             self.builder.unreachable()
 
-        return closure_call(self.builder, closure, [i])
+        res = closure_call(self.builder, closure, [i])
+        free(self.builder, list_value)
+        return res
 
     def list_size(self, tree: TypeTree):
         list_value = self.visit_children(tree)[0]
         length = self.builder.extract_value(list_value, 1)
         free(self.builder, list_value)
         return length
+
+    def map(self, tree: TypeTree):
+        values = self.visit_children(tree)
+        closure_type = tree.return_type.closure
+        module = self.builder.module
+        env_types = [values[0].type.closure, values[1].type]
+
+        with build_closure(module, closure_type, env_types) as (b, args, closure, c_func):
+            closure1, closure2 = read_environment(b, args[0], env_types)
+            temp = closure_call(b, closure1, [args[1]])
+            b.ret(closure_call(b, closure2, [temp]))
+
+        closure1 = self.builder.extract_value(values[0], 0)
+        env_ptr = write_environment(self.builder, [closure1, values[1]])
+        list_value = tree.return_type(ir.Undefined)
+        list_value = self.builder.insert_value(list_value, self.builder.insert_value(closure, env_ptr, 3), 0)
+        return self.builder.insert_value(list_value, self.builder.extract_value(values[0], 1), 1)
 
     def implication(self, tree: TypeTree):
         with options(self.builder, tree.return_type) as (ret, phi):

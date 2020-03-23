@@ -92,3 +92,18 @@ def func_ret(closure, arg_types):
         closure.update(ir.FunctionType(value_type, [pint8, *arg_types]))
 
     return ret
+
+
+def closure_call(self, closure, arg_types):
+    assert len(closure.arg_names) == len(arg_types), "func call with wrong number of arguments"
+
+    if closure.checked:  # we have already been here
+        return closure.func.return_type
+    closure.checked = True
+
+    args = dict()
+    for a, t in zip(closure.arg_names, arg_types):
+        tuple_assign(args, a, t)
+    args["@"] = closure
+
+    self.__class__(closure.block, closure.get_scope, args, func_ret(closure, arg_types))

@@ -112,7 +112,6 @@ def closure_call(b, closure, args):
     env_ptr = b.extract_value(closure, 3)
 
     value = b.call(func, [env_ptr, *args])
-    free(b, closure)
     return value
 
 

@@ -1,13 +1,16 @@
 block: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
 
 ?value: value1
-    | shape "=" value1 -> assign
-    | token "+=" value1 -> add_assign
-    | token "-=" value1 -> sub_assign
-    | token "/=" value1 -> div_assign
-    | token "*=" value1 -> mul_assign
-    // | token "%=" value1 -> mod_assign
-    // | toekn "**=" value1 -> power_assign
+    | shape "=" value0 -> assign
+    | token "+=" value0 -> add_assign
+    | token "-=" value0 -> sub_assign
+    | token "/=" value0 -> div_assign
+    | token "*=" value0 -> mul_assign
+    // | token "%=" value0 -> mod_assign
+    // | token "**=" value0 -> power_assign
+
+?value0: value1
+    | value0 "::" value1 -> map
 
 ?value1: value2
     | value2 "->" value1 -> implication
@@ -22,7 +25,7 @@ block: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     | value3 "&&" value4 -> logic_and
 
 ?value4: value5
-    | ":>" value1 -> returnn
+    | ":>" value1 -> return_n
 
 ?value5: value6
     | value5 "==" value6 -> equals
@@ -42,6 +45,7 @@ block: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     | value8 "/" value9 -> div
     | value8 "%" value9 -> mod
     | value8 "*" value9 -> mul
+    | value9 ".." value9 -> number_list
     // | value8 "**" value9 -> power
 
 ?value9: value10
@@ -49,9 +53,7 @@ block: _LINESEP* (value (_LINESEP+ value)* _LINESEP*)?
     | "!" value9 -> logic_not
     | "~" value9 -> convert_flt
     | value10 "." INTEGER -> convert_int
-    | value10 ".." value10 -> number_list
     | "|" value10 "|" -> list_size
-    // | value2 "::" value2 -> map
 
 ?value10: func
     | "{" block "}"

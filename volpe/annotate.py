@@ -3,7 +3,7 @@ from typing import Callable
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, math_assign, comp, func_ret
+from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, math_assign, comp, func_ret, closure_call
 from tree import TypeTree
 from volpe_types import int1, int32, flt32, flt64, VolpeTuple, Closure, VolpeList, pint8
 
@@ -53,26 +53,15 @@ class AnnotateScope(Interpreter):
         arg_types = [self.visit(child) for child in tree.children[1:]]
 
         assert isinstance(closure, Closure)
-        assert len(closure.arg_names) == len(arg_types), "func call with wrong number of arguments"
 
-        if closure.checked:  # we have already been here
-            return closure.func.return_type
-        closure.checked = True
-
-        args = dict()
-        for a, t in zip(closure.arg_names, arg_types):
-            tuple_assign(args, a, t)
-        args["@"] = closure
-
-        # Make a new AnnotateScope or FastAnnotateScope.
-        self.__class__(closure.block, closure.get_scope, args, func_ret(closure, arg_types))
+        closure_call(self, closure, arg_types)
 
         return closure.func.return_type
 
     def this_func(self, tree: TypeTree):
         return self.get_scope("@")
 
-    def returnn(self, tree: TypeTree):
+    def return_n(self, tree: TypeTree):
         self.ret(self.visit(tree.children[0]))
         return int1
 
@@ -104,6 +93,19 @@ class AnnotateScope(Interpreter):
         ret = self.visit_children(tree)[0]
         assert isinstance(ret, VolpeList)
         return int32
+
+    def map(self, tree: TypeTree):
+        list_value, closure = self.visit_children(tree)
+        assert isinstance(list_value, VolpeList)
+        assert isinstance(closure, Closure)
+
+        arg_types = [list_value.closure.func.return_type]
+
+        closure_call(self, closure, arg_types)
+
+        new_closure = Closure(self.scope, self.local_scope, None, None)
+        new_closure.update(ir.FunctionType(closure.func.return_type, [pint8, int32]))
+        return VolpeList(new_closure)
 
     def convert_int(self, tree: TypeTree):
         assert self.visit(tree.children[0]) == int32
