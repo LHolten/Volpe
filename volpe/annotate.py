@@ -7,13 +7,13 @@ from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, m
 from tree import TypeTree
 from volpe_types import int1, int32, flt32, flt64, VolpeTuple, Closure, VolpeList, pint8
 
-
 class AnnotateScope(Interpreter):
-    def __init__(self, tree: TypeTree, scope: Callable, local_scope: dict, ret: Callable, fast=False):
+    flt = flt64
+
+    def __init__(self, tree: TypeTree, scope: Callable, local_scope: dict, ret: Callable):
         self.scope = scope
         self.local_scope = local_scope
         self.ret = ret
-        self.fast = fast
 
         if tree.data == "block":
             values = self.visit_children(tree)  # sets tree.return_type
@@ -40,7 +40,8 @@ class AnnotateScope(Interpreter):
             else:
                 tree.return_type = value_type
 
-        AnnotateScope(tree, self.get_scope, dict(), ret, fast=self.fast)
+        # Make a new AnnotateScope or FastAnnotateScope.
+        self.__class__(tree, self.get_scope, dict(), ret)
 
         return tree.return_type
 
@@ -63,7 +64,8 @@ class AnnotateScope(Interpreter):
             tuple_assign(args, a, t)
         args["@"] = closure
 
-        AnnotateScope(closure.block, closure.get_scope, args, func_ret(closure, arg_types), fast=self.fast)
+        # Make a new AnnotateScope or FastAnnotateScope.
+        self.__class__(closure.block, closure.get_scope, args, func_ret(closure, arg_types))
 
         return closure.func.return_type
 
@@ -105,15 +107,10 @@ class AnnotateScope(Interpreter):
 
     def convert_int(self, tree: TypeTree):
         assert self.visit(tree.children[0]) == int32
-        if self.fast:
-            return flt32
-        return flt64
+        return self.flt
 
     def convert_flt(self, tree: TypeTree):
-        if self.fast:
-            assert self.visit(tree.children[0]) == flt32
-        else:
-            assert self.visit(tree.children[0]) == flt64
+        assert self.visit(tree.children[0]) == self.flt
         return int32
 
     def collect_tuple(self, tree: TypeTree):
@@ -149,3 +146,7 @@ class AnnotateScope(Interpreter):
 
     def __default__(self, tree: TypeTree):
         raise NotImplementedError("annotate", tree.data)
+
+
+class FastAnnotateScope(AnnotateScope):
+    flt = flt32
