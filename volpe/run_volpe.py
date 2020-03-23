@@ -4,16 +4,16 @@ from os import path
 from lark import Lark
 from llvmlite import ir
 
-from annotate import AnnotateScope
+from annotate import AnnotateScope, FastAnnotateScope
 from annotate_utils import func_ret
-from builder import LLVMScope
+from builder import LLVMScope, FastLLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
 from tree import TypeTree
 from volpe_types import pint8, int32, VolpeTuple, target_data, Closure, copy_func, free_func
 
 
-def volpe_llvm(tree: TypeTree, verbose=False):
+def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
     if verbose:
         print(tree.pretty())
 
@@ -22,7 +22,11 @@ def volpe_llvm(tree: TypeTree, verbose=False):
 
     func_type = Closure(scope, {}, [], tree)
     func_type.checked = True
-    AnnotateScope(tree, func_type.get_scope, {}, func_ret(func_type, []))
+
+    if fast:
+        FastAnnotateScope(tree, func_type.get_scope, {}, func_ret(func_type, []))
+    else:
+        AnnotateScope(tree, func_type.get_scope, {}, func_ret(func_type, []))
 
     if verbose:
         print(tree.pretty())
@@ -39,7 +43,10 @@ def volpe_llvm(tree: TypeTree, verbose=False):
     closure = func_type([func, c_func, f_func, ir.Undefined])
 
     with build_func(func) as (b, args):
-        LLVMScope(b, tree, {"@": closure}, b.ret)
+        if fast:
+            FastLLVMScope(b, tree, {"@": closure}, b.ret)
+        else:
+            LLVMScope(b, tree, {"@": closure}, b.ret)
 
     with build_func(c_func) as (b, args):
         b.ret(pint8(ir.Undefined))
@@ -68,7 +75,7 @@ def volpe_llvm(tree: TypeTree, verbose=False):
     # return scope.visit(tree)
 
 
-def run(file_path, verbose=False):
+def run(file_path, verbose=False, fast=False):
     base_path = path.dirname(__file__)
     path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
     with open(path_to_lark) as lark_file:
@@ -76,5 +83,5 @@ def run(file_path, verbose=False):
     with open(file_path) as vlp_file:
         parsed_tree = volpe_parser.parse(vlp_file.read())
     # print(parsed_tree.pretty())
-    volpe_llvm(parsed_tree, verbose)
+    volpe_llvm(parsed_tree, verbose=verbose, fast=fast)
     # llvm_ir()

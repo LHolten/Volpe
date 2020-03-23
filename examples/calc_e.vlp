@@ -8,7 +8,7 @@ recursive_calc_e = (e, n) => {
     n == 0 -> :> e
 
     # get next term (working backwards)
-    term = 1.0 / ~factorial(n)
+    term = 1.0 / factorial(n).0
 
     # add onto result
     :> @(e + term, n - 1)

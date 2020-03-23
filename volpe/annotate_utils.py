@@ -3,7 +3,7 @@ from typing import Dict
 from llvmlite import ir
 
 from tree import TypeTree
-from volpe_types import VolpeTuple, int1, int32, flt32, pint8
+from volpe_types import VolpeTuple, int1, int32, flt32, flt64, pint8
 
 
 def logic(self, tree: TypeTree):
@@ -25,7 +25,7 @@ def math(self, tree: TypeTree):
     assert ret0 == ret1, "types need to match for math operations"
     if ret0 == int32:
         tree.data = tree.data + "_int"
-    elif ret0 == flt32:
+    elif ret0 == flt32 or ret0 == flt64:
         tree.data = tree.data + "_flt"
     else:
         raise AssertionError("math operations only work for integers and floats")
@@ -36,7 +36,7 @@ def unary_math(self, tree: TypeTree):
     ret = self.visit_children(tree)[0]
     if ret == int32:
         tree.data = tree.data + "_int"
-    elif ret == flt32:
+    elif ret == flt32 or ret == flt64:
         tree.data = tree.data + "_flt"
     else:
         raise AssertionError("unary math operations only work for integers and floats")
@@ -65,7 +65,7 @@ def comp(self, tree: TypeTree):
     assert ret0 == ret1, "types need to match for comparisons"
     if ret0 == int32:
         tree.data = tree.data + "_int"
-    elif ret0 == flt32:
+    elif ret0 == flt32 or ret0 == flt64:
         tree.data = tree.data + "_flt"
     else:
         raise AssertionError("comparisons only work for integers and floats")
