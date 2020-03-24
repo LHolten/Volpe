@@ -58,14 +58,14 @@ block: _LINE_SEP* (value (_LINE_SEP+ value)* _LINE_SEP*)?
 
 ?value10: func
     | "{" block "}"
-    | "(" _SEP* value1 _SEP* ")"
-    | "[" _SEP* (value1 ("," _SEP* value1)* _SEP* )? "]" -> collect_tuple
+    | "[" _SEP* (value0 ("," _SEP* value0)* _SEP* )? "]" -> collect_tuple
     | INTEGER -> integer
     // | ESCAPED_STRING -> string
 
-func: CNAME -> symbol
-    | func "(" _SEP* (value1 ("," _SEP* value1)* _SEP* )? ")" -> func_call
-    | func "[" _SEP* value1 _SEP* "]" -> list_index
+?func: CNAME -> symbol
+    | "(" _SEP* value0 _SEP* ")"
+    | func "(" _SEP* (value0 ("," _SEP* value0)* _SEP* )? ")" -> func_call
+    | func "[" _SEP* value0 _SEP* "]" -> list_index
     | "@" -> this_func
 
 ?shape: token
