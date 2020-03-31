@@ -51,16 +51,15 @@ def determine_c_type(volpe_type, depth=0):
     # Simple types:
     if volpe_type == int1:
         return c_bool
-    elif volpe_type == int32:
+    if volpe_type == int32:
         return c_int32
-    elif volpe_type == flt32:
+    if volpe_type == flt32:
         return c_float
-    elif volpe_type == flt64:
+    if volpe_type == flt64:
         return c_double
     
     # Aggregate types:
-    elif isinstance(volpe_type, VolpeTuple):
-        print(volpe_type._to_string())
+    if isinstance(volpe_type, VolpeTuple):
         elems = volpe_type.elements
         class CTuple(Structure):
             _fields_ = [(f"elem{i}", determine_c_type(elem, depth+1)) for i, elem in enumerate(elems)]
@@ -68,31 +67,70 @@ def determine_c_type(volpe_type, depth=0):
                 return "[" + ", ".join([str(getattr(self, tup[0])) for tup in self._fields_]) + "]"
         return POINTER(CTuple) if depth == 0 else CTuple
 
-    elif isinstance(volpe_type, VolpeClosure):
-        print(volpe_type._to_string())
+    if isinstance(volpe_type, VolpeList):
+        class CList(Structure):
+            _fields_ = [("elem_type", POINTER(None)), ("length", c_int32)]
+            def __repr__(self):
+                if depth == 0:
+                    # TODO get elements
+                    # list_type = get_type_name(volpe_type.element_type)
+                    return f"&<elements go here>"
+                return get_type_name(volpe_type)
+        return CList
+
+    if isinstance(volpe_type, VolpeClosure):
+        elems = volpe_type.elements
         class CFunc(Structure):
             _fields_ = [("func", POINTER(None)), ("c_func", POINTER(None)), ("f_func", POINTER(None)), ("env", POINTER(None))]
             def __repr__(self):
-                return "*function*"
+                if depth == 0:
+                    func = elems[0].pointee
+                    input_type = ", ".join([get_type_name(i) for i in func.args[1:]])
+                    return_type = get_type_name(func.return_type)
+                    return f"function ({input_type}) => {return_type}"
+                return get_type_name(volpe_type)
         return CFunc
 
-    elif isinstance(volpe_type, VolpeIterator):
-        print(volpe_type._to_string())
+    if isinstance(volpe_type, VolpeIterator):
         class CFunc(Structure):
             _fields_ = [("func", POINTER(None)), ("c_func", POINTER(None)), ("f_func", POINTER(None)), ("env", POINTER(None))]
         class CIterator(Structure):
-            _fields_ = [("func", CFunc), ("num", c_int32)]
+            _fields_ = [("func", CFunc), ("length", c_int32)]
             def __repr__(self):
-                return "*iterator*"
+                if depth == 0:
+                    # TODO maybe include length?
+                    func = volpe_type.elements[0].elements[0].pointee
+                    return_type = get_type_name(func.return_type)
+                    return f"iterator {return_type}"
+                return get_type_name(volpe_type)
         return CIterator
-
-    elif isinstance(volpe_type, VolpeList):
-        print(volpe_type._to_string())
-        class CList(Structure):
-            _fields_ = [("elem_type", POINTER(None)), ("num", c_int32)]
-            def __repr__(self):
-                return "*list*"
-        return CList
         
     # Unknown type
-    else: return None
+    return None
+
+
+def get_type_name(volpe_type):
+    """Get short Volpe names for types."""
+    # Simple types:
+    if volpe_type == int1:
+        return "bool"
+    if volpe_type == int32:
+        return "int32"
+    if volpe_type == flt32:
+        return "flt32"
+    if volpe_type == flt64:
+        return "flt64"
+
+    # Aggregate types:
+    if isinstance(volpe_type, VolpeTuple):
+        type_reprs = ", ".join([get_type_name(elem) for elem in volpe_type.elements])
+        return f"[{type_reprs}]"
+    if isinstance(volpe_type, VolpeList):
+        return "*list*"
+    if isinstance(volpe_type, VolpeClosure):
+        return "*function*"
+    if isinstance(volpe_type, VolpeIterator):
+        return "*iterator*"
+        
+    # Unknown type
+    return None
