@@ -68,15 +68,16 @@ def determine_c_type(volpe_type, depth=0):
         return POINTER(CTuple) if depth == 0 else CTuple
 
     if isinstance(volpe_type, VolpeList):
+        element_type = determine_c_type(volpe_type.element_type, depth+1)
         class CList(Structure):
-            _fields_ = [("elem_type", POINTER(None)), ("length", c_int32)]
+            _fields_ = [("elems", POINTER(element_type)), ("length", c_int32)]
             def __repr__(self):
                 if depth == 0:
-                    # TODO get elements
-                    # list_type = get_type_name(volpe_type.element_type)
-                    return f"&<elements go here>"
+                    elems = getattr(self, "elems")
+                    length = getattr(self, "length")
+                    return "&<" + ", ".join([str(elem) for elem in elems[:length]]) + ">"
                 return get_type_name(volpe_type)
-        return CList
+        return POINTER(CList) if depth == 0 else CList
 
     if isinstance(volpe_type, VolpeClosure):
         elems = volpe_type.elements
@@ -101,7 +102,7 @@ def determine_c_type(volpe_type, depth=0):
                     # TODO maybe include length?
                     func = volpe_type.elements[0].elements[0].pointee
                     return_type = get_type_name(func.return_type)
-                    return f"iterator {return_type}"
+                    return f"iterator of {return_type}"
                 return get_type_name(volpe_type)
         return CIterator
         

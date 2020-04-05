@@ -113,6 +113,8 @@ class LLVMScope(Interpreter):
             start = read_environment(b, args[0], env_types)[0]
             b.ret(b.add(start, args[1]))
 
+        # TODO going in reverse
+
         env_ptr = write_environment(self.builder, [values[0]])
         list_value = tree.return_type(ir.Undefined)
         list_value = self.builder.insert_value(list_value, self.builder.insert_value(closure, env_ptr, 3), 0)
