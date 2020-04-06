@@ -109,9 +109,10 @@ class LLVMScope(Interpreter):
         module = self.builder.module
         env_types = [int32]
 
-        with options(self.builder, tree.return_type) as (ret, phi):
+        # TODO compact or simplify the following code:
 
-            # Compare a, b (a..b) to determine reverse.
+        with options(self.builder, tree.return_type) as (ret, phi):
+            # reverse = a > b in (a..b).
             reverse = self.builder.icmp_signed(">", values[0], values[1])
             with self.builder.if_then(reverse):
                 # Going in reverse (10..0).
