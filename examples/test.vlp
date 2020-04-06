@@ -1,21 +1,15 @@
-# a jungle of random tests
+f = (x, [y, z]) => [&x..10, y..z]
+a = f(0, [0, 10])
+[b, c] = a
+ 
+# functions
+# :> f
 
-# testing compound assignment operators
-a = 3
-a += 2
-a /= 5
+# tuples
+# :> [1 > 0, [1, 0.0], f, b, c]
 
-b = 2.5
-b *= 4.0
-b -= a.5  # conversion
+# iterators
+# :> c :: i => [i, i.0, f, f(i-5, [0, 2])]
 
-f = () => ~b  # conversion
-
-c = [1.0, 2, [3.0, 4]]  # tuples
-
-[d, _, e] = c  # tuple decomposition
-
-g = (-2)..2  # ranges
-
-# printing various types, float precision
-:> [b, 1 > 0, !(5 == ~5.0), [1.0, 2, [3.0, 4]], 1.0 / 3.0, f(), f, [f], g[1]]
+# lists
+:> b
