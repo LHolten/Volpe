@@ -62,11 +62,11 @@ def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
     with build_func(main_func) as (b, _):
         b: ir.IRBuilder
         res = b.call(func, [pint8(ir.Undefined)])
+        # TODO return vector as pointer if length is needed in print
         if isinstance(res.type, (VolpeTuple, VolpeList)):
             ptr = b.bitcast(b.call(module.malloc, [int32(res.type.get_abi_size(target_data))]), return_type)
             b.store(res, ptr)
             res = ptr
-        # TODO return list and vector as pointer
         b.ret(res)
 
     if verbose:

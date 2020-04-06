@@ -109,16 +109,33 @@ class LLVMScope(Interpreter):
         module = self.builder.module
         env_types = [int32]
 
-        with build_closure(module, closure_type, env_types) as (b, args, closure, c_func):
-            start = read_environment(b, args[0], env_types)[0]
-            b.ret(b.add(start, args[1]))
+        # TODO compact or simplify the following code:
 
-        # TODO going in reverse
+        with options(self.builder, tree.return_type) as (ret, phi):
+            # reverse = a > b in (a..b).
+            reverse = self.builder.icmp_signed(">", values[0], values[1])
+            with self.builder.if_then(reverse):
+                # Going in reverse (10..0).
+                with build_closure(module, closure_type, env_types) as (b, args, closure, c_func):
+                    start = read_environment(b, args[0], env_types)[0]
+                    b.ret(b.sub(start, b.add(args[1], int32(1))))
 
-        env_ptr = write_environment(self.builder, [values[0]])
-        list_value = tree.return_type(ir.Undefined)
-        list_value = self.builder.insert_value(list_value, self.builder.insert_value(closure, env_ptr, 3), 0)
-        return self.builder.insert_value(list_value, self.builder.sub(values[1], values[0]), 1)
+                env_ptr = write_environment(self.builder, [values[0]])
+                list_value = tree.return_type(ir.Undefined)
+                list_value = self.builder.insert_value(list_value, self.builder.insert_value(closure, env_ptr, 3), 0)
+                ret(self.builder.insert_value(list_value, self.builder.sub(values[0], values[1]), 1))
+
+            # Going forwards (0..10).
+            with build_closure(module, closure_type, env_types) as (b, args, closure, c_func):
+                start = read_environment(b, args[0], env_types)[0]
+                b.ret(b.add(start, args[1]))
+
+            env_ptr = write_environment(self.builder, [values[0]])
+            list_value = tree.return_type(ir.Undefined)
+            list_value = self.builder.insert_value(list_value, self.builder.insert_value(closure, env_ptr, 3), 0)
+            ret(self.builder.insert_value(list_value, self.builder.sub(values[1], values[0]), 1))
+
+        return phi
 
     def list_index(self, tree: TypeTree):
         list_value, i = self.visit_children(tree)
