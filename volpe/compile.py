@@ -72,7 +72,7 @@ def determine_c_type(volpe_type, depth=0):
         class CList(Structure):
             _fields_ = [("elems", POINTER(element_type)), ("length", c_int32)]
             def __repr__(self):
-                if depth == 0:
+                if depth < 2:
                     elems = getattr(self, "elems")
                     length = getattr(self, "length")
                     return "&<" + ", ".join([str(elem) for elem in elems[:length]]) + ">"
