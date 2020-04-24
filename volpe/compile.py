@@ -5,13 +5,12 @@ import llvmlite.binding as llvm
 
 # All these initializations are required for code generation!
 from volpe_types import (
-    int1, 
-    int32, 
-    flt32, 
-    flt64, 
-    VolpeTuple, 
+    int1,
+    int32,
+    flt32,
+    flt64,
+    VolpeObject,
     VolpeClosure,
-    VolpeIterator,
     VolpeList
 )
 
@@ -59,18 +58,22 @@ def determine_c_type(volpe_type, depth=0):
         return c_double
     
     # Aggregate types:
-    if isinstance(volpe_type, VolpeTuple):
+    if isinstance(volpe_type, VolpeObject):
         elems = volpe_type.elements
+
         class CTuple(Structure):
             _fields_ = [(f"elem{i}", determine_c_type(elem, depth+1)) for i, elem in enumerate(elems)]
+
             def __repr__(self):
                 return "[" + ", ".join([str(getattr(self, tup[0])) for tup in self._fields_]) + "]"
         return POINTER(CTuple) if depth == 0 else CTuple
 
     if isinstance(volpe_type, VolpeList):
         element_type = determine_c_type(volpe_type.element_type, depth+1)
+
         class CList(Structure):
             _fields_ = [("elems", POINTER(element_type)), ("length", c_int32)]
+
             def __repr__(self):
                 if depth < 2:
                     elems = getattr(self, "elems")
@@ -81,8 +84,10 @@ def determine_c_type(volpe_type, depth=0):
 
     if isinstance(volpe_type, VolpeClosure):
         elems = volpe_type.elements
+
         class CFunc(Structure):
             _fields_ = [("func", POINTER(None)), ("c_func", POINTER(None)), ("f_func", POINTER(None)), ("env", POINTER(None))]
+
             def __repr__(self):
                 if depth == 0:
                     func = elems[0].pointee
@@ -91,20 +96,6 @@ def determine_c_type(volpe_type, depth=0):
                     return f"function ({input_type}) => {return_type}"
                 return get_type_name(volpe_type)
         return CFunc
-
-    if isinstance(volpe_type, VolpeIterator):
-        class CFunc(Structure):
-            _fields_ = [("func", POINTER(None)), ("c_func", POINTER(None)), ("f_func", POINTER(None)), ("env", POINTER(None))]
-        class CIterator(Structure):
-            _fields_ = [("func", CFunc), ("length", c_int32)]
-            def __repr__(self):
-                if depth == 0:
-                    # TODO Maybe include length.
-                    func = volpe_type.elements[0].elements[0].pointee
-                    return_type = get_type_name(func.return_type)
-                    return f"iterator {return_type}"
-                return get_type_name(volpe_type)
-        return CIterator
         
     # Unknown type
     return None
@@ -123,15 +114,13 @@ def get_type_name(volpe_type):
         return "flt64"
 
     # Aggregate types:
-    if isinstance(volpe_type, VolpeTuple):
+    if isinstance(volpe_type, VolpeObject):
         type_reprs = ", ".join([get_type_name(elem) for elem in volpe_type.elements])
         return f"[{type_reprs}]"
     if isinstance(volpe_type, VolpeList):
         return "*list*"
     if isinstance(volpe_type, VolpeClosure):
         return "*func*"
-    if isinstance(volpe_type, VolpeIterator):
-        return "*iter*"
         
     # Unknown type
     return None

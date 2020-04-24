@@ -158,23 +158,6 @@ class LLVMScope(Interpreter):
         free(self.builder, list_value)
         return length
 
-    def map(self, tree: TypeTree):
-        values = self.visit_children(tree)
-        closure_type = tree.return_type.closure
-        module = self.builder.module
-        env_types = [values[0].type.closure, values[1].type]
-
-        with build_closure(module, closure_type, env_types) as (b, args, closure, c_func):
-            closure1, closure2 = read_environment(b, args[0], env_types)
-            temp = closure_call(b, closure1, [args[1]])
-            b.ret(closure_call(b, closure2, [temp]))
-
-        closure1 = self.builder.extract_value(values[0], 0)
-        env_ptr = write_environment(self.builder, [closure1, values[1]])
-        list_value = tree.return_type(ir.Undefined)
-        list_value = self.builder.insert_value(list_value, self.builder.insert_value(closure, env_ptr, 3), 0)
-        return self.builder.insert_value(list_value, self.builder.extract_value(values[0], 1), 1)
-
     def make_list(self, tree: TypeTree):
         iter_value = self.visit_children(tree)[0]
         closure = self.builder.extract_value(iter_value, 0)
@@ -234,7 +217,8 @@ class LLVMScope(Interpreter):
         return value
         
     # Integers
-    def integer(self, tree: TypeTree):
+    @staticmethod
+    def integer(tree: TypeTree):
         return tree.return_type(int(tree.children[0].value))
 
     def add_int(self, tree: TypeTree):
@@ -296,10 +280,6 @@ class LLVMScope(Interpreter):
     def less_equals_int(self, tree: TypeTree):
         values = self.visit_children(tree)
         return self.builder.icmp_signed("<=", values[0], values[1])
-
-    # Floating point numbers
-    def floating(self, tree: TypeTree):
-        return tree.return_type(float(tree.children[0].value))
 
     def add_flt(self, tree: TypeTree):
         values = self.visit_children(tree)

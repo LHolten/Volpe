@@ -3,9 +3,9 @@ from typing import Callable
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, math_assign, comp, func_ret, closure_call
+from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, math_assign, comp, closure_call
 from tree import TypeTree
-from volpe_types import int1, int32, flt32, flt64, VolpeTuple, VolpeClosure, VolpeIterator, pint8, VolpeList
+from volpe_types import int1, int32, flt32, flt64, VolpeObject, VolpeClosure, pint8, VolpeList
 
 
 class AnnotateScope(Interpreter):
@@ -77,14 +77,6 @@ class AnnotateScope(Interpreter):
     def integer(tree: TypeTree):
         return int32
 
-    def number_iter(self, tree: TypeTree):
-        ret = self.visit_children(tree)
-        assert ret[0] == int32
-        assert ret[1] == int32
-        closure = VolpeClosure(self.scope, self.local_scope, None, None)
-        closure.update(ir.FunctionType(int32, [pint8, int32]))
-        return VolpeIterator(closure)
-
     def list_index(self, tree: TypeTree):
         ret = self.visit_children(tree)
         assert isinstance(ret[0], VolpeList)
@@ -93,25 +85,12 @@ class AnnotateScope(Interpreter):
 
     def list_size(self, tree: TypeTree):
         ret = self.visit_children(tree)[0]
-        assert isinstance(ret, VolpeList) or isinstance(ret, VolpeIterator)
+        assert isinstance(ret, VolpeList)
         return int32
 
-    def map(self, tree: TypeTree):
-        iter_value, closure = self.visit_children(tree)
-        assert isinstance(iter_value, VolpeIterator)
-        assert isinstance(closure, VolpeClosure)
-
-        arg_types = [iter_value.closure.func.return_type]
-
-        closure_call(self, closure, arg_types)
-
-        new_closure = VolpeClosure(self.scope, self.local_scope, None, None)
-        new_closure.update(ir.FunctionType(closure.func.return_type, [pint8, int32]))
-        return VolpeIterator(new_closure)
-
     def make_list(self, tree: TypeTree):
+        # update this function
         ret = self.visit_children(tree)[0]
-        assert isinstance(ret, VolpeIterator)
         return VolpeList(ret.closure.func.return_type)
 
     def convert_int(self, tree: TypeTree):
@@ -123,7 +102,7 @@ class AnnotateScope(Interpreter):
         return int32
 
     def object(self, tree: TypeTree):
-        return VolpeTuple(self.visit_children(tree))
+        return VolpeObject(self.visit_children(tree))
 
     # Boolean logic
     implication = logic

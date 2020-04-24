@@ -10,7 +10,7 @@ from builder import LLVMScope, FastLLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
 from tree import TypeTree
-from volpe_types import pint8, int32, VolpeTuple, VolpeList, target_data, VolpeClosure, copy_func, free_func
+from volpe_types import pint8, int32, VolpeObject, VolpeList, target_data, VolpeClosure, copy_func, free_func
 
 
 def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
@@ -55,7 +55,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
         b.ret_void()
 
     return_type = func_type.func.return_type
-    if isinstance(return_type, (VolpeTuple, VolpeList)):
+    if isinstance(return_type, (VolpeObject, VolpeList)):
         return_type = return_type.as_pointer()
 
     main_func = ir.Function(module, ir.FunctionType(return_type, []), "main")
@@ -63,7 +63,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
         b: ir.IRBuilder
         res = b.call(func, [pint8(ir.Undefined)])
         # TODO return vector as pointer if length is needed in print
-        if isinstance(res.type, (VolpeTuple, VolpeList)):
+        if isinstance(res.type, (VolpeObject, VolpeList)):
             ptr = b.bitcast(b.call(module.malloc, [int32(res.type.get_abi_size(target_data))]), return_type)
             b.store(res, ptr)
             res = ptr

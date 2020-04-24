@@ -3,7 +3,7 @@ from typing import Dict
 from llvmlite import ir
 
 from tree import TypeTree
-from volpe_types import VolpeTuple, int1, int32, pint8
+from volpe_types import VolpeObject, int1, int32, pint8
 
 
 def logic(self, tree: TypeTree):
@@ -74,7 +74,7 @@ def comp(self, tree: TypeTree):
 
 def tuple_assign(scope: Dict, tree: TypeTree, value_type):
     if tree.data == "object":
-        assert isinstance(value_type, VolpeTuple), "can only destructure tuples"
+        assert isinstance(value_type, VolpeObject), "can only destructure tuples"
         assert len(tree.children) == len(value_type.elements)
 
         for i, child in enumerate(tree.children):

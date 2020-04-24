@@ -21,14 +21,8 @@ unknown_func = ir.FunctionType(unknown, [])
 target_data = llvm.Target.from_default_triple().create_target_machine().target_data
 
 
-class VolpeTuple(ir.LiteralStructType):
+class VolpeObject(ir.LiteralStructType):
     pass
-
-
-class VolpeIterator(ir.LiteralStructType):
-    def __init__(self, closure):
-        super().__init__([closure, int32])
-        self.closure = closure
 
 
 class VolpeList(ir.LiteralStructType):

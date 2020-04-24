@@ -4,8 +4,8 @@ from typing import List, Dict, Iterable
 from llvmlite import ir
 
 from tree import TypeTree
-from volpe_types import int32, target_data, VolpeTuple, VolpeClosure, copy_func, free_func, VolpeIterator, VolpeList, \
-    pint8, int1
+from volpe_types import int32, target_data, VolpeObject, VolpeClosure, copy_func, free_func, VolpeList, \
+    pint8
 
 
 def free(b, value):
@@ -13,11 +13,9 @@ def free(b, value):
         f_func = b.extract_value(value, 2)
         env_ptr = b.extract_value(value, 3)
         b.call(f_func, [env_ptr])
-    if isinstance(value.type, VolpeTuple):
+    if isinstance(value.type, VolpeObject):
         for i in range(len(value.type.elements)):
             free(b, b.extract_value(value, i))
-    if isinstance(value.type, VolpeIterator):
-        free(b, b.extract_value(value, 0))
     if isinstance(value.type, VolpeList):
         free_list(b, value)
 
@@ -26,12 +24,9 @@ def copy(b, value):
     if isinstance(value.type, VolpeClosure):
         env_copy = b.call(b.extract_value(value, 1), [b.extract_value(value, 3)])
         value = b.insert_value(value, env_copy, 3)
-    if isinstance(value.type, VolpeTuple):
+    if isinstance(value.type, VolpeObject):
         for i in range(len(value.type.elements)):
             value = b.insert_value(value, copy(b, b.extract_value(value, i)), i)
-    if isinstance(value.type, VolpeIterator):
-        closure = b.extract_value(value, 0)
-        value = b.insert_value(value, copy(b, closure), 0)
     if isinstance(value.type, VolpeList):
         value = copy_list(b, value)
 
