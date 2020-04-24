@@ -122,7 +122,7 @@ class AnnotateScope(Interpreter):
         assert self.visit(tree.children[0]) == self.flt
         return int32
 
-    def collect_tuple(self, tree: TypeTree):
+    def object(self, tree: TypeTree):
         return VolpeTuple(self.visit_children(tree))
 
     # Boolean logic

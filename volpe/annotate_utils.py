@@ -73,7 +73,7 @@ def comp(self, tree: TypeTree):
 
 
 def tuple_assign(scope: Dict, tree: TypeTree, value_type):
-    if tree.data == "shape":
+    if tree.data == "object":
         assert isinstance(value_type, VolpeTuple), "can only destructure tuples"
         assert len(tree.children) == len(value_type.elements)
 

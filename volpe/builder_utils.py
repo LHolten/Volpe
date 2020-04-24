@@ -144,7 +144,7 @@ def build_closure(module, closure_type, env_types):
         b.ret_void()
 
 
-def closure_call(b, closure, args):
+def closure_call(b: ir.IRBuilder, closure, args):
     func = b.extract_value(closure, 0)
     env_ptr = b.extract_value(closure, 3)
 
@@ -153,7 +153,7 @@ def closure_call(b, closure, args):
 
 
 def tuple_assign(b: ir.IRBuilder, scope: Dict, shape: TypeTree, value):
-    if shape.data == "shape":
+    if shape.data == "object":
         for i, child in enumerate(shape.children):
             tuple_assign(b, scope, child, b.extract_value(value, i))
     else:

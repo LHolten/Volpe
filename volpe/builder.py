@@ -227,7 +227,7 @@ class LLVMScope(Interpreter):
         value = self.visit_children(tree)[0]
         return self.builder.not_(value)
 
-    def collect_tuple(self, tree: TypeTree):
+    def object(self, tree: TypeTree):
         value = tree.return_type(ir.Undefined)
         for i, v in enumerate(self.visit_children(tree)):
             value = self.builder.insert_value(value, v, i)
