@@ -38,11 +38,11 @@ class VolpeList(ir.LiteralStructType):
 
 
 class VolpeClosure(ir.LiteralStructType):
-    def __init__(self, scope: Callable, local_scope: dict, arg_names, block):
+    def __init__(self, scope: Callable, local_scope: dict, arg_object, block):
         super().__init__([unknown_func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
         self.func = unknown_func
         self.outside_used = set()
-        self.arg_names = arg_names
+        self.arg_object = arg_object
         self.block = block
         self.checked = False
 

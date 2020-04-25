@@ -9,15 +9,16 @@ from volpe_types import int32, target_data, VolpeObject, VolpeClosure, copy_func
 
 
 def free(b, value):
-    if isinstance(value.type, VolpeClosure):
-        f_func = b.extract_value(value, 2)
-        env_ptr = b.extract_value(value, 3)
-        b.call(f_func, [env_ptr])
-    if isinstance(value.type, VolpeObject):
-        for i in range(len(value.type.elements)):
-            free(b, b.extract_value(value, i))
-    if isinstance(value.type, VolpeList):
-        free_list(b, value)
+    pass
+    # if isinstance(value.type, VolpeClosure):
+    #     f_func = b.extract_value(value, 2)
+    #     env_ptr = b.extract_value(value, 3)
+    #     b.call(f_func, [env_ptr])
+    # if isinstance(value.type, VolpeObject):
+    #     for i in range(len(value.type.elements)):
+    #         free(b, b.extract_value(value, i))
+    # if isinstance(value.type, VolpeList):
+    #     free_list(b, value)
 
 
 def copy(b, value):
@@ -139,30 +140,15 @@ def build_closure(module, closure_type, env_types):
         b.ret_void()
 
 
-def closure_call(b: ir.IRBuilder, closure, args):
-    func = b.extract_value(closure, 0)
-    env_ptr = b.extract_value(closure, 3)
-
-    value = b.call(func, [env_ptr, *args])
-    return value
-
-
-def tuple_assign(self, tree: TypeTree, value):
+def tuple_assign(b: ir.IRBuilder, scope, tree: TypeTree, value):
     if tree.data == "object":
-        def scope(key):
-            if key in value.type.type_dict.keys():
-                return self.builder.extract_value(value, list(value.type.type_dict.keys()).index(key))
-            return self.scope(key)
-
-        local_scope = self.__class__(self.builder, tree, scope, None).local_scope
-        for name, value in local_scope.items():
-            if name in self.local_scope:
-                free(self.builder, self.local_scope[name])
-            self.local_scope[name] = value
-
-        free(self.builder, value)
+        for i, child in enumerate(tree.children):
+            tuple_assign(b, scope, child, b.extract_value(value, i))
     else:
+        assert tree.data == "symbol", "trait deconstruction is not supported yet"
         name = tree.children[0].value
-        if name in self.local_scope:
-            free(self.builder, self.local_scope[name])
-        self.local_scope[name] = value
+        if name in scope:
+            free(b, scope[name])
+        scope[name] = value
+
+    return scope

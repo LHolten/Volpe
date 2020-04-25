@@ -4,7 +4,7 @@ from lark.visitors import Interpreter
 from llvmlite import ir
 
 from builder_utils import write_environment, free_environment, options, \
-    read_environment, tuple_assign, copy, copy_environment, build_closure, closure_call, free
+    read_environment, tuple_assign, copy, copy_environment, build_closure, free
 from tree import TypeTree
 from volpe_types import int1, flt32, flt64, VolpeClosure, int32, target_data
 
@@ -31,7 +31,7 @@ class LLVMScope(Interpreter):
 
     def get_scope(self, name):
         if name in self.local_scope:
-            return self.local_scope[name]
+            return copy(self.builder, self.local_scope[name])
         return self.scope(name)
 
     def visit(self, tree: TypeTree):
@@ -43,11 +43,11 @@ class LLVMScope(Interpreter):
         return getattr(self, tree.data)(tree)
 
     def assign(self, tree: TypeTree):
-        tuple_assign(self, tree.children[0], self.visit(tree.children[1]))
+        tuple_assign(self.builder, self.local_scope, tree.children[0], self.visit(tree.children[1]))
         return int1(True)
 
     def symbol(self, tree: TypeTree):
-        return copy(self.builder, self.get_scope(tree.children[0].value))
+        return self.get_scope(tree.children[0].value)
 
     def func(self, tree: TypeTree):
         closure_type = tree.return_type
@@ -55,7 +55,7 @@ class LLVMScope(Interpreter):
 
         module = self.builder.module
         env_names = list(closure_type.outside_used)
-        env_values = [self.scope[name] for name in env_names]
+        env_values = [self.get_scope(name) for name in env_names]
         env_types = [value.type for value in env_values]
 
         with build_closure(module, closure_type, env_types) as (b, args, closure, c_func):
@@ -63,20 +63,20 @@ class LLVMScope(Interpreter):
                 new_values = read_environment(b, args[0], env_types)
 
                 env_scope = dict(zip(env_names, new_values))
-                # TODO fix freeing the environment
-                for shape, value in zip(tree.children[:-1], args[1:]):
-                    tuple_assign(b, new_scope, shape, value)
-                new_scope["@"] = closure
+                env_scope["@"] = b.insert_value(closure, args[0], 3)
+
+                arg_scope = tuple_assign(b, dict(), tree.children[0], args[1])
 
                 def scope(name):
-                    return new_scope[name]
+                    if name in arg_scope:
+                        return copy(b, arg_scope[name])
+                    return copy(b, env_scope[name])
 
                 def ret(value):
+                    free_environment(b, arg_scope.values())
+                    b.ret(value)
 
-
-                # Creates new LLVMScope or FastLLVMScope.
-                self.__class__(b, tree.children[-1], scope, b.ret)
-
+                self.__class__(b, tree.children[-1], scope, ret)
             else:
                 b.ret_void()
                 print("ignoring function without usage")
@@ -87,33 +87,30 @@ class LLVMScope(Interpreter):
     def func_call(self, tree: TypeTree):
         values = self.visit_children(tree)
         closure = values[0]
-        args = values[1:]
+        args = values[1]
 
-        res = closure_call(self.builder, closure, args)
+        func = self.builder.extract_value(closure, 0)
+        env_ptr = self.builder.extract_value(closure, 3)
+
+        res = self.builder.call(func, [env_ptr, args])
+
         free(self.builder, closure)
         return res
 
-    def this_func(self, tree: TypeTree):
-        return copy(self.builder, self.scope["@"])
-
     def return_n(self, tree: TypeTree):
         value = self.visit(tree.children[0])
-        free_environment(self.builder, self.scope.values())
+        free_environment(self.builder, self.local_scope.values())
         self.ret(value)
 
     def block(self, tree: TypeTree):
-        new_scope = dict(zip(self.scope.keys(), copy_environment(self.builder, self.scope.values())))
         with options(self.builder, tree.return_type) as (ret, phi):
-            # Creates new LLVMScope or FastLLVMScope.
-            self.__class__(self.builder, tree, new_scope, ret)
+            self.__class__(self.builder, tree, self.get_scope, ret)
         return phi
 
     def object(self, tree: TypeTree):
-        local_scope = self.__class__(self.builder, tree, self.get_scope, None).local_scope
-
         value = tree.return_type(ir.Undefined)
-        for i, k in enumerate(tree.return_type.type_dict.keys()):
-            value = self.builder.insert_value(value, local_scope[k], i)
+        for i, child in enumerate(tree.children):
+            value = self.builder.insert_value(value, self.visit(child), i)
         return value
 
     def list_index(self, tree: TypeTree):
@@ -149,7 +146,8 @@ class LLVMScope(Interpreter):
             ret(int32(0))
 
         with self.builder.if_then(self.builder.icmp_signed("<", phi, length)):
-            self.builder.store(closure_call(self.builder, closure, [phi]), self.builder.gep(pointer, [phi]))
+            # TODO fix lists
+            # self.builder.store(closure_call(self.builder, closure, [phi]), self.builder.gep(pointer, [phi]))
             ret(self.builder.add(phi, int32(1)))
 
         free(self.builder, closure)

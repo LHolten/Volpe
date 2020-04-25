@@ -1,18 +1,18 @@
-block: _LINE_SEP* (value_ass _LINE_SEP+)* value_ret _LINE_SEP*
+block: _LINE_SEP* (value_ass _LINE_SEP+)* value_ass _LINE_SEP*
 
 ?value_ass: value1
-    | shape "=" value1 -> assign
-    | shape "+=" value1 -> add_assign
-    | shape "-=" value1 -> sub_assign
-    | shape "/=" value1 -> div_assign
-    | shape "*=" value1 -> mul_assign
-    // | shape "%=" value1 -> mod_assign
-    // | shape "**=" value1 -> power_assign
+    | value_ass ":=" value1 -> assign
+    | value_ass "+=" value1 -> add_assign
+    | value_ass "-=" value1 -> sub_assign
+    | value_ass "/=" value1 -> div_assign
+    | value_ass "*=" value1 -> mul_assign
+    // | value_ass "%=" value1 -> mod_assign
+    // | value_ass "**=" value1 -> power_assign
 
 value_ret: ">" value1 -> return_n
 
 ?value1: value2
-    | "(" _SEP* (shape ("," _SEP* shape)* _SEP*)? ")" value1 -> func
+    | object value1 -> func
 
 ?value2: value3
     | value2 "->" value3 -> implication
@@ -27,7 +27,7 @@ value_ret: ">" value1 -> return_n
     | value4 "&&" value_ret -> logic_and
 
 ?value5: value6
-    | value5 "==" value6 -> equals
+    | value5 "=" value6 -> equals
     | value5 "!=" value6 -> not_equals
 
 ?value6: value7
@@ -54,17 +54,19 @@ value_ret: ">" value1 -> return_n
     | "|" value10 "|" -> list_size
 
 ?value10: func
+    | object
     | "{" block "}"
     | INTEGER -> integer
     // | ESCAPED_STRING -> string
 
-?func: shape
-    | func "(" _SEP* (value1 ("," _SEP* value1)* _SEP*)? ")" -> func_call
+?func: symbol
+    | func object -> func_call
     | func "[" _SEP* value1 _SEP* "]" -> list_index
-    | "@" -> this_func
 
-?shape: CNAME -> symbol
-    | "{" (_LINE_SEP* value_ass (_LINE_SEP+ value_ass)* _LINE_SEP*)? "}" -> object
+symbol: CNAME
+    | THIS_FUNC
+
+object: "(" _SEP* (value_ass ("," _SEP* value_ass)* _SEP*)? ")"
 
 %import common.ESCAPED_STRING
 %import common.INT
@@ -80,6 +82,8 @@ FLOATING: INT "." INT
 MULTILINE_COMMENT: "#!" /((?!!#).|\n)*/ "!#" " "*
 COMMENT: "#" /.*/
 NEWLINE: (CR? LF)
+
+THIS_FUNC: "@"
 
 _LINE_SEP: _SEP
     | ";"

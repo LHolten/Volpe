@@ -24,9 +24,9 @@ def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
     func_type.checked = True
 
     if fast:
-        FastAnnotateScope(tree, func_type.get_scope, {}, func_ret(func_type, []))
+        FastAnnotateScope(tree, func_type.get_scope, func_ret(func_type, []))
     else:
-        AnnotateScope(tree, func_type.get_scope, {}, func_ret(func_type, []))
+        AnnotateScope(tree, func_type.get_scope, func_ret(func_type, []))
 
     if verbose:
         print(tree.pretty())

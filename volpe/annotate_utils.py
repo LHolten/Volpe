@@ -74,22 +74,18 @@ def comp(self, tree: TypeTree):
     return int1
 
 
-def tuple_assign(self, scope: Dict, tree: TypeTree, value_type):
+def tuple_assign(scope: Dict, tree: TypeTree, value_type):
     if tree.data == "object":
         assert isinstance(value_type, VolpeObject), "can only destructure objects"
+        assert len(tree.children) == len(value_type.type_dict.values())
 
-        def ret(value_type):
-            assert False, "can't return from an object"
-
-        c = count()
         for i, child in enumerate(tree.children):
-            if child.data not in {"assign", "add_assign", "sub_assign", "div_assign", "mul_assign"}:
-                tree.children[i] = TypeTree("assign", [child, TypeTree("symbol", [Token("", f"_{next(c)}")])])
-
-        obj = self.__class__(tree, self.get_scope, value_type.type_dict, ret)
-        scope[obj.local_scope.keys()] = obj.local_scope.values()
+            tuple_assign(scope, child, value_type.type_dict[f"_{i}"])
     else:
+        assert tree.data == "symbol"
         scope[tree.children[0].value] = value_type
+
+    return scope
 
 
 def func_ret(closure, arg_types):
@@ -101,26 +97,3 @@ def func_ret(closure, arg_types):
         closure.update(ir.FunctionType(value_type, [pint8, *arg_types]))
 
     return ret
-
-
-def closure_call(self, closure: VolpeClosure, arg_types):
-    assert len(closure.arg_names) == len(arg_types), "func call with wrong number of arguments"
-
-    if closure.checked:  # we have already been here
-        return closure.func.return_type
-    closure.checked = True
-
-    args = dict()
-    for a, t in zip(closure.arg_names, arg_types):
-        tuple_assign(self, args, a, t)
-    args["@"] = closure
-
-    if closure.block.data != "block":
-        closure.block = TypeTree("block", [TypeTree("return_n", [closure.block])])
-
-    def scope(name):
-        if name in args.keys():
-            return args[name]
-        return closure.get_scope
-
-    self.__class__(closure.block, closure.get_scope, args, func_ret(closure, arg_types))
