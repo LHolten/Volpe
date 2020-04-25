@@ -9,16 +9,15 @@ from volpe_types import int32, target_data, VolpeObject, VolpeClosure, copy_func
 
 
 def free(b, value):
-    pass
-    # if isinstance(value.type, VolpeClosure):
-    #     f_func = b.extract_value(value, 2)
-    #     env_ptr = b.extract_value(value, 3)
-    #     b.call(f_func, [env_ptr])
-    # if isinstance(value.type, VolpeObject):
-    #     for i in range(len(value.type.elements)):
-    #         free(b, b.extract_value(value, i))
-    # if isinstance(value.type, VolpeList):
-    #     free_list(b, value)
+    if isinstance(value.type, VolpeClosure):
+        f_func = b.extract_value(value, 2)
+        env_ptr = b.extract_value(value, 3)
+        b.call(f_func, [env_ptr])
+    if isinstance(value.type, VolpeObject):
+        for i in range(len(value.type.elements)):
+            free(b, b.extract_value(value, i))
+    if isinstance(value.type, VolpeList):
+        free_list(b, value)
 
 
 def copy(b, value):
