@@ -12,29 +12,27 @@ from volpe_types import int1, flt32, flt64, VolpeClosure, int32, target_data
 class LLVMScope(Interpreter):
     flt = flt64
 
-    def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: dict, ret: Callable):
+    def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: callable, ret: Callable):
         self.builder = builder
         self.scope = scope
+        self.local_scope = dict()
         self.ret = ret
 
-        if tree.data == "block":
-            assert len(tree.children) > 0, "code block needs code"
+        def evaluate(children):
+            if len(children) == 1:
+                self.visit_unsafe(children[0])
+            else:
+                success = self.visit(children[0])
+                with self.builder.if_then(success):
+                    evaluate(children[1:])
+                builder.unreachable()
 
-            def evaluate(children):
-                if len(children) == 1:
-                    self.visit_unsafe(children[0])
-                else:
-                    success = self.visit(children[0])
-                    with self.builder.if_then(success):
-                        evaluate(children[1:])
-                    builder.unreachable()
+        evaluate(tree.children)
 
-            evaluate(tree.children)
-            assert builder.block.is_terminated, "you forgot a return statement at the end of a code block"
-        else:
-            value = self.visit(tree)
-            free_environment(builder, scope.values())
-            ret(value)
+    def get_scope(self, name):
+        if name in self.local_scope:
+            return self.local_scope[name]
+        return self.scope(name)
 
     def visit(self, tree: TypeTree):
         value = getattr(self, tree.data)(tree)
@@ -45,11 +43,11 @@ class LLVMScope(Interpreter):
         return getattr(self, tree.data)(tree)
 
     def assign(self, tree: TypeTree):
-        tuple_assign(self.builder, self.scope, tree.children[0], self.visit(tree.children[1]))
+        tuple_assign(self, tree.children[0], self.visit(tree.children[1]))
         return int1(True)
 
     def symbol(self, tree: TypeTree):
-        return copy(self.builder, self.scope[tree.children[0].value])
+        return copy(self.builder, self.get_scope(tree.children[0].value))
 
     def func(self, tree: TypeTree):
         closure_type = tree.return_type
@@ -62,15 +60,22 @@ class LLVMScope(Interpreter):
 
         with build_closure(module, closure_type, env_types) as (b, args, closure, c_func):
             if closure_type.checked:
-                new_values = copy_environment(b, read_environment(b, args[0], env_types))
+                new_values = read_environment(b, args[0], env_types)
 
-                new_scope = dict(zip(env_names, new_values))
+                env_scope = dict(zip(env_names, new_values))
+                # TODO fix freeing the environment
                 for shape, value in zip(tree.children[:-1], args[1:]):
                     tuple_assign(b, new_scope, shape, value)
-                new_scope["@"] = b.insert_value(closure, b.call(c_func, [args[0]]), 3)
+                new_scope["@"] = closure
+
+                def scope(name):
+                    return new_scope[name]
+
+                def ret(value):
+
 
                 # Creates new LLVMScope or FastLLVMScope.
-                self.__class__(b, tree.children[-1], new_scope, b.ret)
+                self.__class__(b, tree.children[-1], scope, b.ret)
 
             else:
                 b.ret_void()
@@ -103,39 +108,13 @@ class LLVMScope(Interpreter):
             self.__class__(self.builder, tree, new_scope, ret)
         return phi
 
-    def number_iter(self, tree: TypeTree):
-        values = self.visit_children(tree)
-        closure_type = tree.return_type.closure
-        module = self.builder.module
-        env_types = [int32]
+    def object(self, tree: TypeTree):
+        local_scope = self.__class__(self.builder, tree, self.get_scope, None).local_scope
 
-        # TODO compact or simplify the following code:
-
-        with options(self.builder, tree.return_type) as (ret, phi):
-            # reverse = a > b in (a..b).
-            reverse = self.builder.icmp_signed(">", values[0], values[1])
-            with self.builder.if_then(reverse):
-                # Going in reverse (10..0).
-                with build_closure(module, closure_type, env_types) as (b, args, closure, c_func):
-                    start = read_environment(b, args[0], env_types)[0]
-                    b.ret(b.sub(start, b.add(args[1], int32(1))))
-
-                env_ptr = write_environment(self.builder, [values[0]])
-                list_value = tree.return_type(ir.Undefined)
-                list_value = self.builder.insert_value(list_value, self.builder.insert_value(closure, env_ptr, 3), 0)
-                ret(self.builder.insert_value(list_value, self.builder.sub(values[0], values[1]), 1))
-
-            # Going forwards (0..10).
-            with build_closure(module, closure_type, env_types) as (b, args, closure, c_func):
-                start = read_environment(b, args[0], env_types)[0]
-                b.ret(b.add(start, args[1]))
-
-            env_ptr = write_environment(self.builder, [values[0]])
-            list_value = tree.return_type(ir.Undefined)
-            list_value = self.builder.insert_value(list_value, self.builder.insert_value(closure, env_ptr, 3), 0)
-            ret(self.builder.insert_value(list_value, self.builder.sub(values[1], values[0]), 1))
-
-        return phi
+        value = tree.return_type(ir.Undefined)
+        for i, k in enumerate(tree.return_type.type_dict.keys()):
+            value = self.builder.insert_value(value, local_scope[k], i)
+        return value
 
     def list_index(self, tree: TypeTree):
         list_value, i = self.visit_children(tree)
@@ -209,12 +188,6 @@ class LLVMScope(Interpreter):
     def logic_not(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
         return self.builder.not_(value)
-
-    def object(self, tree: TypeTree):
-        value = tree.return_type(ir.Undefined)
-        for i, v in enumerate(self.visit_children(tree)):
-            value = self.builder.insert_value(value, v, i)
-        return value
         
     # Integers
     @staticmethod

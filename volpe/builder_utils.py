@@ -147,12 +147,22 @@ def closure_call(b: ir.IRBuilder, closure, args):
     return value
 
 
-def tuple_assign(b: ir.IRBuilder, scope: Dict, shape: TypeTree, value):
-    if shape.data == "object":
-        for i, child in enumerate(shape.children):
-            tuple_assign(b, scope, child, b.extract_value(value, i))
+def tuple_assign(self, tree: TypeTree, value):
+    if tree.data == "object":
+        def scope(key):
+            if key in value.type.type_dict.keys():
+                return self.builder.extract_value(value, list(value.type.type_dict.keys()).index(key))
+            return self.scope(key)
+
+        local_scope = self.__class__(self.builder, tree, scope, None).local_scope
+        for name, value in local_scope.items():
+            if name in self.local_scope:
+                free(self.builder, self.local_scope[name])
+            self.local_scope[name] = value
+
+        free(self.builder, value)
     else:
-        name = shape.children[0].value
-        if name in scope:
-            free(b, scope[name])
-        scope[name] = value
+        name = tree.children[0].value
+        if name in self.local_scope:
+            free(self.builder, self.local_scope[name])
+        self.local_scope[name] = value

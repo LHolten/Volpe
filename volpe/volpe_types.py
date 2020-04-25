@@ -22,7 +22,13 @@ target_data = llvm.Target.from_default_triple().create_target_machine().target_d
 
 
 class VolpeObject(ir.LiteralStructType):
-    pass
+    def __init__(self, type_dict: Dict[str, ir.Type]):
+        super().__init__(type_dict.values())
+        self.type_dict = type_dict
+
+    def set(self, name: str, t: ir.Type):
+        self.type_dict[name] = t
+        self.__init__(self.type_dict)
 
 
 class VolpeList(ir.LiteralStructType):

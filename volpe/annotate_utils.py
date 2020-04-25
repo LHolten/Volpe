@@ -1,9 +1,11 @@
+from itertools import count
 from typing import Dict
 
+from lark import Token
 from llvmlite import ir
 
 from tree import TypeTree
-from volpe_types import VolpeObject, int1, int32, pint8
+from volpe_types import VolpeObject, int1, int32, pint8, VolpeClosure
 
 
 def logic(self, tree: TypeTree):
@@ -72,13 +74,20 @@ def comp(self, tree: TypeTree):
     return int1
 
 
-def tuple_assign(scope: Dict, tree: TypeTree, value_type):
+def tuple_assign(self, scope: Dict, tree: TypeTree, value_type):
     if tree.data == "object":
-        assert isinstance(value_type, VolpeObject), "can only destructure tuples"
-        assert len(tree.children) == len(value_type.elements)
+        assert isinstance(value_type, VolpeObject), "can only destructure objects"
 
+        def ret(value_type):
+            assert False, "can't return from an object"
+
+        c = count()
         for i, child in enumerate(tree.children):
-            tuple_assign(scope, child, value_type.elements[i])
+            if child.data not in {"assign", "add_assign", "sub_assign", "div_assign", "mul_assign"}:
+                tree.children[i] = TypeTree("assign", [child, TypeTree("symbol", [Token("", f"_{next(c)}")])])
+
+        obj = self.__class__(tree, self.get_scope, value_type.type_dict, ret)
+        scope[obj.local_scope.keys()] = obj.local_scope.values()
     else:
         scope[tree.children[0].value] = value_type
 
@@ -94,7 +103,7 @@ def func_ret(closure, arg_types):
     return ret
 
 
-def closure_call(self, closure, arg_types):
+def closure_call(self, closure: VolpeClosure, arg_types):
     assert len(closure.arg_names) == len(arg_types), "func call with wrong number of arguments"
 
     if closure.checked:  # we have already been here
@@ -103,7 +112,15 @@ def closure_call(self, closure, arg_types):
 
     args = dict()
     for a, t in zip(closure.arg_names, arg_types):
-        tuple_assign(args, a, t)
+        tuple_assign(self, args, a, t)
     args["@"] = closure
+
+    if closure.block.data != "block":
+        closure.block = TypeTree("block", [TypeTree("return_n", [closure.block])])
+
+    def scope(name):
+        if name in args.keys():
+            return args[name]
+        return closure.get_scope
 
     self.__class__(closure.block, closure.get_scope, args, func_ret(closure, arg_types))

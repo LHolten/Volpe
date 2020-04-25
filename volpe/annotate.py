@@ -1,28 +1,29 @@
 from typing import Callable
 
+from lark import Token
 from lark.visitors import Interpreter
-from llvmlite import ir
 
 from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, math_assign, comp, closure_call
 from tree import TypeTree
 from volpe_types import int1, int32, flt32, flt64, VolpeObject, VolpeClosure, pint8, VolpeList
 
+from itertools import count
+
 
 class AnnotateScope(Interpreter):
     flt = flt64
 
-    def __init__(self, tree: TypeTree, scope: Callable, local_scope: dict, ret: Callable):
+    def __init__(self, tree: TypeTree, scope: Callable, ret: Callable):
         self.scope = scope
-        self.local_scope = local_scope
+        self.local_scope = dict()
         self.ret = ret
 
         if tree.data == "block":
             values = self.visit_children(tree)  # sets tree.return_type
             assert all([v == int1 for v in values]), "some line does not evaluate to a bool"
         else:
-            ret(self.visit(tree))
-
-        assert tree.return_type, "void methods should return true"
+            assert tree.data == "object"
+            self.visit_children(tree)
 
     def get_scope(self, name):
         if name in self.local_scope:
@@ -42,7 +43,7 @@ class AnnotateScope(Interpreter):
                 tree.return_type = value_type
 
         # Make a new AnnotateScope or FastAnnotateScope.
-        self.__class__(tree, self.get_scope, dict(), ret)
+        self.__class__(tree, self.get_scope, ret)
 
         return tree.return_type
 
@@ -70,7 +71,7 @@ class AnnotateScope(Interpreter):
         return self.get_scope(tree.children[0].value)
 
     def assign(self, tree: TypeTree):
-        tuple_assign(self.local_scope, tree.children[0], self.visit(tree.children[1]))
+        tuple_assign(self, self.local_scope, tree.children[0], self.visit(tree.children[1]))
         return int1
 
     @staticmethod
@@ -102,7 +103,16 @@ class AnnotateScope(Interpreter):
         return int32
 
     def object(self, tree: TypeTree):
-        return VolpeObject(self.visit_children(tree))
+        def ret(value_type):
+            assert False, "can't return from an object"
+
+        c = count()
+        for i, child in enumerate(tree.children):
+            if child.data not in {"assign", "add_assign", "sub_assign", "div_assign", "mul_assign"}:
+                tree.children[i] = TypeTree("assign", [TypeTree("symbol", [Token("", f"_{next(c)}")]), child])
+
+        obj = self.__class__(tree, self.get_scope, dict(), ret)
+        return VolpeObject(obj.local_scope)
 
     # Boolean logic
     implication = logic

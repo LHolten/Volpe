@@ -42,11 +42,15 @@ def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
     f_func = ir.Function(module, free_func, "actual_main.free")
     closure = func_type([func, c_func, f_func, ir.Undefined])
 
+    def scope(name):
+        assert name == "@"
+        return closure
+
     with build_func(func) as (b, args):
         if fast:
-            FastLLVMScope(b, tree, {"@": closure}, b.ret)
+            FastLLVMScope(b, tree, scope, b.ret)
         else:
-            LLVMScope(b, tree, {"@": closure}, b.ret)
+            LLVMScope(b, tree, scope, b.ret)
 
     with build_func(c_func) as (b, args):
         b.ret(pint8(ir.Undefined))
