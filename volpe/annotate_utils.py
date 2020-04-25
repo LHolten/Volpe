@@ -1,7 +1,5 @@
-from itertools import count
 from typing import Dict
 
-from lark import Token
 from llvmlite import ir
 
 from tree import TypeTree
@@ -82,7 +80,6 @@ def tuple_assign(scope: Dict, tree: TypeTree, value_type):
         for i, child in enumerate(tree.children):
             tuple_assign(scope, child, value_type.type_dict[f"_{i}"])
     else:
-        print(tree.data)
         assert tree.data == "symbol"
         scope[tree.children[0].value] = value_type
 

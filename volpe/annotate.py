@@ -115,6 +115,11 @@ class AnnotateScope(Interpreter):
         assert self.visit(tree.children[0]) == self.flt
         return int32
 
+    def if_then(self, tree: TypeTree):
+        tree.data = "implication"
+        tree.children[1] = TypeTree("return_n", [tree.children[1]])
+        return self.visit(tree)
+
     # Boolean logic
     implication = logic
     logic_and = logic

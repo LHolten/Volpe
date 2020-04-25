@@ -1,30 +1,26 @@
 block: _LINE_SEP* (value_ass _LINE_SEP+)* value1 _LINE_SEP*
 
-?value_ass: value1
+?value_ass: value1 "!"
     | shape ":=" value1 -> assign
     | shape "+=" value1 -> add_assign
     | shape "-=" value1 -> sub_assign
     | shape "/=" value1 -> div_assign
     | shape "*=" value1 -> mul_assign
-    // | shape "%=" value1 -> mod_assign
-    // | shape "**=" value1 -> power_assign
-
-value_ret: ">" value1 -> return_n
+    | shape "%=" value1 -> mod_assign
+    | shape "**=" value1 -> power_assign
+    | value2 "->" value3 -> if_then
 
 ?value1: value2
     | object value1 -> func
 
 ?value2: value3
     | value2 "->" value3 -> implication
-    | value2 "->" value_ret -> implication
 
 ?value3: value4
     | value3 "||" value4 -> logic_or
-    | value3 "||" value_ret -> logic_or
 
 ?value4: value5
     | value4 "&&" value5 -> logic_and
-    | value4 "&&" value_ret -> logic_and
 
 ?value5: value6
     | value5 "=" value6 -> equals
@@ -44,7 +40,7 @@ value_ret: ">" value1 -> return_n
     | value8 "/" value9 -> div
     | value8 "%" value9 -> mod
     | value8 "*" value9 -> mul
-    // | value8 "**" value9 -> power
+    | value8 "**" value9 -> power
 
 ?value9: value10
     | "-" value9 -> negate
@@ -57,9 +53,10 @@ value_ret: ">" value1 -> return_n
     | object
     | "{" block "}"
     | INTEGER -> integer
-    // | ESCAPED_STRING -> string
+    | ESCAPED_STRING -> string
 
 ?func: symbol
+    | func "." CNAME -> attribute
     | func object -> func_call
     | func "[" _SEP* value1 _SEP* "]" -> list_index
 
@@ -69,7 +66,7 @@ value_ret: ">" value1 -> return_n
 symbol: CNAME
     | THIS_FUNC
 
-object: "(" _SEP* (value_ass ("," _SEP* value_ass)* _SEP*)? ")"
+object: "(" _SEP* (value1 ("," _SEP* value1)* _SEP*)? ")"
 
 %import common.ESCAPED_STRING
 %import common.INT
