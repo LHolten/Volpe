@@ -12,7 +12,7 @@ pow := (a, n) {
 }
 
 # calculate the amount of times a ball bounces
-calc_bounces := (ball) {
+calc_bounces := (ball,) {
     # deconstruct ball object
     (state, properties) := ball
     (height, vel) := state
@@ -41,4 +41,4 @@ vertical_velocity := 3.0 # m/s
 mass := 0.1 # kg
 bounciness := 0.8 # coefficient
 ball := ((initial_height, vertical_velocity), (mass, bounciness))
-calc_bounces(ball)
+calc_bounces(ball,)
