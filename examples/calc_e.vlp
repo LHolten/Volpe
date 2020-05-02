@@ -1,18 +1,18 @@
 # recursive factorial of x
 factorial := (x,) {
-    x < 2 -> 1
-    x * @(x - 1,)
+    x < 2 -> 1.0
+    x.0 * @(x - 1,)
 }
 
 # using block to calculate e
 e := {
     # e := sum of 1 / i! for each i -> inf
-    precision := 10
+    precision := 100
     calc_e := (e, i) {
         # exit condition
         i >= precision -> e
         # calculate next term
-        term := 1.0 / factorial(i,).0
+        term := 1.0 / factorial(i,)
         # recursively call self with updated args
         @(e + term, i + 1)
     }
