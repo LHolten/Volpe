@@ -12,11 +12,12 @@ from volpe_types import int1, flt32, flt64, VolpeClosure, int32, target_data
 class LLVMScope(Interpreter):
     flt = flt64
 
-    def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: callable, ret: Callable):
+    def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: callable, ret: Callable, rec: Callable):
         self.builder = builder
         self.scope = scope
         self.local_scope = dict()
         self.ret = ret
+        self.rec = rec
 
         def evaluate(children):
             if len(children) == 1:
@@ -58,7 +59,7 @@ class LLVMScope(Interpreter):
         env_values = [self.get_scope(name) for name in env_names]
         env_types = [value.type for value in env_values]
 
-        with build_closure(module, closure_type, env_types) as (b, args, closure, c_func):
+        with build_closure(module, closure_type, env_types) as (b, rec_ret, args, closure, c_func):
             if closure_type.checked:
                 new_values = read_environment(b, args[0], env_types)
 
@@ -76,7 +77,11 @@ class LLVMScope(Interpreter):
                     free_environment(b, arg_scope.values())
                     b.ret(value)
 
-                self.__class__(b, tree.children[-1], scope, ret)
+                def rec(value):
+                    free_environment(b, arg_scope.values())
+                    rec_ret(value)
+
+                self.__class__(b, tree.children[-1], scope, ret, rec)
             else:
                 b.ret_void()
                 print("ignoring function without usage")
@@ -98,13 +103,21 @@ class LLVMScope(Interpreter):
         return res
 
     def return_n(self, tree: TypeTree):
+        # recursive tail call
+        if tree.children[0].data == "func_call" and tree.children[0].children[0].children[0].value == "@":
+            value = self.visit(tree.children[0].children[1])
+            free_environment(self.builder, self.local_scope.values())
+            self.rec(value)
+            return int1
+
         value = self.visit(tree.children[0])
         free_environment(self.builder, self.local_scope.values())
         self.ret(value)
+        return int1
 
     def block(self, tree: TypeTree):
         with options(self.builder, tree.return_type) as (ret, phi):
-            self.__class__(self.builder, tree, self.get_scope, ret)
+            self.__class__(self.builder, tree, self.get_scope, ret, None)
         return phi
 
     def object(self, tree: TypeTree):

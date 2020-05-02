@@ -48,9 +48,9 @@ def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
 
     with build_func(func) as (b, args):
         if fast:
-            FastLLVMScope(b, tree, scope, b.ret)
+            FastLLVMScope(b, tree, scope, b.ret, None)
         else:
-            LLVMScope(b, tree, scope, b.ret)
+            LLVMScope(b, tree, scope, b.ret, None)
 
     with build_func(c_func) as (b, args):
         b.ret(pint8(ir.Undefined))

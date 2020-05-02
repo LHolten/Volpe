@@ -128,7 +128,10 @@ def build_closure(module, closure_type, env_types):
     closure = closure_type([func, c_func, f_func, ir.Undefined])
 
     with build_func(func) as (b, args):
-        yield b, args, closure, c_func
+        with options(b, args[1].type) as (ret, phi):
+            ret(args[1])
+
+        yield b, ret, (args[0], phi), closure, c_func
 
     with build_func(c_func) as (b, args):
         b.ret(write_environment(b, copy_environment(b, read_environment(b, args[0], env_types))))
