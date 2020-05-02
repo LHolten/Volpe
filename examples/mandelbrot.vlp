@@ -1,0 +1,48 @@
+# define bools
+true := 1 > 0
+false := !true
+
+# define a complex number
+complex := (a, b) {
+    # name the recursive pointer
+    # so we can use it inside nested functions
+    # and refer to this one instead of themselves
+    complex := @
+
+    # define complex number z
+    z := (re: a, im: b)
+
+    # define adding
+    add := ((re: a, im: b), (re: x, im: y)) {
+        # (a + bi) + (x + yi) = (a + x) + i(b + y)
+        complex(a + x, b + y)
+    }
+    z.add := add
+
+    # define multiplication
+    mult := ((re: a, im: b), (re: x, im: y)) {
+        # (a + bi)(x + yi) = ax + ayi + bxi + byii
+        # = (ax - by) + i(ay + bx)
+        complex(a*x - b*y, a*y + b*x)
+    }
+    z.mult := mult
+
+    # define magnitude
+    magnitude := (re: a, im: b) {
+        a*a + b*b
+    }
+    z.magnitude := magnitude
+
+    # return z
+    z
+}
+
+# checks whether a complex number is part of the mandelbrot set
+is_in_set := (c, max_count) {
+    loop := (z, i) {
+        z.magnitude() > 2.0 -> false
+        i > max_count -> true
+        @(z.mult(z).add(c), i + 1)
+    }
+    loop(complex(0.0, 0.0), 0)
+}

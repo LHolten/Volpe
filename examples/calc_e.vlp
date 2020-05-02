@@ -1,26 +1,24 @@
-factorial = x => {
-    x < 2 -> :> 1
-    :> x * @(x - 1) 
+# recursive factorial of x
+factorial := (x,) {
+    x < 2 -> 1
+    x * @(x - 1,)
 }
 
-recursive_calc_e = (e, n) => {
-    # output result
-    n == 0 -> :> e
-
-    # get next term (working backwards)
-    term = 1.0 / factorial(n).0
-
-    # add onto result
-    :> @(e + term, n - 1)
+# using block to calculate e
+e := {
+    # e := sum of 1 / i! for each i -> inf
+    precision := 10
+    calc_e := (e, i) {
+        # exit condition
+        i >= precision -> e
+        # calculate next term
+        term := 1.0 / factorial(i,).0
+        # recursively call self with updated args
+        @(e + term, i + 1)
+    }
+    # call the function and return the result
+    calc_e(0.0, 0)
 }
 
-calculate_e = n => {
-    # asserts that n is positive
-    # also that it is an int (during compilation)
-    n >= 0
-    :> recursive_calc_e(1.0, n)
-}
-
-e = calculate_e(10)
-
-:> e
+# return e
+e
