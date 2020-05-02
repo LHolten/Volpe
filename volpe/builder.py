@@ -317,6 +317,10 @@ class LLVMScope(Interpreter):
         values = self.visit_children(tree)
         return self.builder.fcmp_ordered("<=", values[0], values[1])
 
+    @staticmethod
+    def character(tree: TypeTree):
+        return tree.return_type(ord(tree.children[0].value[1]))
+
     def __default__(self, tree: TypeTree):
         raise NotImplementedError("llvm", tree.data)
 
