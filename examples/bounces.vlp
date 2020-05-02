@@ -1,0 +1,44 @@
+g := 9.81 # m/s^2
+bounce_threshold := 1.0 # J
+
+# a^n
+pow := (a, n) {
+    n > 0!
+    loop := (x, a, n) {
+        n = 1 -> a
+        @(x, a*x, n-1)
+    }
+    loop(a, a, n)
+}
+
+# calculate the amount of times a ball bounces
+calc_bounces := (ball) {
+    # deconstruct ball object
+    (state, properties) := ball
+    (height, vel) := state
+    (mass, bounciness) := properties
+    # make sure bounciness doesn't violate laws of thermodynamics
+    bounciness < 1.0!
+    bounciness >= 0.0!
+
+    # simulate energy loss with every bounce
+    bounce := (energy, bounces) {
+        energy < bounce_threshold -> bounces
+        @(energy * bounciness, bounces + 1)
+    }
+
+    # calculate energy
+    ke := 0.5 * mass * pow(vel, 2)
+    gpe := g * mass * height
+    total_energy := ke + gpe
+
+    # use energy loss simulation
+    bounce(total_energy, 0)
+}
+
+initial_height := 10.0 # m
+vertical_velocity := 3.0 # m/s
+mass := 0.1 # kg
+bounciness := 0.8 # coefficient
+ball := ((initial_height, vertical_velocity), (mass, bounciness))
+calc_bounces(ball)

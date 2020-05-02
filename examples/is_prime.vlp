@@ -1,33 +1,22 @@
-# defining bools
-true = 1 > 0
-false = !true
+# define bools
+true := 1 > 0
+false := !true
 
-# more readable
-is_divisible = (n, x) => n % x == 0
-
-check_primality = (n, i) => {
-    # exit condition:
-    # we have reached one, it is a prime
-    i == 1 -> :> true
-
-    # if it is divisible, it is not a prime
-    is_divisible(n, i) -> :> false
-
-    # if it is not divisible by any of 
-    # the lower numbers it is a prime
-    @(n, i - 1) -> :> true
-
-    # it IS divisible by one of the lower numbers
-    # thus it is not a prime
-    :> false
+# check that a number is prime by testing divisibility
+check_primality := (number, test) {
+    # exit condition
+    test = 1 -> true
+    # number is divisible, it is not prime
+    number % test = 0 -> false
+    # test divisibility by lower numbers
+    @(number, test - 1)
 }
 
-is_prime = n => {
-    # assert positive n
-    n > 0
-    # 1 is not a prime
-    n == 1 -> :> false
-    :> check_primality(n, n - 1)
+# call check_primality with starting "test"
+is_prime := (n,) {
+    n > 0! # assert that n is a positive integer
+    n = 1 -> false
+    check_primality(n, n / 2)
 }
 
-:> is_prime(7789)
+is_prime(7789,)

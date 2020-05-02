@@ -65,7 +65,7 @@ def determine_c_type(volpe_type, depth=0):
             _fields_ = [(f"elem{i}", determine_c_type(elem, depth+1)) for i, elem in enumerate(elems)]
 
             def __repr__(self):
-                return "[" + ", ".join([str(getattr(self, tup[0])) for tup in self._fields_]) + "]"
+                return "(" + ", ".join([str(getattr(self, tup[0])) for tup in self._fields_]) + ")"
         return POINTER(CTuple) if depth == 0 else CTuple
 
     if isinstance(volpe_type, VolpeList):
@@ -78,7 +78,7 @@ def determine_c_type(volpe_type, depth=0):
                 if depth < 2:
                     elems = getattr(self, "elems")
                     length = getattr(self, "length")
-                    return "&<" + ", ".join([str(elem) for elem in elems[:length]]) + ">"
+                    return "[" + ", ".join([str(elem) for elem in elems[:length]]) + "]"
                 return get_type_name(volpe_type)
         return POINTER(CList) if depth == 0 else CList
 
@@ -93,7 +93,7 @@ def determine_c_type(volpe_type, depth=0):
                     func = elems[0].pointee
                     input_type = ", ".join([get_type_name(i) for i in func.args[1:]])
                     return_type = get_type_name(func.return_type)
-                    return f"function ({input_type}) => {return_type}"
+                    return f"function {input_type} {return_type}"
                 return get_type_name(volpe_type)
         return CFunc
         
@@ -116,7 +116,7 @@ def get_type_name(volpe_type):
     # Aggregate types:
     if isinstance(volpe_type, VolpeObject):
         type_reprs = ", ".join([get_type_name(elem) for elem in volpe_type.elements])
-        return f"[{type_reprs}]"
+        return f"({type_reprs})"
     if isinstance(volpe_type, VolpeList):
         return "*list*"
     if isinstance(volpe_type, VolpeClosure):

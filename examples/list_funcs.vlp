@@ -1,0 +1,23 @@
+# define bools
+true := 1 > 0
+false := !true
+
+# tests whether an element is in a list
+in := (list, elem) {
+    loop := (i) {
+        i = |list| -> false
+        list[i] = elem -> true
+        @(i + 1)
+    }
+    loop(0)
+}
+
+# returns the first index which matches the element
+index := (list, elem) {
+    loop := (i) {
+        i != |list|!
+        list[i] = elem -> i
+        @(i + 1)
+    }
+    loop(0)
+}
