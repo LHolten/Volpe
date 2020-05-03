@@ -9,6 +9,7 @@ from volpe_types import (
     int32,
     flt32,
     flt64,
+    char,
     VolpeObject,
     VolpeClosure,
     VolpeList
@@ -56,6 +57,8 @@ def determine_c_type(volpe_type, depth=0):
         return c_float
     if volpe_type == flt64:
         return c_double
+    if volpe_type == char:
+        return c_char
     
     # Aggregate types:
     if isinstance(volpe_type, VolpeObject):
@@ -112,6 +115,8 @@ def get_type_name(volpe_type):
         return "flt32"
     if volpe_type == flt64:
         return "flt64"
+    if volpe_type == char:
+        return "char"
 
     # Aggregate types:
     if isinstance(volpe_type, VolpeObject):

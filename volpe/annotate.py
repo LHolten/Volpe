@@ -4,7 +4,17 @@ from lark.visitors import Interpreter
 
 from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, math_assign, comp, func_ret
 from tree import TypeTree
-from volpe_types import int1, int32, flt32, flt64, VolpeObject, VolpeClosure, pint8, VolpeList
+from volpe_types import (
+    int1,
+    int32,
+    flt32,
+    flt64,
+    char,
+    VolpeObject,
+    VolpeClosure,
+    pint8,
+    VolpeList
+)
 
 
 class AnnotateScope(Interpreter):
@@ -90,6 +100,10 @@ class AnnotateScope(Interpreter):
     @staticmethod
     def integer(tree: TypeTree):
         return int32
+
+    @staticmethod
+    def character(tree: TypeTree):
+        return char
 
     def list_index(self, tree: TypeTree):
         ret = self.visit_children(tree)
