@@ -53,6 +53,7 @@ block: _LINE_SEP* (value_ass _LINE_SEP+)* value1 _LINE_SEP*
     | object
     | INTEGER -> integer
     | CHARACTER -> character
+    | ESCAPED_CHARACTER -> escaped_character
     | ESCAPED_STRING -> string
 
 ?func: symbol
@@ -86,7 +87,8 @@ WS: /[ \t\f]/+
 
 INTEGER: INT
 FLOATING: INT "." INT
-CHARACTER: /'.'/
+ESCAPED_CHARACTER: /'\\[abfnrtv'\\]'/
+CHARACTER: /'[^'\\]'/
 
 MULTILINE_COMMENT: "#!" /((?!!#).|\n)*/ "!#" " "*
 COMMENT: "#" /.*/

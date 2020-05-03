@@ -10,3 +10,4 @@ They are supposed to give you an idea of where the language is headed and what t
 - calc_e
 - bounces
 - projectile_sim
+- trig

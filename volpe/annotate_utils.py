@@ -3,7 +3,7 @@ from typing import Dict
 from llvmlite import ir
 
 from tree import TypeTree
-from volpe_types import VolpeObject, int1, int32, pint8, VolpeClosure
+from volpe_types import VolpeObject, int1, int32, char, pint8, VolpeClosure
 
 
 def logic(self, tree: TypeTree):
@@ -63,12 +63,12 @@ def comp(self, tree: TypeTree):
     ret0 = children[0]
     ret1 = children[1]
     assert ret0 == ret1, "types need to match for comparisons"
-    if ret0 == int32:
+    if ret0 == int32 or ret0 == char:
         tree.data = tree.data + "_int"
     elif ret0 == self.flt:
         tree.data = tree.data + "_flt"
     else:
-        raise AssertionError("comparisons only work for integers and floats")
+        raise AssertionError("comparisons only work for integers, floats, and chars")
     return int1
 
 

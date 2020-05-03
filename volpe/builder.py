@@ -323,6 +323,12 @@ class LLVMScope(Interpreter):
     def character(tree: TypeTree):
         return tree.return_type(ord(tree.children[0].value[1]))
 
+    @staticmethod
+    def escaped_character(tree: TypeTree):
+        # let Python parse the escaped character
+        evaluated = eval(f"{tree.children[0]}")
+        return tree.return_type(ord(evaluated))
+
     def __default__(self, tree: TypeTree):
         raise NotImplementedError("llvm", tree.data)
 

@@ -13,7 +13,7 @@ from tree import TypeTree
 from volpe_types import pint8, int32, VolpeObject, VolpeList, target_data, VolpeClosure, copy_func, free_func
 
 
-def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
+def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, fast=False):
     if verbose:
         print(tree.pretty())
 
@@ -59,6 +59,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
         b.ret_void()
 
     return_type = func_type.func.return_type
+    # return as pointer so they can be printed more easily
     if isinstance(return_type, (VolpeObject, VolpeList)):
         return_type = return_type.as_pointer()
 
@@ -66,7 +67,6 @@ def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
     with build_func(main_func) as (b, _):
         b: ir.IRBuilder
         res = b.call(func, [pint8(ir.Undefined)])
-        # TODO return vector as pointer if length is needed in print
         if isinstance(res.type, (VolpeObject, VolpeList)):
             ptr = b.bitcast(b.call(module.malloc, [int32(res.type.get_abi_size(target_data))]), return_type)
             b.store(res, ptr)
@@ -76,11 +76,11 @@ def volpe_llvm(tree: TypeTree, verbose=False, fast=False):
     if verbose:
         print(module)
 
-    compile_and_run(str(module), tree.return_type)
+    compile_and_run(str(module), tree.return_type, show_time=show_time)
     # return scope.visit(tree)
 
 
-def run(file_path, verbose=False, fast=False):
+def run(file_path, verbose=False, show_time=False, fast=False):
     base_path = path.dirname(__file__)
     path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
     with open(path_to_lark) as lark_file:
@@ -88,5 +88,5 @@ def run(file_path, verbose=False, fast=False):
     with open(file_path) as vlp_file:
         parsed_tree = volpe_parser.parse(vlp_file.read())
     # print(parsed_tree.pretty())
-    volpe_llvm(parsed_tree, verbose=verbose, fast=fast)
+    volpe_llvm(parsed_tree, verbose=verbose, show_time=show_time, fast=fast)
     # llvm_ir()
