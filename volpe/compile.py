@@ -7,8 +7,7 @@ import llvmlite.binding as llvm
 # All these initializations are required for code generation!
 from volpe_types import (
     int1,
-    int32,
-    flt32,
+    int64,
     flt64,
     char,
     VolpeObject,
@@ -62,10 +61,8 @@ def determine_c_type(volpe_type, depth=0):
     # Simple types:
     if volpe_type == int1:
         return c_bool
-    if volpe_type == int32:
-        return c_int32
-    if volpe_type == flt32:
-        return c_float
+    if volpe_type == int64:
+        return c_int64
     if volpe_type == flt64:
         return c_double
     if volpe_type == char:
@@ -86,7 +83,7 @@ def determine_c_type(volpe_type, depth=0):
         element_type = determine_c_type(volpe_type.element_type, depth+1)
 
         class CList(Structure):
-            _fields_ = [("elems", POINTER(element_type)), ("length", c_int32)]
+            _fields_ = [("elems", POINTER(element_type)), ("length", c_int64)]
 
             def __repr__(self):
                 if depth < 2:
@@ -120,10 +117,8 @@ def get_type_name(volpe_type):
     # Simple types:
     if volpe_type == int1:
         return "bool"
-    if volpe_type == int32:
-        return "int32"
-    if volpe_type == flt32:
-        return "flt32"
+    if volpe_type == int64:
+        return "int64"
     if volpe_type == flt64:
         return "flt64"
     if volpe_type == char:

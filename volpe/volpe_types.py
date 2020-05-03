@@ -9,9 +9,10 @@ llvm.initialize_native_asmprinter()  # yes, even this one
 
 int1 = ir.IntType(1)
 int32 = ir.IntType(32)
+int64 = ir.IntType(64)
 int8 = ir.IntType(8)
 pint8 = int8.as_pointer()
-flt32 = ir.FloatType()
+# flt32 = ir.FloatType()
 flt64 = ir.DoubleType()
 char = ir.IntType(8)
 unknown = ir.VoidType()

@@ -6,12 +6,10 @@ from llvmlite import ir
 from builder_utils import write_environment, free_environment, options, \
     read_environment, tuple_assign, copy, copy_environment, build_closure, free
 from tree import TypeTree
-from volpe_types import int1, flt32, flt64, VolpeClosure, int32, target_data
+from volpe_types import int1, int32, int64, flt64, VolpeClosure, target_data
 
 
 class LLVMScope(Interpreter):
-    flt = flt64
-
     def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: callable, ret: Callable, rec: Callable):
         self.builder = builder
         self.scope = scope
@@ -134,7 +132,7 @@ class LLVMScope(Interpreter):
         length = self.builder.extract_value(list_value, 1)
 
         before_end = self.builder.icmp_signed("<", i, length)
-        more_than_0 = self.builder.icmp_signed(">=", i, int32(0))
+        more_than_0 = self.builder.icmp_signed(">=", i, int64(0))
         in_range = self.builder.and_(before_end, more_than_0)
         with self.builder.if_then(self.builder.not_(in_range)):
             self.builder.unreachable()
@@ -163,7 +161,7 @@ class LLVMScope(Interpreter):
         with self.builder.if_then(self.builder.icmp_signed("<", phi, length)):
             # TODO fix lists
             # self.builder.store(closure_call(self.builder, closure, [phi]), self.builder.gep(pointer, [phi]))
-            ret(self.builder.add(phi, int32(1)))
+            ret(self.builder.add(phi, int64(1)))
 
         free(self.builder, closure)
 
@@ -239,7 +237,7 @@ class LLVMScope(Interpreter):
 
     def convert_int(self, tree: TypeTree):
         value = self.visit(tree.children[0])
-        float_value = self.builder.sitofp(value, self.flt)
+        float_value = self.builder.sitofp(value, flt64)
         decimals = tree.return_type(float("0." + tree.children[1].value))
         return self.builder.fadd(float_value, decimals)
 
@@ -289,11 +287,11 @@ class LLVMScope(Interpreter):
 
     def negate_flt(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
-        return self.builder.fsub(self.flt(0), value)
+        return self.builder.fsub(flt64(0), value)
 
     def convert_flt(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
-        return self.builder.fptosi(value, int32)
+        return self.builder.fptosi(value, int64)
 
     def equals_flt(self, tree: TypeTree):
         values = self.visit_children(tree)
@@ -331,7 +329,3 @@ class LLVMScope(Interpreter):
 
     def __default__(self, tree: TypeTree):
         raise NotImplementedError("llvm", tree.data)
-
-
-class FastLLVMScope(LLVMScope):
-    flt = flt32
