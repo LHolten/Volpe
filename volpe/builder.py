@@ -323,6 +323,28 @@ class LLVMScope(Interpreter):
     def character(tree: TypeTree):
         return tree.return_type(ord(tree.children[0].value[1]))
 
+    @staticmethod
+    def escaped_character(tree: TypeTree):
+        val = tree.children[0][1:-1]
+        if val == "\\a":
+            return tree.return_type(ord("\a"))
+        if val == "\\b":
+            return tree.return_type(ord("\b"))
+        if val == "\\f":
+            return tree.return_type(ord("\f"))
+        if val == "\\n":
+            return tree.return_type(ord("\n"))
+        if val == "\\r":
+            return tree.return_type(ord("\r"))
+        if val == "\\t":
+            return tree.return_type(ord("\t"))
+        if val == "\\v":
+            return tree.return_type(ord("\v"))
+        if val == "\\'":
+            return tree.return_type(ord("\'"))
+        if val == "\\\\":
+            return tree.return_type(ord("\\"))
+
     def __default__(self, tree: TypeTree):
         raise NotImplementedError("llvm", tree.data)
 

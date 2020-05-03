@@ -105,6 +105,10 @@ class AnnotateScope(Interpreter):
     def character(tree: TypeTree):
         return char
 
+    @staticmethod
+    def escaped_character(tree: TypeTree):
+        return char
+
     def list_index(self, tree: TypeTree):
         ret = self.visit_children(tree)
         assert isinstance(ret[0], VolpeList)
