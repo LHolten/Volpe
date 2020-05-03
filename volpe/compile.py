@@ -21,7 +21,7 @@ llvm.initialize_native_target()
 llvm.initialize_native_asmprinter()  # yes, even this one
 
 
-def compile_and_run(llvm_ir, result_type):
+def compile_and_run(llvm_ir, result_type, show_time=False):
     """
     Create an ExecutionEngine suitable for JIT code generation on
     the host CPU.  The engine is reusable for an arbitrary number of
@@ -49,12 +49,12 @@ def compile_and_run(llvm_ir, result_type):
     else:
         print("main() =", res)
     
-    # # print time
-    # time_taken = end_time - start_time
-    # if time_taken > 100000:
-    #     print(f"time = {time_taken/1E9}s")
-    # else:
-    #     print(f"time = {time_taken}ns")
+    if show_time:
+        time_taken = end_time - start_time
+        if time_taken > 100000:
+            print(f"time = {time_taken/1E9}s")
+        else:
+            print(f"time = {time_taken}ns")
 
 
 def determine_c_type(volpe_type, depth=0):

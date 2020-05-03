@@ -3,11 +3,12 @@
 Usage:
     volpe -h | --help
     volpe add-path
-    volpe <file_path> [-v | --verbose] [-f | --fast]
+    volpe <file_path> [-v | --verbose] [-t | --time] [-f | --fast]
 
 Options:
     -h --help     Show this screen.
     -v --verbose  Print out the parsed tree and code.
+    -t --time     Shows execution time.
     -f --fast     Use 32 bit instead of 64 bit for floating point numbers.
 """
 
@@ -48,16 +49,14 @@ def install():
         print("=====")
         print("Please restart this console for changes to take effect.")
 
-    
 
-
-def compile_and_run(file_path, verbose=False, fast=False):
+def compile_and_run(file_path, verbose=False, show_time=False, fast=False):
     from run_volpe import run
 
     assert file_path.split(".")[-1] == "vlp", "Volpe files have the file ending .vlp"
     assert os.path.exists(file_path), f"Could not find file: {file_path}"
 
-    run(file_path, verbose=verbose, fast=fast)
+    run(file_path, verbose=verbose, show_time=show_time, fast=fast)
 
 
 if __name__ == '__main__':
@@ -68,4 +67,4 @@ if __name__ == '__main__':
     if args["add-path"]:
         install()
     else:
-        compile_and_run(args["<file_path>"], args["--verbose"], args["--fast"])
+        compile_and_run(args["<file_path>"], verbose=args["--verbose"], show_time=args["--time"], fast=args["--fast"])
