@@ -6,8 +6,7 @@ from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, m
 from tree import TypeTree
 from volpe_types import (
     int1,
-    int32,
-    flt32,
+    int64,
     flt64,
     char,
     VolpeObject,
@@ -97,7 +96,7 @@ class AnnotateScope(Interpreter):
 
     @staticmethod
     def integer(tree: TypeTree):
-        return int32
+        return int64
 
     @staticmethod
     def character(tree: TypeTree):
@@ -110,13 +109,13 @@ class AnnotateScope(Interpreter):
     def list_index(self, tree: TypeTree):
         ret = self.visit_children(tree)
         assert isinstance(ret[0], VolpeList)
-        assert ret[1] == int32
+        assert ret[1] == int64
         return ret[0].element_type
 
     def list_size(self, tree: TypeTree):
         ret = self.visit_children(tree)[0]
         assert isinstance(ret, VolpeList)
-        return int32
+        return int64
 
     def make_list(self, tree: TypeTree):
         # update this function
@@ -124,12 +123,12 @@ class AnnotateScope(Interpreter):
         return VolpeList(ret.closure.func.return_type)
 
     def convert_int(self, tree: TypeTree):
-        assert self.visit(tree.children[0]) == int32
+        assert self.visit(tree.children[0]) == int64
         return flt64
 
     def convert_flt(self, tree: TypeTree):
         assert self.visit(tree.children[0]) == flt64
-        return int32
+        return int64
 
     def if_then(self, tree: TypeTree):
         tree.data = "implication"
