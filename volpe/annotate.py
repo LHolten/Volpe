@@ -18,8 +18,6 @@ from volpe_types import (
 
 
 class AnnotateScope(Interpreter):
-    flt = flt64
-
     def __init__(self, tree: TypeTree, scope: Callable, ret: Callable):
         self.scope = scope
         self.local_scope = dict()
@@ -127,10 +125,10 @@ class AnnotateScope(Interpreter):
 
     def convert_int(self, tree: TypeTree):
         assert self.visit(tree.children[0]) == int32
-        return self.flt
+        return flt64
 
     def convert_flt(self, tree: TypeTree):
-        assert self.visit(tree.children[0]) == self.flt
+        assert self.visit(tree.children[0]) == flt64
         return int32
 
     def if_then(self, tree: TypeTree):
@@ -168,7 +166,3 @@ class AnnotateScope(Interpreter):
 
     def __default__(self, tree: TypeTree):
         raise NotImplementedError("annotate", tree.data)
-
-
-class FastAnnotateScope(AnnotateScope):
-    flt = flt32

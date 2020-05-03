@@ -6,12 +6,10 @@ from llvmlite import ir
 from builder_utils import write_environment, free_environment, options, \
     read_environment, tuple_assign, copy, copy_environment, build_closure, free
 from tree import TypeTree
-from volpe_types import int1, flt32, flt64, VolpeClosure, int32, target_data
+from volpe_types import int1, flt64, VolpeClosure, int32, target_data
 
 
 class LLVMScope(Interpreter):
-    flt = flt64
-
     def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: callable, ret: Callable, rec: Callable):
         self.builder = builder
         self.scope = scope
@@ -239,7 +237,7 @@ class LLVMScope(Interpreter):
 
     def convert_int(self, tree: TypeTree):
         value = self.visit(tree.children[0])
-        float_value = self.builder.sitofp(value, self.flt)
+        float_value = self.builder.sitofp(value, flt64)
         decimals = tree.return_type(float("0." + tree.children[1].value))
         return self.builder.fadd(float_value, decimals)
 
@@ -289,7 +287,7 @@ class LLVMScope(Interpreter):
 
     def negate_flt(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
-        return self.builder.fsub(self.flt(0), value)
+        return self.builder.fsub(flt64(0), value)
 
     def convert_flt(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
@@ -347,7 +345,3 @@ class LLVMScope(Interpreter):
 
     def __default__(self, tree: TypeTree):
         raise NotImplementedError("llvm", tree.data)
-
-
-class FastLLVMScope(LLVMScope):
-    flt = flt32

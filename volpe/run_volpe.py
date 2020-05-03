@@ -4,16 +4,16 @@ from os import path
 from lark import Lark
 from llvmlite import ir
 
-from annotate import AnnotateScope, FastAnnotateScope
+from annotate import AnnotateScope
 from annotate_utils import func_ret
-from builder import LLVMScope, FastLLVMScope
+from builder import LLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
 from tree import TypeTree
 from volpe_types import pint8, int32, VolpeObject, VolpeList, target_data, VolpeClosure, copy_func, free_func
 
 
-def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, fast=False):
+def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
     if verbose:
         print(tree.pretty())
 
@@ -23,10 +23,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, fast=False):
     func_type = VolpeClosure(scope, {}, [], tree)
     func_type.checked = True
 
-    if fast:
-        FastAnnotateScope(tree, func_type.get_scope, func_ret(func_type, []))
-    else:
-        AnnotateScope(tree, func_type.get_scope, func_ret(func_type, []))
+    AnnotateScope(tree, func_type.get_scope, func_ret(func_type, []))
 
     if verbose:
         print(tree.pretty())
@@ -47,10 +44,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, fast=False):
         return closure
 
     with build_func(func) as (b, args):
-        if fast:
-            FastLLVMScope(b, tree, scope, b.ret, None)
-        else:
-            LLVMScope(b, tree, scope, b.ret, None)
+        LLVMScope(b, tree, scope, b.ret, None)
 
     with build_func(c_func) as (b, args):
         b.ret(pint8(ir.Undefined))
@@ -80,7 +74,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, fast=False):
     # return scope.visit(tree)
 
 
-def run(file_path, verbose=False, show_time=False, fast=False):
+def run(file_path, verbose=False, show_time=False):
     base_path = path.dirname(__file__)
     path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
     with open(path_to_lark) as lark_file:
@@ -88,5 +82,5 @@ def run(file_path, verbose=False, show_time=False, fast=False):
     with open(file_path) as vlp_file:
         parsed_tree = volpe_parser.parse(vlp_file.read())
     # print(parsed_tree.pretty())
-    volpe_llvm(parsed_tree, verbose=verbose, show_time=show_time, fast=fast)
+    volpe_llvm(parsed_tree, verbose=verbose, show_time=show_time)
     # llvm_ir()
