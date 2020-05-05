@@ -103,6 +103,7 @@ class LLVMScope(Interpreter):
     def return_n(self, tree: TypeTree):
         # recursive tail call
         if tree.children[0].data == "func_call" \
+                and tree.children[0].children[0].data == "symbol" \
                 and tree.children[0].children[0].children[0].value == "@" \
                 and self.rec is not None:  # prevent tail call optimization in blocks
             value = self.visit(tree.children[0].children[1])

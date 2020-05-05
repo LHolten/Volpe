@@ -11,7 +11,6 @@ block: _LINE_SEP* (value_ass _LINE_SEP+)* value1 _LINE_SEP*
     | value2 "->" value3 -> if_then
 
 ?value1: value2
-    | object_shape "{" block "}" -> func
 
 ?value2: value3
     | value2 "->" value3 -> implication
@@ -56,6 +55,7 @@ block: _LINE_SEP* (value_ass _LINE_SEP+)* value1 _LINE_SEP*
     | ESCAPED_STRING -> string
 
 ?func: symbol
+    | object_shape "{" block "}" -> func
     | object
     | "{" block "}"
     | "(" value1 ")"
