@@ -18,7 +18,7 @@ char = ir.IntType(8)
 unknown = ir.VoidType()
 copy_func = ir.FunctionType(pint8, [pint8])
 free_func = ir.FunctionType(unknown, [pint8])
-unknown_func = ir.FunctionType(unknown, [])
+unknown_func = ir.FunctionType(unknown, [pint8, pint8])
 
 target_data = llvm.Target.from_default_triple().create_target_machine().target_data
 
