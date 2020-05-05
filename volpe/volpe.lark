@@ -11,7 +11,7 @@ block: _LINE_SEP* (value_ass _LINE_SEP+)* value1 _LINE_SEP*
     | value2 "->" value3 -> if_then
 
 ?value1: value2
-    | object_shape value1 -> func
+    | object_shape "{" block "}" -> func
 
 ?value2: value3
     | value2 "->" value3 -> implication
@@ -50,13 +50,13 @@ block: _LINE_SEP* (value_ass _LINE_SEP+)* value1 _LINE_SEP*
     | "|" value10 "|" -> list_size
 
 ?value10: func
-    | object
     | INTEGER -> integer
     | CHARACTER -> character
     | ESCAPED_CHARACTER -> escaped_character
     | ESCAPED_STRING -> string
 
 ?func: symbol
+    | object
     | "{" block "}"
     | "(" value1 ")"
     | func "." CNAME -> attribute

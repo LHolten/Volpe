@@ -56,8 +56,6 @@ class AnnotateScope(Interpreter):
         return res
 
     def func(self, tree: TypeTree):
-        if tree.children[1].data != "block":
-            tree.children[1] = TypeTree("block", [tree.children[1]])
         return VolpeClosure(self.scope, self.local_scope, tree.children[0], tree.children[1])
 
     def func_call(self, tree: TypeTree):
