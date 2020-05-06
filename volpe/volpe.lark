@@ -55,27 +55,24 @@ block: _LINE_SEP* (value_ass _LINE_SEP+)* value1 _LINE_SEP*
     | ESCAPED_STRING -> string
 
 ?func: symbol
-    | object_shape "{" block "}" -> func
-    | object
+    | "(" shapes ")" "{" block "}" -> func
+    | "{" _SEP* value1 "," (_SEP* value1 ("," _SEP* value1)*)? _SEP* "}" -> object
+    | "{" _SEP* "}" -> object
     | "{" block "}"
     | "(" value1 ")"
     | func "." CNAME -> attribute
-    | func object -> func_call
+    | func "(" values ")" -> func_call
     | func "[" _SEP* value1 _SEP* "]" -> list_index
 
-object_shape:  "(" _SEP* shape "," _SEP* shape ("," _SEP* shape)* _SEP* ")" -> object
-    | "(" _SEP* shape "," _SEP* ")" -> object
-    | "(" _SEP* ")" -> object
+values: _SEP* value1 ("," _SEP* value1)* _SEP* -> object
+shapes: _SEP* shape ("," _SEP* shape)* _SEP* -> object
 
 ?shape: symbol
-    | object_shape
+    | "{" _SEP* shape "," (_SEP* shape ("," _SEP* shape)*)? _SEP* "}" -> object
+    | "{" _SEP* "}" -> object
 
 symbol: CNAME
     | THIS_FUNC
-
-object: "(" _SEP* value1 "," _SEP* value1 ("," _SEP* value1)* _SEP* ")"
-    | "(" _SEP* value1 "," _SEP* ")"
-    | "(" _SEP* ")"
 
 %import common.ESCAPED_STRING
 %import common.INT
