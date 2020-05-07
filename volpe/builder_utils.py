@@ -1,11 +1,11 @@
 from contextlib import contextmanager
-from typing import List, Dict, Iterable
+from typing import List, Iterable
 
 from llvmlite import ir
 
 from tree import TypeTree
-from volpe_types import int32, target_data, VolpeObject, VolpeClosure, copy_func, free_func, VolpeList, \
-    pint8
+from volpe_types import target_data, VolpeObject, VolpeClosure, copy_func, free_func, VolpeList, \
+    pint8, int64
 
 
 def free(b, value):
@@ -35,11 +35,11 @@ def copy(b, value):
 
 def write_environment(b: ir.IRBuilder, value_list: List):
     env_type = ir.LiteralStructType([value.type for value in value_list])
-    untyped_ptr = b.call(b.module.malloc, [int32(env_type.get_abi_size(target_data))])
+    untyped_ptr = b.call(b.module.malloc, [int64(env_type.get_abi_size(target_data))])
     ptr = b.bitcast(untyped_ptr, env_type.as_pointer())
 
     for i, value in enumerate(value_list):
-        b.store(value, b.gep(ptr, [int32(0), int32(i)]))
+        b.store(value, b.gep(ptr, [int64(0), int64(i)]))
 
     return untyped_ptr
 
@@ -50,7 +50,7 @@ def read_environment(b: ir.IRBuilder, untyped_ptr: ir.NamedValue, type_list: Lis
 
     value_list = []
     for i, t in enumerate(type_list):
-        value = b.load(b.gep(ptr, [int32(0), int32(i)]))
+        value = b.load(b.gep(ptr, [int64(0), int64(i)]))
         value_list.append(value)
 
     return value_list
@@ -65,18 +65,18 @@ def free_environment(b: ir.IRBuilder, value_list: Iterable) -> None:
 
 
 def copy_list(b: ir.IRBuilder, list_value):
-    data_size = int32(list_value.type.element_type.get_abi_size(target_data))
+    data_size = int64(list_value.type.element_type.get_abi_size(target_data))
     pointer = b.extract_value(list_value, 0)
     length = b.extract_value(list_value, 1)
     new_pointer = b.call(b.module.malloc, [b.mul(data_size, length)])
     new_pointer = b.bitcast(new_pointer, list_value.type.element_type.as_pointer())
 
-    with options(b, int32) as (ret, phi):
-        ret(int32(0))
+    with options(b, int64) as (ret, phi):
+        ret(int64(0))
 
     with b.if_then(b.icmp_signed("<", phi, length)):
         b.store(copy(b, b.load(b.gep(pointer, [phi]))), b.gep(new_pointer, [phi]))
-        ret(b.add(phi, int32(1)))
+        ret(b.add(phi, int64(1)))
 
     return b.insert_value(list_value, new_pointer, 0)
 
@@ -85,12 +85,12 @@ def free_list(b: ir.IRBuilder, list_value):
     pointer = b.bitcast(b.extract_value(list_value, 0), pint8)
     length = b.extract_value(list_value, 1)
 
-    with options(b, int32) as (ret, phi):
-        ret(int32(0))
+    with options(b, int64) as (ret, phi):
+        ret(int64(0))
 
     with b.if_then(b.icmp_signed("<", phi, length)):
         free(b, b.load(b.gep(pointer, [phi])))
-        ret(b.add(phi, int32(1)))
+        ret(b.add(phi, int64(1)))
 
     b.call(b.module.free, [pointer])
 

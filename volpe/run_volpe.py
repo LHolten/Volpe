@@ -9,7 +9,7 @@ from builder import LLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
 from tree import TypeTree
-from volpe_types import pint8, int32, VolpeObject, VolpeList, target_data, VolpeClosure, VolpeBlock
+from volpe_types import pint8, int32, VolpeObject, VolpeList, target_data, VolpeClosure, VolpeBlock, int64
 
 
 def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
@@ -28,9 +28,9 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
 
     module = ir.Module("program")
     module.func_count = itertools.count()
-    module.malloc = ir.Function(module, ir.FunctionType(pint8, [int32]), "malloc")
+    module.malloc = ir.Function(module, ir.FunctionType(pint8, [int64]), "malloc")
     module.free = ir.Function(module, ir.FunctionType(ir.VoidType(), [pint8]), "free")
-    module.memcpy = module.declare_intrinsic('llvm.memcpy', [pint8, pint8, int32])
+    module.memcpy = module.declare_intrinsic('llvm.memcpy', [pint8, pint8, int64])
 
     return_type = func_type.func.return_type
     # return as pointer so they can be printed more easily

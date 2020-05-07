@@ -107,7 +107,7 @@ class AnnotateScope(Interpreter):
         return int64
 
     def list(self, tree: TypeTree):
-        ret = combine_types(self, self.visit_children(tree))
+        ret = combine_types(self, *self.visit_children(tree))
         return VolpeList(ret)
 
     def convert_int(self, tree: TypeTree):

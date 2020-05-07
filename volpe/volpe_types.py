@@ -37,7 +37,7 @@ class VolpeObject(ir.LiteralStructType):
 
 class VolpeList(ir.LiteralStructType):
     def __init__(self, element_type: ir.Type):
-        super().__init__([element_type.as_pointer(), int32])
+        super().__init__([element_type.as_pointer(), int64])
         self.element_type = element_type
 
 
@@ -117,6 +117,9 @@ def combine_types(annotate, t1, *t):
             assert len(t1.type_dict.values()) == len(t2.type_dict.values())
             for k in t1.type_dict.keys():
                 combine_types(annotate, t1.type_dict[k], t2.type_dict[k])
+    if isinstance(t1, VolpeList):
+        for t2 in t:
+            combine_types(annotate, t1.element_type, t2.element_type)
     else:
         assert all(t1 == t2 for t2 in t), "all elements should have the same type"
     return t1

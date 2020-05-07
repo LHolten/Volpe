@@ -148,27 +148,17 @@ class LLVMScope(Interpreter):
         free(self.builder, list_value)
         return length
 
-    def make_list(self, tree: TypeTree):
-        iter_value = self.visit_children(tree)[0]
-        closure = self.builder.extract_value(iter_value, 0)
-        length = self.builder.extract_value(iter_value, 1)
-        data_size = int32(tree.return_type.element_type.get_abi_size(target_data))
-        pointer = self.builder.call(self.builder.module.malloc, [self.builder.mul(data_size, length)])
+    def list(self, tree: TypeTree):
+        data_size = int64(tree.return_type.element_type.get_abi_size(target_data) * len(tree.children))
+        pointer = self.builder.call(self.builder.module.malloc, [data_size])
         pointer = self.builder.bitcast(pointer, tree.return_type.element_type.as_pointer())
 
-        with options(self.builder, int32) as (ret, phi):
-            ret(int32(0))
-
-        with self.builder.if_then(self.builder.icmp_signed("<", phi, length)):
-            # TODO fix lists
-            # self.builder.store(closure_call(self.builder, closure, [phi]), self.builder.gep(pointer, [phi]))
-            ret(self.builder.add(phi, int64(1)))
-
-        free(self.builder, closure)
+        for i, ret in enumerate(self.visit_children(tree)):
+            self.builder.store(ret, self.builder.gep(pointer, [int64(i)]))
 
         list_value = tree.return_type(ir.Undefined)
         list_value = self.builder.insert_value(list_value, pointer, 0)
-        return self.builder.insert_value(list_value, length, 1)
+        return self.builder.insert_value(list_value, int64(len(tree.children)), 1)
 
     def implication(self, tree: TypeTree):
         with options(self.builder, tree.return_type) as (ret, phi):
