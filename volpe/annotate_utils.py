@@ -1,5 +1,5 @@
 from tree import TypeTree
-from volpe_types import int1, int64, flt64, char
+from volpe_types import int1, int64, flt64, char, VolpeList, combine_types
 
 
 def logic(self, tree: TypeTree):
@@ -18,11 +18,13 @@ def math(self, tree: TypeTree):
     children = self.visit_children(tree)
     ret0 = children[0]
     ret1 = children[1]
-    assert ret0 == ret1, "types need to match for math operations"
+    assert combine_types(self, ret0, ret1), "types need to match for math operations"
     if ret0 == int64:
         tree.data = tree.data + "_int"
     elif ret0 == flt64:
         tree.data = tree.data + "_flt"
+    elif isinstance(ret0, VolpeList) and tree.data == "add":
+        tree.data = "add_list"
     else:
         raise AssertionError("math operations only work for integers and floats")
     return ret0

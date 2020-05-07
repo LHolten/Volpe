@@ -9,7 +9,7 @@ from builder import LLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
 from tree import TypeTree
-from volpe_types import pint8, int32, VolpeObject, VolpeList, target_data, VolpeClosure, VolpeBlock, int64
+from volpe_types import pint8, VolpeObject, VolpeList, target_data, VolpeClosure, VolpeBlock, int64
 
 
 def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
@@ -41,7 +41,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
     with build_func(main_func) as (b, _):
         def ret(res):
             if isinstance(res.type, (VolpeObject, VolpeList)):
-                ptr = b.bitcast(b.call(module.malloc, [int32(res.type.get_abi_size(target_data))]), return_type)
+                ptr = b.bitcast(b.call(module.malloc, [int64(res.type.get_abi_size(target_data))]), return_type)
                 b.store(res, ptr)
                 res = ptr
             b.ret(res)

@@ -6,7 +6,7 @@ from llvmlite import ir
 from builder_utils import write_environment, free_environment, options, \
     read_environment, tuple_assign, copy, copy_environment, build_closure, free
 from tree import TypeTree
-from volpe_types import int1, int32, int64, flt64, VolpeClosure, target_data
+from volpe_types import int1, int64, flt64, VolpeClosure, target_data, pint8
 
 
 class LLVMScope(Interpreter):
@@ -159,6 +159,27 @@ class LLVMScope(Interpreter):
         list_value = tree.return_type(ir.Undefined)
         list_value = self.builder.insert_value(list_value, pointer, 0)
         return self.builder.insert_value(list_value, int64(len(tree.children)), 1)
+
+    def add_list(self, tree: TypeTree):
+        b = self.builder
+        list_value, other_list = self.visit_children(tree)
+        data_size = int64(tree.return_type.element_type.get_abi_size(target_data))
+        pointer = b.bitcast(b.extract_value(list_value, 0), pint8)
+        length = b.mul(b.extract_value(list_value, 1), data_size)
+        pointer2 = b.bitcast(b.extract_value(other_list, 0), pint8)
+        length2 = b.mul(b.extract_value(other_list, 1), data_size)
+
+        new_length = b.add(length, length2)
+        new_pointer = b.call(self.builder.module.malloc, [new_length])
+        b.call(b.module.memcpy, [new_pointer, pointer, length, int1(False)])
+        b.call(b.module.memcpy, [b.gep(new_pointer, [length]), pointer2, length2, int1(False)])
+        b.call(b.module.free, [pointer])
+        b.call(b.module.free, [pointer2])
+
+        list_value = tree.return_type(ir.Undefined)
+        list_value = self.builder.insert_value(list_value, b.bitcast(new_pointer, tree.return_type.element_type.as_pointer()), 0)
+        new_size = b.sdiv(new_length, data_size)
+        return self.builder.insert_value(list_value, new_size, 1)
 
     def implication(self, tree: TypeTree):
         with options(self.builder, tree.return_type) as (ret, phi):
