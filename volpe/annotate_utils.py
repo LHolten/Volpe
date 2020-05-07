@@ -1,9 +1,5 @@
-from typing import Dict
-
-from llvmlite import ir
-
 from tree import TypeTree
-from volpe_types import VolpeObject, int1, int64, flt64, char, pint8, VolpeClosure
+from volpe_types import int1, int64, flt64, char
 
 
 def logic(self, tree: TypeTree):
@@ -72,26 +68,7 @@ def comp(self, tree: TypeTree):
     return int1
 
 
-def tuple_assign(scope: Dict, tree: TypeTree, value_type):
-    if tree.data == "object":
-        assert isinstance(value_type, VolpeObject), "can only destructure objects"
-        assert len(tree.children) == len(value_type.type_dict.values())
-
-        for i, child in enumerate(tree.children):
-            tuple_assign(scope, child, value_type.type_dict[f"_{i}"])
-    else:
-        assert tree.data == "symbol"
-        scope[tree.children[0].value] = value_type
-
-    return scope
 
 
-def func_ret(closure, arg_types):
-    def ret(value_type):
-        if closure.block.return_type is not None:
-            assert closure.block.return_type == value_type, "different return types encountered in same block"
-        else:
-            closure.block.return_type = value_type
-        closure.update(ir.FunctionType(value_type, [pint8, *arg_types]))
 
-    return ret
+

@@ -2,7 +2,7 @@ from typing import Callable
 
 from lark.visitors import Interpreter
 
-from annotate_utils import tuple_assign, logic, unary_logic, math, unary_math, math_assign, comp, func_ret
+from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp
 from tree import TypeTree
 from volpe_types import (
     int1,
@@ -11,14 +11,13 @@ from volpe_types import (
     char,
     VolpeObject,
     VolpeClosure,
-    pint8,
-    VolpeList
+    VolpeList, combine_types, tuple_assign, VolpeBlock
 )
 
 
 class AnnotateScope(Interpreter):
-    def __init__(self, tree: TypeTree, scope: Callable, ret: Callable):
-        self.scope = scope
+    def __init__(self, tree: TypeTree, instance_scope: Callable, ret: Callable):
+        self.instance_scope = instance_scope
         self.local_scope = dict()
         self.ret = ret
 
@@ -28,23 +27,29 @@ class AnnotateScope(Interpreter):
         values = self.visit_children(tree)  # sets tree.return_type
         assert all([v == int1 for v in values]), "some line does not evaluate to a bool"
 
-    def get_scope(self, name):
-        if name in self.local_scope:
-            return self.local_scope[name]
-        else:
-            return self.scope(name)
-
     def visit(self, tree: TypeTree):
         tree.return_type = getattr(self, tree.data)(tree)
         return tree.return_type
 
+    def get_instance_scope(self):
+        frozen_local = self.local_scope.copy()
+        frozen_parent = self.instance_scope()
+
+        def scope(name):
+            if name in frozen_local:
+                return frozen_local[name]
+            else:
+                return frozen_parent(name)
+
+        return scope
+
     def block(self, tree: TypeTree):
         def ret(value_type):
             if tree.return_type is not None:
-                assert tree.return_type == value_type, "different return types encountered in same block"
+                combine_types(self, value_type, tree.return_type)
             tree.return_type = value_type
 
-        self.__class__(tree, self.get_scope, ret)
+        self.__class__(tree, self.get_instance_scope, ret)
         return tree.return_type
 
     def object(self, tree: TypeTree):
@@ -56,7 +61,8 @@ class AnnotateScope(Interpreter):
         return res
 
     def func(self, tree: TypeTree):
-        return VolpeClosure(self.scope, self.local_scope, tree.children[0], tree.children[1])
+        tree.block = VolpeBlock(tree, self.get_instance_scope)
+        return VolpeClosure(tree.block)
 
     def func_call(self, tree: TypeTree):
         closure = self.visit(tree.children[0])
@@ -64,29 +70,14 @@ class AnnotateScope(Interpreter):
 
         assert isinstance(closure, VolpeClosure), "can only call closures"
 
-        if closure.checked:  # we have already been here
-            assert arg_type == closure.func.args[1], "generics are not supported"
-            return closure.func.return_type
-        closure.checked = True
-
-        args = tuple_assign(dict(), closure.arg_object, arg_type)
-        args["@"] = closure
-
-        def scope(name):
-            if name in args.keys():
-                return args[name]
-            return closure.get_scope(name)
-
-        self.__class__(closure.block, scope, func_ret(closure, [arg_type]))
-
-        return closure.func.return_type
+        return closure.call(arg_type, self.__class__)
 
     def return_n(self, tree: TypeTree):
         self.ret(self.visit(tree.children[0]))
         return int1
 
     def symbol(self, tree: TypeTree):
-        return self.get_scope(tree.children[0].value)
+        return self.get_instance_scope()(tree.children[0].value)
 
     def assign(self, tree: TypeTree):
         tuple_assign(self.local_scope, tree.children[0], self.visit(tree.children[1]))
@@ -115,10 +106,9 @@ class AnnotateScope(Interpreter):
         assert isinstance(ret, VolpeList)
         return int64
 
-    def make_list(self, tree: TypeTree):
-        # update this function
-        ret = self.visit_children(tree)[0]
-        return VolpeList(ret.closure.func.return_type)
+    def list(self, tree: TypeTree):
+        ret = combine_types(self, self.visit_children(tree))
+        return VolpeList(ret)
 
     def convert_int(self, tree: TypeTree):
         assert self.visit(tree.children[0]) == int64

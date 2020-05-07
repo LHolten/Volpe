@@ -3,6 +3,8 @@ from typing import Dict, Callable
 import llvmlite.binding as llvm
 from llvmlite import ir
 
+from tree import TypeTree
+
 llvm.initialize()
 llvm.initialize_native_target()
 llvm.initialize_native_asmprinter()  # yes, even this one
@@ -39,25 +41,93 @@ class VolpeList(ir.LiteralStructType):
         self.element_type = element_type
 
 
+class VolpeBlock:
+    def __init__(self, tree: TypeTree, instance_scope: Callable):
+        self.arg_object = tree.children[0]
+        self.block = tree.children[1]
+        self.tree = tree
+        self.outside_used = set()
+
+        self.frozen_scope = instance_scope()
+
+    def call(self, arg_type, closure, annotate):
+        args = tuple_assign(dict(), self.arg_object, arg_type)
+        args["@"] = closure
+
+        def get_instance_scope():
+            def scope(name):
+                if name in args.keys():
+                    return args[name]
+                self.outside_used.add(name)
+                return self.frozen_scope(name)
+
+            return scope
+
+        annotate(self.block, get_instance_scope, closure.ret(annotate, arg_type))
+        self.block.return_type = closure.func.return_type
+
+    def update(self, closure):
+        self.tree.return_type = closure
+
+
 class VolpeClosure(ir.LiteralStructType):
-    def __init__(self, scope: Callable, local_scope: dict, arg_object, block):
+    def __init__(self, block):
         super().__init__([unknown_func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
         self.func = unknown_func
-        self.outside_used = set()
-        self.arg_object = arg_object
-        self.block = block
+        self.blocks = [block]
         self.checked = False
 
-        frozen_scope = local_scope.copy()
+    def call(self, arg_type, annotate):
+        if self.checked:  # we have already been here
+            combine_types(annotate, self.func.args[1], arg_type)
+            return self.func.return_type
+        self.checked = True
 
-        def get_scope(name):
-            self.outside_used.add(name)
-            if name in frozen_scope:
-                return frozen_scope[name]
-            else:
-                return scope(name)
-        self.get_scope = get_scope
+        for block in self.blocks:
+            block.call(arg_type, self, annotate)
+
+        return self.func.return_type
+
+    def ret(self, annotate, arg_type):
+        def ret(value_type):
+            if self.func.return_type is not unknown:
+                combine_types(annotate, value_type, self.func.return_type)
+            self.update(ir.FunctionType(value_type, [pint8, arg_type]))
+        return ret
 
     def update(self, func: ir.FunctionType):
         super().__init__([func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
         self.func = func
+
+
+def combine_types(annotate, t1, *t):
+    if isinstance(t1, VolpeClosure):
+        for t2 in t:
+            if t1.checked:
+                t2.call(t1.func.args[1], annotate)
+                combine_types(annotate, t1.func.return_type, t2.func.return_type)
+            elif t2.checked:
+                t1.call(t2.func.args[1], annotate)
+                combine_types(annotate, t1.func.return_type, t2.func.return_type)
+            t1.blocks.extend(t2.blocks)
+            for block in t1.blocks:
+                block.update(t1)
+    else:
+        assert all(t1 == t2 for t2 in t), "all elements should have the same type"
+    return t1
+
+
+def tuple_assign(scope: Dict, tree: TypeTree, value_type):
+    if tree is None:
+        return scope
+    if tree.data == "object":
+        assert isinstance(value_type, VolpeObject), "can only destructure objects"
+        assert len(tree.children) == len(value_type.type_dict.values())
+
+        for i, child in enumerate(tree.children):
+            tuple_assign(scope, child, value_type.type_dict[f"_{i}"])
+    else:
+        assert tree.data == "symbol"
+        scope[tree.children[0].value] = value_type
+
+    return scope

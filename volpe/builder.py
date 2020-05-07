@@ -53,7 +53,7 @@ class LLVMScope(Interpreter):
         assert isinstance(closure_type, VolpeClosure)
 
         module = self.builder.module
-        env_names = list(closure_type.outside_used)
+        env_names = list(tree.block.outside_used)
         env_values = [self.get_scope(name) for name in env_names]
         env_types = [value.type for value in env_values]
 
