@@ -36,9 +36,13 @@ class VolpeObject(ir.LiteralStructType):
 
 
 class VolpeList(ir.LiteralStructType):
-    def __init__(self, element_type: ir.Type):
+    def __init__(self, element_type: ir.Type, checked: bool):
         super().__init__([element_type.as_pointer(), int64])
         self.element_type = element_type
+        self.checked = checked
+
+    def update(self, element_type):
+        self.__init__(element_type, True,)
 
 
 class VolpeBlock:
@@ -78,9 +82,7 @@ class VolpeClosure(ir.LiteralStructType):
         self.checked = False
 
     def call(self, arg_type, annotate):
-        if self.checked:  # we have already been here
-            combine_types(annotate, self.func.args[1], arg_type)
-            return self.func.return_type
+        assert not self.checked
         self.checked = True
 
         for block in self.blocks:
@@ -103,14 +105,16 @@ class VolpeClosure(ir.LiteralStructType):
 def combine_types(annotate, t1, *t):
     if isinstance(t1, VolpeClosure):
         for t2 in t:
-            if t1.checked:
-                t2.call(t1.func.args[1], annotate)
-                combine_types(annotate, t1.func.return_type, t2.func.return_type)
-            elif t2.checked:
-                t1.call(t2.func.args[1], annotate)
+            if t1.checked or t2.checked:
+                if t1.checked and not t2.checked:
+                    t2.call(t1.func.args[1], annotate)
+                if t2.checked and not t1.checked:
+                    t1.call(t2.func.args[1], annotate)
+                if t1.checked and t2.checked:
+                    combine_types(annotate, t1.func.args[1], t2.func.args[1])
                 combine_types(annotate, t1.func.return_type, t2.func.return_type)
             t1.blocks.extend(t2.blocks)
-            for block in t1.blocks:
+            for block in t2.blocks:
                 block.update(t1)
     if isinstance(t1, VolpeObject):
         for t2 in t:
@@ -119,7 +123,10 @@ def combine_types(annotate, t1, *t):
                 combine_types(annotate, t1.type_dict[k], t2.type_dict[k])
     if isinstance(t1, VolpeList):
         for t2 in t:
-            combine_types(annotate, t1.element_type, t2.element_type)
+            if t2.checked and not t1.checked:
+                t1.update(t2.element_type)
+            if t1.checked and t2.checked:
+                combine_types(annotate, t1.element_type, t2.element_type)
     else:
         assert all(t1 == t2 for t2 in t), "all elements should have the same type"
     return t1

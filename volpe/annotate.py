@@ -11,7 +11,7 @@ from volpe_types import (
     char,
     VolpeObject,
     VolpeClosure,
-    VolpeList, combine_types, tuple_assign, VolpeBlock
+    VolpeList, combine_types, tuple_assign, VolpeBlock, unknown, pint8
 )
 
 
@@ -107,8 +107,10 @@ class AnnotateScope(Interpreter):
         return int64
 
     def list(self, tree: TypeTree):
-        ret = combine_types(self, *self.visit_children(tree))
-        return VolpeList(ret)
+        ret = self.visit_children(tree)
+        if len(ret) > 0:
+            return VolpeList(combine_types(self, *ret), True)
+        return VolpeList(pint8, False)
 
     def convert_int(self, tree: TypeTree):
         assert self.visit(tree.children[0]) == int64
