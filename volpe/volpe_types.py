@@ -116,15 +116,17 @@ def combine_types(annotate, t1, *t):
             t1.blocks.extend(t2.blocks)
             for block in t2.blocks:
                 block.update(t1)
-    if isinstance(t1, VolpeObject):
+    elif isinstance(t1, VolpeObject):
         for t2 in t:
             assert len(t1.type_dict.values()) == len(t2.type_dict.values()), "object has different size"
             for k in t1.type_dict.keys():
                 combine_types(annotate, t1.type_dict[k], t2.type_dict[k])
-    if isinstance(t1, VolpeList):
+    elif isinstance(t1, VolpeList):
         for t2 in t:
             if t2.checked and not t1.checked:
                 t1.update(t2.element_type)
+            if t1.checked and not t2.checked:
+                t2.update(t1.element_type)
             if t1.checked and t2.checked:
                 combine_types(annotate, t1.element_type, t2.element_type)
     else:
