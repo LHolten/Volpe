@@ -82,7 +82,7 @@ class VolpeClosure(ir.LiteralStructType):
         self.checked = False
 
     def call(self, arg_type, annotate):
-        assert not self.checked
+        assert not self.checked, "this shouldn't happen"
         self.checked = True
 
         for block in self.blocks:

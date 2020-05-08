@@ -59,8 +59,7 @@ def math_assign(self, tree: TypeTree):
 def comp(self, tree: TypeTree):
     children = self.visit_children(tree)
     ret0 = children[0]
-    ret1 = children[1]
-    assert ret0 == ret1, "types need to match for comparisons"
+    combine_types(self, children)
     if ret0 == int64 or ret0 == char:
         tree.data = tree.data + "_int"
     elif ret0 == flt64:

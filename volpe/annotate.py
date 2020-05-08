@@ -70,7 +70,10 @@ class AnnotateScope(Interpreter):
 
         assert isinstance(closure, VolpeClosure), "can only call closures"
 
-        return closure.call(arg_type, self.__class__)
+        if not closure.checked:
+            return closure.call(arg_type, self.__class__)
+        combine_types(self, closure.func.args[1], arg_type)
+        return closure.func.return_type
 
     def return_n(self, tree: TypeTree):
         self.ret(self.visit(tree.children[0]))
@@ -103,7 +106,7 @@ class AnnotateScope(Interpreter):
 
     def list_size(self, tree: TypeTree):
         ret = self.visit_children(tree)[0]
-        assert isinstance(ret, VolpeList)
+        assert isinstance(ret, VolpeList), "can only get size of lists"
         return int64
 
     def list(self, tree: TypeTree):

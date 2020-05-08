@@ -76,7 +76,7 @@ def determine_c_type(volpe_type, depth=0):
             _fields_ = [(f"elem{i}", determine_c_type(elem, depth+1)) for i, elem in enumerate(elems)]
 
             def __repr__(self):
-                return "(" + ", ".join([str(getattr(self, tup[0])) for tup in self._fields_]) + ")"
+                return "{" + ", ".join([str(getattr(self, tup[0])) for tup in self._fields_]) + "}"
         return POINTER(CTuple) if depth == 0 else CTuple
 
     if isinstance(volpe_type, VolpeList):
@@ -89,6 +89,8 @@ def determine_c_type(volpe_type, depth=0):
                 if depth < 2:
                     elems = getattr(self, "elems")
                     length = getattr(self, "length")
+                    if length == 0:
+                        return "[]"
                     return "[" + ", ".join([str(elem) for elem in elems[:length]]) + "]"
                 return get_type_name(volpe_type)
         return POINTER(CList) if depth == 0 else CList
