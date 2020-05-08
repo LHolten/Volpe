@@ -5,7 +5,7 @@ from llvmlite import ir
 
 from tree import TypeTree
 from volpe_types import target_data, VolpeObject, VolpeClosure, copy_func, free_func, VolpeList, \
-    pint8, int64
+    pint8, int64, int32
 
 
 def free(b, value):
@@ -39,7 +39,7 @@ def write_environment(b: ir.IRBuilder, value_list: List):
     ptr = b.bitcast(untyped_ptr, env_type.as_pointer())
 
     for i, value in enumerate(value_list):
-        b.store(value, b.gep(ptr, [int64(0), int64(i)]))
+        b.store(value, b.gep(ptr, [int32(0), int32(i)]))
 
     return untyped_ptr
 
@@ -50,7 +50,7 @@ def read_environment(b: ir.IRBuilder, untyped_ptr: ir.NamedValue, type_list: Lis
 
     value_list = []
     for i, t in enumerate(type_list):
-        value = b.load(b.gep(ptr, [int64(0), int64(i)]))
+        value = b.load(b.gep(ptr, [int32(0), int32(i)]))
         value_list.append(value)
 
     return value_list
