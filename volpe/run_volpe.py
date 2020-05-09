@@ -69,10 +69,13 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
 def run(file_path, verbose=False, show_time=False):
     base_path = path.dirname(__file__)
     path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
-    with open(path_to_lark) as lark_file:
-        volpe_parser = Lark(lark_file, start='block', parser='earley', ambiguity='explicit', tree_class=TypeTree)
+    volpe_parser = get_parser(path_to_lark)
     with open(file_path) as vlp_file:
         parsed_tree = volpe_parser.parse(vlp_file.read())
     # print(parsed_tree.pretty())
     volpe_llvm(parsed_tree, verbose=verbose, show_time=show_time)
     # llvm_ir()
+
+def get_parser(path_to_lark):
+    with open(path_to_lark) as lark_file:
+        return Lark(lark_file, start='block', parser='earley', ambiguity='explicit', tree_class=TypeTree)
