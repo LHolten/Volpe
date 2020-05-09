@@ -4,9 +4,9 @@ from lark.visitors import Interpreter
 from llvmlite import ir
 
 from builder_utils import write_environment, free_environment, options, \
-    read_environment, tuple_assign, copy, copy_environment, build_closure, free
+    read_environment, tuple_assign, copy, copy_environment, build_closure, free, math, comp, unary_math
 from tree import TypeTree
-from volpe_types import int1, int64, flt64, VolpeClosure, target_data, pint8
+from volpe_types import int1, int64, flt64, target_data, pint8, unwrap
 
 
 class LLVMScope(Interpreter):
@@ -50,39 +50,34 @@ class LLVMScope(Interpreter):
 
     def func(self, tree: TypeTree):
         closure_type = tree.return_type
-        assert isinstance(closure_type, VolpeClosure)
 
         module = self.builder.module
-        env_names = list(tree.block.outside_used)
+        env_names = list(tree.outside_used)
         env_values = [self.get_scope(name) for name in env_names]
         env_types = [value.type for value in env_values]
 
         with build_closure(module, closure_type, env_types) as (b, rec_ret, args, closure, c_func):
-            if closure_type.checked:
-                new_values = read_environment(b, args[0], env_types)
+            new_values = read_environment(b, args[0], env_types)
 
-                env_scope = dict(zip(env_names, new_values))
-                env_scope["@"] = b.insert_value(closure, args[0], 3)
+            env_scope = dict(zip(env_names, new_values))
+            env_scope["@"] = b.insert_value(closure, args[0], 3)
 
-                arg_scope = tuple_assign(b, dict(), tree.children[0], args[1])
+            arg_scope = tuple_assign(b, dict(), tree.children[0], args[1])
 
-                def scope(name):
-                    if name in arg_scope:
-                        return copy(b, arg_scope[name])
-                    return copy(b, env_scope[name])
+            def scope(name):
+                if name in arg_scope:
+                    return copy(b, arg_scope[name])
+                return copy(b, env_scope[name])
 
-                def ret(value):
-                    free_environment(b, arg_scope.values())
-                    b.ret(value)
+            def ret(value):
+                free_environment(b, arg_scope.values())
+                b.ret(value)
 
-                def rec(value):
-                    free_environment(b, arg_scope.values())
-                    rec_ret(value)
+            def rec(value):
+                free_environment(b, arg_scope.values())
+                rec_ret(value)
 
-                self.__class__(b, tree.children[-1], scope, ret, rec)
-            else:
-                b.ret_void()
-                print("ignoring function without usage")
+            LLVMScope(b, tree.children[-1], scope, ret, rec)
 
         env_ptr = write_environment(self.builder, copy_environment(self.builder, env_values))
         return self.builder.insert_value(closure, env_ptr, 3)
@@ -117,12 +112,12 @@ class LLVMScope(Interpreter):
         return int1
 
     def block(self, tree: TypeTree):
-        with options(self.builder, tree.return_type) as (ret, phi):
+        with options(self.builder, unwrap(tree.return_type)) as (ret, phi):
             self.__class__(self.builder, tree, self.get_scope, ret, None)
         return phi
 
     def object(self, tree: TypeTree):
-        value = tree.return_type(ir.Undefined)
+        value = unwrap(tree.return_type)(ir.Undefined)
         for i, child in enumerate(tree.children):
             value = self.builder.insert_value(value, self.visit(child), i)
         return value
@@ -156,14 +151,15 @@ class LLVMScope(Interpreter):
         for i, ret in enumerate(self.visit_children(tree)):
             self.builder.store(ret, self.builder.gep(pointer, [int64(i)]))
 
-        list_value = tree.return_type(ir.Undefined)
+        list_value = unwrap(tree.return_type)(ir.Undefined)
         list_value = self.builder.insert_value(list_value, pointer, 0)
         return self.builder.insert_value(list_value, int64(len(tree.children)), 1)
 
-    def add_list(self, tree: TypeTree):
+    def add_list(self, tree: TypeTree, values):
         b = self.builder
-        list_value, other_list = self.visit_children(tree)
-        data_size = int64(tree.return_type.element_type.get_abi_size(target_data))
+        element_type = unwrap(tree.return_type.element_type)
+        list_value, other_list = values
+        data_size = int64(element_type.get_abi_size(target_data))
         pointer = b.bitcast(b.extract_value(list_value, 0), pint8)
         length = b.mul(b.extract_value(list_value, 1), data_size)
         pointer2 = b.bitcast(b.extract_value(other_list, 0), pint8)
@@ -176,8 +172,8 @@ class LLVMScope(Interpreter):
         b.call(b.module.free, [pointer])
         b.call(b.module.free, [pointer2])
 
-        list_value = tree.return_type(ir.Undefined)
-        list_value = self.builder.insert_value(list_value, b.bitcast(new_pointer, tree.return_type.element_type.as_pointer()), 0)
+        list_value = unwrap(tree.return_type)(ir.Undefined)
+        list_value = self.builder.insert_value(list_value, b.bitcast(new_pointer, element_type.as_pointer()), 0)
         new_size = b.sdiv(new_length, data_size)
         return self.builder.insert_value(list_value, new_size, 1)
 
@@ -217,35 +213,29 @@ class LLVMScope(Interpreter):
     def integer(tree: TypeTree):
         return tree.return_type(int(tree.children[0].value))
 
-    def add_int(self, tree: TypeTree):
+    def add_int(self, values):
         # TODO Use overflow bit to raise runtime error
         # self.builder.extract_value(self.builder.sadd_with_overflow(values[0], values[1]), 0)
-        values = self.visit_children(tree)
         return self.builder.add(values[0], values[1])
 
-    def sub_int(self, tree: TypeTree):
+    def sub_int(self, values):
         # TODO Use overflow bit to raise runtime error
         # self.builder.extract_value(self.builder.ssub_with_overflow(values[0], values[1]), 0)
-        values = self.visit_children(tree)
         return self.builder.sub(values[0], values[1])
 
-    def mod_int(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def mod_int(self, values):
         return self.builder.srem(values[0], values[1])
 
-    def div_int(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def div_int(self, values):
         return self.builder.sdiv(values[0], values[1])
 
-    def mul_int(self, tree: TypeTree):
+    def mul_int(self, values):
         # TODO Use overflow bit to raise runtime error
         # self.builder.extract_value(self.builder.smul_with_overflow(values[0], values[1]), 0)
-        values = self.visit_children(tree)
         return self.builder.mul(values[0], values[1])
 
-    def negate_int(self, tree: TypeTree):
-        value = self.visit_children(tree)[0]
-        return self.builder.neg(value)
+    def negate_int(self, values):
+        return self.builder.neg(values[0])
 
     def convert_int(self, tree: TypeTree):
         value = self.visit(tree.children[0])
@@ -253,53 +243,41 @@ class LLVMScope(Interpreter):
         decimals = tree.return_type(float("0." + tree.children[1].value))
         return self.builder.fadd(float_value, decimals)
 
-    def equals_int(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def equals_int(self, values):
         return self.builder.icmp_signed("==", values[0], values[1])
 
-    def not_equals_int(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def not_equals_int(self, values):
         return self.builder.icmp_signed("!=", values[0], values[1])
 
-    def greater_int(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def greater_int(self, values):
         return self.builder.icmp_signed(">", values[0], values[1])
 
-    def less_int(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def less_int(self, values):
         return self.builder.icmp_signed("<", values[0], values[1])
 
-    def greater_equals_int(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def greater_equals_int(self, values):
         return self.builder.icmp_signed(">=", values[0], values[1])
 
-    def less_equals_int(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def less_equals_int(self, values):
         return self.builder.icmp_signed("<=", values[0], values[1])
 
-    def add_flt(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def add_flt(self, values):
         return self.builder.fadd(values[0], values[1])
 
-    def sub_flt(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def sub_flt(self, values):
         return self.builder.fsub(values[0], values[1])
 
-    def mod_flt(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def mod_flt(self, values):
         return self.builder.frem(values[0], values[1])
 
-    def div_flt(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def div_flt(self, values):
         return self.builder.fdiv(values[0], values[1])
 
-    def mul_flt(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def mul_flt(self, values):
         return self.builder.fmul(values[0], values[1])
 
-    def negate_flt(self, tree: TypeTree):
-        value = self.visit_children(tree)[0]
-        return self.builder.fsub(flt64(0), value)
+    def negate_flt(self, values):
+        return self.builder.fsub(flt64(0), values[0])
 
     def convert_flt(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
@@ -338,6 +316,23 @@ class LLVMScope(Interpreter):
         # let Python parse the escaped character
         evaluated = eval(f"{tree.children[0]}")
         return tree.return_type(ord(evaluated))
+
+    # Mathematics
+    add = math
+    mod = math
+    mul = math
+    sub = math
+    div = math
+    # power = math
+    negate = unary_math
+
+    # Comparison
+    equals = comp
+    not_equals = comp
+    greater = comp
+    less = comp
+    greater_equals = comp
+    less_equals = comp
 
     def __default__(self, tree: TypeTree):
         raise NotImplementedError("llvm", tree.data)

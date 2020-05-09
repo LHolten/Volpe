@@ -5,7 +5,39 @@ from llvmlite import ir
 
 from tree import TypeTree
 from volpe_types import target_data, VolpeObject, VolpeClosure, copy_func, free_func, VolpeList, \
-    pint8, int64, int32
+    pint8, int64, int32, flt64, char, unwrap
+
+
+def math(self, tree: TypeTree):
+    values = self.visit_children(tree)
+    t = tree.return_type
+    if t is int64:
+        return getattr(self, tree.data + "_int")(values)
+    if t is flt64:
+        return getattr(self, tree.data + "_flt")(values)
+    if isinstance(t, VolpeList) and tree.data == "add":
+        return getattr(self, "add_list")(tree, values)
+    raise AssertionError("math operations only work for integers and floats")
+
+
+def unary_math(self, tree: TypeTree):
+    values = self.visit_children(tree)
+    t = tree.return_type
+    if t is int64 or t is char:
+        return getattr(self, tree.data + "_int")(values)
+    if t is flt64:
+        return getattr(self, tree.data + "_flt")(values)
+    raise AssertionError("unary math operations only work for integers and floats")
+
+
+def comp(self, tree: TypeTree):
+    values = self.visit_children(tree)
+    t = tree.children[0].return_type
+    if t is int64 or t is char:
+        return getattr(self, tree.data + "_int")(values)
+    if t is flt64:
+        return getattr(self, tree.data + "_flt")(values)
+    raise AssertionError("comparisons only work for integers, floats, and chars")
 
 
 def free(b, value):
@@ -120,12 +152,13 @@ def build_func(func: ir.Function):
 
 
 @contextmanager
-def build_closure(module, closure_type, env_types):
+def build_closure(module, closure_type: VolpeClosure, env_types):
     func_name = str(next(module.func_count))
-    func = ir.Function(module, closure_type.func, func_name)
+    func_type = ir.FunctionType(unwrap(closure_type.ret_type), [pint8, unwrap(closure_type.arg_type)])
+    func = ir.Function(module, func_type, func_name)
     c_func = ir.Function(module, copy_func, func_name + ".copy")
     f_func = ir.Function(module, free_func, func_name + ".free")
-    closure = closure_type([func, c_func, f_func, ir.Undefined])
+    closure = unwrap(closure_type)([func, c_func, f_func, ir.Undefined])
 
     with build_func(func) as (b, args):
         with options(b, args[1].type) as (ret, phi):

@@ -3,25 +3,37 @@ from os import path
 
 from lark import Lark
 from llvmlite import ir
+from unification import var, reify
 
 from annotate import AnnotateScope
 from builder import LLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
 from tree import TypeTree
-from volpe_types import pint8, VolpeObject, VolpeList, target_data, VolpeClosure, VolpeBlock, int64
+from volpe_types import pint8, VolpeObject, VolpeList, target_data, VolpeClosure, int64, unwrap
 
 
 def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
     if verbose:
         print(tree.pretty())
 
-    def scope(name):
-        raise AssertionError("not in scope: " + name)
+    closure = VolpeClosure(VolpeObject(dict()), var())
+    arg_scope = {"@": closure}
 
-    func_type = VolpeClosure(VolpeBlock(TypeTree("func", [TypeTree("object", []), tree]), lambda: scope))
-    tree.return_type = func_type
-    func_type.call(VolpeObject(dict()), AnnotateScope)
+    def scope(name):
+        if name in arg_scope:
+            return arg_scope[name]
+        assert False, f"variable `{name}` not found"
+
+    rules = AnnotateScope(tree, scope, dict(), closure.ret_type).rules
+
+    def update(t: TypeTree):
+        t.return_type = reify(t.return_type, rules)
+        for child in t.children:
+            if isinstance(child, TypeTree):
+                update(child)
+
+    update(tree)
 
     if verbose:
         print(tree.pretty())
@@ -32,15 +44,15 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
     module.free = ir.Function(module, ir.FunctionType(ir.VoidType(), [pint8]), "free")
     module.memcpy = module.declare_intrinsic('llvm.memcpy', [pint8, pint8, int64])
 
-    return_type = func_type.func.return_type
+    return_type = unwrap(tree.return_type)
     # return as pointer so they can be printed more easily
-    if isinstance(return_type, (VolpeObject, VolpeList)):
+    if isinstance(return_type, ir.LiteralStructType):
         return_type = return_type.as_pointer()
 
     main_func = ir.Function(module, ir.FunctionType(return_type, []), "main")
     with build_func(main_func) as (b, _):
         def ret(res):
-            if isinstance(res.type, (VolpeObject, VolpeList)):
+            if isinstance(res.type, ir.LiteralStructType):
                 ptr = b.bitcast(b.call(module.malloc, [int64(res.type.get_abi_size(target_data))]), return_type)
                 b.store(res, ptr)
                 res = ptr

@@ -1,16 +1,18 @@
+from unification import var
+
 from tree import TypeTree
-from volpe_types import int1, int64, flt64, char, VolpeList, combine_types
+from volpe_types import int1, VolpeObject
 
 
 def logic(self, tree: TypeTree):
     ret = self.visit_children(tree)
-    assert ret[0] == int1 and ret[1] == int1, "logic operations only work for booleans"
+    assert self.unify(ret[0], int1) and self.unify(ret[1], int1), "logic operations only work for booleans"
     return int1
 
 
 def unary_logic(self, tree: TypeTree):
     ret = self.visit_children(tree)[0]
-    assert ret == int1, "unary logic operations only work for booleans"
+    assert self.unify(ret, int1), "unary logic operations only work for booleans"
     return int1
 
 
@@ -18,32 +20,16 @@ def math(self, tree: TypeTree):
     children = self.visit_children(tree)
     ret0 = children[0]
     ret1 = children[1]
-    assert combine_types(self, ret0, ret1), "types need to match for math operations"
-    if ret0 == int64:
-        tree.data = tree.data + "_int"
-    elif ret0 == flt64:
-        tree.data = tree.data + "_flt"
-    elif isinstance(ret0, VolpeList) and tree.data == "add":
-        tree.data = "add_list"
-    else:
-        raise AssertionError("math operations only work for integers and floats")
+    assert self.unify(ret0, ret1), "types need to match for math operations"
     return ret0
 
 
 def unary_math(self, tree: TypeTree):
-    ret = self.visit_children(tree)[0]
-    if ret == int64:
-        tree.data = tree.data + "_int"
-    elif ret == flt64:
-        tree.data = tree.data + "_flt"
-    else:
-        raise AssertionError("unary math operations only work for integers and floats")
-    return ret
+    return self.visit_children(tree)[0]
 
 
 def math_assign(self, tree: TypeTree):
     symbol = tree.children[0]
-    symbol.data = "symbol"
     expression = tree.children[1]
 
     # Make the current node an assign.
@@ -59,17 +45,21 @@ def math_assign(self, tree: TypeTree):
 def comp(self, tree: TypeTree):
     children = self.visit_children(tree)
     ret0 = children[0]
-    combine_types(self, children)
-    if ret0 == int64 or ret0 == char:
-        tree.data = tree.data + "_int"
-    elif ret0 == flt64:
-        tree.data = tree.data + "_flt"
-    else:
-        raise AssertionError("comparisons only work for integers, floats, and chars")
+    ret1 = children[1]
+    assert self.unify(ret0, ret1), "types need to match for comparison operations"
     return int1
 
 
+def shape(scope: dict, tree: TypeTree):
+    if tree.data == "object":
+        obj_scope = dict()
+        for i, child in enumerate(tree.children):
+            name = f"_{i}"
+            obj_scope[name] = shape(scope, child)
+        tree.return_type = VolpeObject(obj_scope)
+        return tree.return_type
 
-
-
-
+    assert tree.data == "symbol"
+    tree.return_type = var()
+    scope[tree.children[0].value] = tree.return_type
+    return tree.return_type

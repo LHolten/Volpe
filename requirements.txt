@@ -1,3 +1,4 @@
-docopt
-lark-parser
-llvmlite
+docopt~=0.6.2
+lark-parser~=0.8.1
+llvmlite~=0.31.0
+unification~=0.2.2

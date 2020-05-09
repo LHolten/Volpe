@@ -1,7 +1,8 @@
-from typing import Dict, Callable
+from typing import Dict, Callable, Union
 
 import llvmlite.binding as llvm
 from llvmlite import ir
+from unification import unifiable
 
 from tree import TypeTree
 
@@ -25,126 +26,59 @@ unknown_func = ir.FunctionType(unknown, [pint8, pint8])
 target_data = llvm.Target.from_default_triple().create_target_machine().target_data
 
 
-class VolpeObject(ir.LiteralStructType):
-    def __init__(self, type_dict: Dict[str, ir.Type]):
-        super().__init__(type_dict.values())
+class VolpeType:
+    def gen(self) -> ir.Type:
+        raise NotImplementedError()
+
+
+def unwrap(value: Union[ir.Type, VolpeType]) -> ir.Type:
+    if isinstance(value, VolpeType):
+        return value.gen()
+    return value
+
+
+@unifiable
+class VolpeObject(VolpeType):
+    def __init__(self, type_dict: Dict[str, Union[ir.Type, VolpeType]]):
         self.type_dict = type_dict
 
-    def set(self, name: str, t: ir.Type):
-        self.type_dict[name] = t
-        self.__init__(self.type_dict)
+    def __eq__(self, other):
+        return isinstance(other, VolpeObject) and self.type_dict == other.type_dict
+
+    def __repr__(self):
+        return "{" + ", ".join(str(v) for v in self.type_dict.values()) + "}"
+
+    def gen(self) -> ir.Type:
+        return ir.LiteralStructType(unwrap(value) for value in self.type_dict.values())
 
 
-class VolpeList(ir.LiteralStructType):
-    def __init__(self, element_type: ir.Type, checked: bool):
-        super().__init__([element_type.as_pointer(), int64])
+@unifiable
+class VolpeList(VolpeType):
+    def __init__(self, element_type: Union[ir.Type, VolpeType]):
         self.element_type = element_type
-        self.checked = checked
 
-    def update(self, element_type):
-        self.__init__(element_type, True,)
+    def __eq__(self, other):
+        return isinstance(other, VolpeList) and self.element_type == other.element_type
 
+    def __repr__(self):
+        return f"[{self.element_type}]"
 
-class VolpeBlock:
-    def __init__(self, tree: TypeTree, instance_scope: Callable):
-        self.arg_object = tree.children[0]
-        self.block = tree.children[1]
-        self.tree = tree
-        self.outside_used = set()
-
-        self.frozen_scope = instance_scope()
-
-    def call(self, arg_type, closure, annotate):
-        args = tuple_assign(dict(), self.arg_object, arg_type)
-        args["@"] = closure
-
-        def get_instance_scope():
-            def scope(name):
-                if name in args.keys():
-                    return args[name]
-                self.outside_used.add(name)
-                return self.frozen_scope(name)
-
-            return scope
-
-        annotate(self.block, get_instance_scope, closure.ret(annotate, arg_type))
-        self.block.return_type = closure.func.return_type
-
-    def update(self, closure):
-        self.tree.return_type = closure
+    def gen(self) -> ir.Type:
+        return ir.LiteralStructType([unwrap(self.element_type).as_pointer(), int64])
 
 
-class VolpeClosure(ir.LiteralStructType):
-    def __init__(self, block):
-        super().__init__([unknown_func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
-        self.func = unknown_func
-        self.blocks = [block]
-        self.checked = False
+@unifiable
+class VolpeClosure(VolpeType):
+    def __init__(self, arg_type: Union[ir.Type, VolpeType], ret_type: Union[ir.Type, VolpeType]):
+        self.arg_type = arg_type
+        self.ret_type = ret_type
 
-    def call(self, arg_type, annotate):
-        assert not self.checked, "this shouldn't happen"
-        self.checked = True
+    def __eq__(self, other):
+        return isinstance(other, VolpeClosure) and (self.arg_type, self.ret_type) == (other.arg_type, other.ret_type)
 
-        for block in self.blocks:
-            block.call(arg_type, self, annotate)
+    def __repr__(self):
+        return f"({self.arg_type})" + "{" + str(self.ret_type) + "}"
 
-        return self.func.return_type
-
-    def ret(self, annotate, arg_type):
-        def ret(value_type):
-            if self.func.return_type is not unknown:
-                combine_types(annotate, value_type, self.func.return_type)
-            self.update(ir.FunctionType(value_type, [pint8, arg_type]))
-        return ret
-
-    def update(self, func: ir.FunctionType):
-        super().__init__([func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
-        self.func = func
-
-
-def combine_types(annotate, t1, *t):
-    if isinstance(t1, VolpeClosure):
-        for t2 in t:
-            if t1.checked or t2.checked:
-                if t1.checked and not t2.checked:
-                    t2.call(t1.func.args[1], annotate)
-                if t2.checked and not t1.checked:
-                    t1.call(t2.func.args[1], annotate)
-                if t1.checked and t2.checked:
-                    combine_types(annotate, t1.func.args[1], t2.func.args[1])
-                combine_types(annotate, t1.func.return_type, t2.func.return_type)
-            t1.blocks.extend(t2.blocks)
-            for block in t2.blocks:
-                block.update(t1)
-    elif isinstance(t1, VolpeObject):
-        for t2 in t:
-            assert len(t1.type_dict.values()) == len(t2.type_dict.values()), "object has different size"
-            for k in t1.type_dict.keys():
-                combine_types(annotate, t1.type_dict[k], t2.type_dict[k])
-    elif isinstance(t1, VolpeList):
-        for t2 in t:
-            if t2.checked and not t1.checked:
-                t1.update(t2.element_type)
-            if t1.checked and not t2.checked:
-                t2.update(t1.element_type)
-            if t1.checked and t2.checked:
-                combine_types(annotate, t1.element_type, t2.element_type)
-    else:
-        assert all(t1 == t2 for t2 in t), "all elements should have the same type"
-    return t1
-
-
-def tuple_assign(scope: Dict, tree: TypeTree, value_type):
-    if tree is None:
-        return scope
-    if tree.data == "object":
-        assert isinstance(value_type, VolpeObject), "can only destructure objects"
-        assert len(tree.children) == len(value_type.type_dict.values())
-
-        for i, child in enumerate(tree.children):
-            tuple_assign(scope, child, value_type.type_dict[f"_{i}"])
-    else:
-        assert tree.data == "symbol"
-        scope[tree.children[0].value] = value_type
-
-    return scope
+    def gen(self) -> ir.Type:
+        func = ir.FunctionType(unwrap(self.ret_type), [pint8, unwrap(self.arg_type)])
+        return ir.LiteralStructType([func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])

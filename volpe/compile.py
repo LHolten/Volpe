@@ -59,18 +59,18 @@ def compile_and_run(llvm_ir, result_type, show_time=False):
 def determine_c_type(volpe_type, depth=0):
     """Interpret the volpe type and return a corresponding C type."""
     # Simple types:
-    if volpe_type == int1:
+    if volpe_type is int1:
         return c_bool
-    if volpe_type == int64:
+    if volpe_type is int64:
         return c_int64
-    if volpe_type == flt64:
+    if volpe_type is flt64:
         return c_double
-    if volpe_type == char:
+    if volpe_type is char:
         return c_char
     
     # Aggregate types:
     if isinstance(volpe_type, VolpeObject):
-        elems = volpe_type.elements
+        elems = volpe_type.type_dict.values()
 
         class CTuple(Structure):
             _fields_ = [(f"elem{i}", determine_c_type(elem, depth+1)) for i, elem in enumerate(elems)]
@@ -96,16 +96,13 @@ def determine_c_type(volpe_type, depth=0):
         return POINTER(CList) if depth == 0 else CList
 
     if isinstance(volpe_type, VolpeClosure):
-        elems = volpe_type.elements
-
         class CFunc(Structure):
             _fields_ = [("func", POINTER(None)), ("c_func", POINTER(None)), ("f_func", POINTER(None)), ("env", POINTER(None))]
 
             def __repr__(self):
                 if depth == 0:
-                    func = elems[0].pointee
-                    input_type = ", ".join([get_type_name(i) for i in func.args[1:]])
-                    return_type = get_type_name(func.return_type)
+                    input_type = get_type_name(volpe_type.arg_type)
+                    return_type = get_type_name(volpe_type.ret_type)
                     return f"function {input_type} {return_type}"
                 return get_type_name(volpe_type)
         return CFunc
@@ -128,7 +125,7 @@ def get_type_name(volpe_type):
 
     # Aggregate types:
     if isinstance(volpe_type, VolpeObject):
-        type_reprs = ", ".join([get_type_name(elem) for elem in volpe_type.elements])
+        type_reprs = ", ".join([get_type_name(elem) for elem in volpe_type.type_dict.values()])
         return f"({type_reprs})"
     if isinstance(volpe_type, VolpeList):
         return "*list*"
