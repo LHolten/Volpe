@@ -1,6 +1,7 @@
 from typing import Callable
 
 from lark.visitors import Interpreter
+from lark import Token
 from unification import var, unify
 
 from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, shape
@@ -100,6 +101,14 @@ class AnnotateScope(Interpreter):
     @staticmethod
     def escaped_character(tree: TypeTree):
         return char
+
+    def string(self, tree: TypeTree):
+        tree.data = "list"
+        text = eval(tree.children[0])
+        tree.children = []
+        for eval_character in text:
+            tree.children.append(TypeTree("character", [Token("CHARACTER", "'" + eval_character + "'")]))
+        return self.visit(tree)        
 
     def list_index(self, tree: TypeTree):
         ret = self.visit_children(tree)
