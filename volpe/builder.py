@@ -144,9 +144,10 @@ class LLVMScope(Interpreter):
         return length
 
     def list(self, tree: TypeTree):
-        data_size = int64(tree.return_type.element_type.get_abi_size(target_data) * len(tree.children))
+        element_type = unwrap(tree.return_type.element_type)
+        data_size = int64(element_type.get_abi_size(target_data) * len(tree.children))
         pointer = self.builder.call(self.builder.module.malloc, [data_size])
-        pointer = self.builder.bitcast(pointer, tree.return_type.element_type.as_pointer())
+        pointer = self.builder.bitcast(pointer, element_type.as_pointer())
 
         for i, ret in enumerate(self.visit_children(tree)):
             self.builder.store(ret, self.builder.gep(pointer, [int64(i)]))
