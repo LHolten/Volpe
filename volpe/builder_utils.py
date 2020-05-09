@@ -11,9 +11,9 @@ from volpe_types import target_data, VolpeObject, VolpeClosure, copy_func, free_
 def math(self, tree: TypeTree):
     values = self.visit_children(tree)
     t = tree.return_type
-    if t is int64:
+    if t == int64:
         return getattr(self, tree.data + "_int")(values)
-    if t is flt64:
+    if t == flt64:
         return getattr(self, tree.data + "_flt")(values)
     if isinstance(t, VolpeList) and tree.data == "add":
         return getattr(self, "add_list")(tree, values)
@@ -23,9 +23,9 @@ def math(self, tree: TypeTree):
 def unary_math(self, tree: TypeTree):
     values = self.visit_children(tree)
     t = tree.return_type
-    if t is int64 or t is char:
+    if t == int64 or t == char:
         return getattr(self, tree.data + "_int")(values)
-    if t is flt64:
+    if t == flt64:
         return getattr(self, tree.data + "_flt")(values)
     raise AssertionError("unary math operations only work for integers and floats")
 
@@ -33,9 +33,9 @@ def unary_math(self, tree: TypeTree):
 def comp(self, tree: TypeTree):
     values = self.visit_children(tree)
     t = tree.children[0].return_type
-    if t is int64 or t is char:
+    if t == int64 or t == char:
         return getattr(self, tree.data + "_int")(values)
-    if t is flt64:
+    if t == flt64:
         return getattr(self, tree.data + "_flt")(values)
     raise AssertionError("comparisons only work for integers, floats, and chars")
 

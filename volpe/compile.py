@@ -59,13 +59,13 @@ def compile_and_run(llvm_ir, result_type, show_time=False):
 def determine_c_type(volpe_type, depth=0):
     """Interpret the volpe type and return a corresponding C type."""
     # Simple types:
-    if volpe_type is int1:
+    if volpe_type == int1:
         return c_bool
-    if volpe_type is int64:
+    if volpe_type == int64:
         return c_int64
-    if volpe_type is flt64:
+    if volpe_type == flt64:
         return c_double
-    if volpe_type is char:
+    if volpe_type == char:
         return c_char
     
     # Aggregate types:
