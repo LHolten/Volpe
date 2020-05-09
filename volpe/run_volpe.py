@@ -13,8 +13,8 @@ from tree import TypeTree
 from volpe_types import pint8, VolpeObject, VolpeList, target_data, VolpeClosure, int64, unwrap, check
 
 
-def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
-    if verbose:
+def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=False):
+    if more_verbose:
         print(tree.pretty())
 
     closure = VolpeClosure(VolpeObject(dict()), var())
@@ -39,10 +39,10 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
 
     update(tree)
 
-    assert not failed[0], "Some value has not been typed, run with verbose to see which"
-
     if verbose:
         print(tree.pretty())
+
+    assert not failed[0], "Some value has not been typed, run with verbose to see which"
 
     module = ir.Module("program")
     module.func_count = itertools.count()
@@ -66,10 +66,15 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
 
         LLVMScope(b, tree, scope, ret, None)
 
-    if verbose:
+    if more_verbose:
         print(module)
 
     compile_and_run(str(module), tree.return_type, show_time=show_time)
+
+
+def get_parser(path_to_lark):
+    with open(path_to_lark) as lark_file:
+        return Lark(lark_file, start='block', parser='earley', ambiguity='explicit', tree_class=TypeTree)
 
 
 def run(file_path, verbose=False, show_time=False):
@@ -79,9 +84,6 @@ def run(file_path, verbose=False, show_time=False):
     with open(file_path) as vlp_file:
         parsed_tree = volpe_parser.parse(vlp_file.read())
     # print(parsed_tree.pretty())
-    volpe_llvm(parsed_tree, verbose=verbose, show_time=show_time)
+    volpe_llvm(parsed_tree, verbose=verbose, show_time=show_time, more_verbose=verbose)
     # llvm_ir()
 
-def get_parser(path_to_lark):
-    with open(path_to_lark) as lark_file:
-        return Lark(lark_file, start='block', parser='earley', ambiguity='explicit', tree_class=TypeTree)
