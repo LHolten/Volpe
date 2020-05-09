@@ -86,9 +86,16 @@ def determine_c_type(volpe_type, depth=0):
             _fields_ = [("elems", POINTER(element_type)), ("length", c_int64)]
 
             def __repr__(self):
-                if depth < 2:
+                if True: # depth < 2:
                     elems = getattr(self, "elems")
                     length = getattr(self, "length")
+                    
+                    # Special case if elements are chars -> string
+                    if element_type == c_char:
+                        if length == 0:
+                            return "\"\""
+                        return "\"" + "".join([chr(elem) for elem in elems[:length]]) + "\""
+
                     if length == 0:
                         return "[]"
                     return "[" + ", ".join([str(elem) for elem in elems[:length]]) + "]"
