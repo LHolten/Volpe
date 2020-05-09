@@ -10,7 +10,7 @@ from builder import LLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
 from tree import TypeTree
-from volpe_types import pint8, VolpeObject, VolpeList, target_data, VolpeClosure, int64, unwrap
+from volpe_types import pint8, VolpeObject, VolpeList, target_data, VolpeClosure, int64, unwrap, check
 
 
 def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
@@ -27,13 +27,19 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False):
 
     rules = AnnotateScope(tree, scope, dict(), closure.ret_type).rules
 
+    failed = [False]
+
     def update(t: TypeTree):
         t.return_type = reify(t.return_type, rules)
+        if not check(t.return_type):
+            failed[0] = True
         for child in t.children:
             if isinstance(child, TypeTree):
                 update(child)
 
     update(tree)
+
+    assert not failed[0], "Some value has not been typed, run with verbose to see which"
 
     if verbose:
         print(tree.pretty())

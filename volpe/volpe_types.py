@@ -27,14 +27,25 @@ target_data = llvm.Target.from_default_triple().create_target_machine().target_d
 
 
 class VolpeType:
-    def gen(self) -> ir.Type:
+    def unwrap(self) -> ir.Type:
+        raise NotImplementedError()
+
+    def check(self) -> bool:
         raise NotImplementedError()
 
 
 def unwrap(value: Union[ir.Type, VolpeType]) -> ir.Type:
     if isinstance(value, VolpeType):
-        return value.gen()
+        return value.unwrap()
     return value
+
+
+def check(value) -> bool:
+    if isinstance(value, VolpeType):
+        return value.check()
+    if isinstance(value, ir.Type):
+        return True
+    return False
 
 
 @unifiable
@@ -48,8 +59,11 @@ class VolpeObject(VolpeType):
     def __repr__(self):
         return "{" + ", ".join(str(v) for v in self.type_dict.values()) + "}"
 
-    def gen(self) -> ir.Type:
+    def unwrap(self) -> ir.Type:
         return ir.LiteralStructType(unwrap(value) for value in self.type_dict.values())
+
+    def check(self) -> bool:
+        return all(check(v) for v in self.type_dict.values())
 
 
 @unifiable
@@ -63,8 +77,11 @@ class VolpeList(VolpeType):
     def __repr__(self):
         return f"[{self.element_type}]"
 
-    def gen(self) -> ir.Type:
+    def unwrap(self) -> ir.Type:
         return ir.LiteralStructType([unwrap(self.element_type).as_pointer(), int64])
+
+    def check(self) -> bool:
+        return check(self.element_type)
 
 
 @unifiable
@@ -79,6 +96,9 @@ class VolpeClosure(VolpeType):
     def __repr__(self):
         return f"({self.arg_type})" + "{" + str(self.ret_type) + "}"
 
-    def gen(self) -> ir.Type:
+    def unwrap(self) -> ir.Type:
         func = ir.FunctionType(unwrap(self.ret_type), [pint8, unwrap(self.arg_type)])
         return ir.LiteralStructType([func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
+
+    def check(self) -> bool:
+        return check(self.arg_type) and check(self.ret_type)
