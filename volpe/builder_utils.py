@@ -175,12 +175,35 @@ def build_closure(module, closure_type: VolpeClosure, env_types):
         b.ret_void()
 
 
-def tuple_assign(b: ir.IRBuilder, scope, tree: TypeTree, value):
+def tuple_assign(self, scope, tree: TypeTree, value):
+    b: ir.IRBuilder = self.builder
+
     if tree.data == "object":
         for i, child in enumerate(tree.children):
-            tuple_assign(b, scope, child, b.extract_value(value, i))
+            tuple_assign(self, scope, child, b.extract_value(value, i))
+
+    elif tree.data == "list_index":
+        name = tree.children[0].value
+        if name in scope:
+            list_value = scope[name]
+        else:
+            list_value = self.get_scope(name)
+        scope[name] = list_value
+        i = self.visit(tree.children[1])
+
+        pointer = b.extract_value(list_value, 0)
+        length = b.extract_value(list_value, 1)
+
+        before_end = b.icmp_signed("<", i, length)
+        more_than_0 = b.icmp_signed(">=", i, int64(0))
+        in_range = b.and_(before_end, more_than_0)
+        with b.if_then(self.builder.not_(in_range)):
+            b.unreachable()
+
+        b.store(value, b.gep(pointer, [i]))
+
     else:
-        assert tree.data == "symbol", "trait deconstruction is not supported yet"
+        assert tree.data == "symbol"
         name = tree.children[0].value
         if name in scope:
             free(b, scope[name])

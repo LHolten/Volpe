@@ -87,7 +87,7 @@ class AnnotateScope(Interpreter):
         return self.get_scope(tree.children[0].value)
 
     def assign(self, tree: TypeTree):
-        assert self.unify(shape(self.local_scope, tree.children[0]), self.visit(tree.children[1])), "assign error"
+        assert self.unify(shape(self, self.local_scope, tree.children[0]), self.visit(tree.children[1])), "assign error"
         return int1
 
     @staticmethod

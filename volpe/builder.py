@@ -42,7 +42,7 @@ class LLVMScope(Interpreter):
         return getattr(self, tree.data)(tree)
 
     def assign(self, tree: TypeTree):
-        tuple_assign(self.builder, self.local_scope, tree.children[0], self.visit(tree.children[1]))
+        tuple_assign(self, self.local_scope, tree.children[0], self.visit(tree.children[1]))
         return int1(True)
 
     def symbol(self, tree: TypeTree):

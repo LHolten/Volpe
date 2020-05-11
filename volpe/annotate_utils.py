@@ -1,7 +1,7 @@
 from unification import var
 
 from tree import TypeTree
-from volpe_types import int1, VolpeObject
+from volpe_types import int1, VolpeObject, VolpeList, int64
 
 
 def logic(self, tree: TypeTree):
@@ -50,13 +50,19 @@ def comp(self, tree: TypeTree):
     return int1
 
 
-def shape(scope: dict, tree: TypeTree):
+def shape(self, scope: dict, tree: TypeTree):
     if tree.data == "object":
         obj_scope = dict()
         for i, child in enumerate(tree.children):
             name = f"_{i}"
-            obj_scope[name] = shape(scope, child)
+            obj_scope[name] = shape(self, scope, child)
         tree.return_type = VolpeObject(obj_scope)
+        return tree.return_type
+
+    if tree.data == "list_index":
+        tree.return_type = var()
+        self.unify(self.get_scope(tree.children[0].value), VolpeList(tree.return_type))
+        self.unify(self.visit(tree.children[1]), int64)
         return tree.return_type
 
     assert tree.data == "symbol"
