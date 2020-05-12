@@ -41,25 +41,25 @@ def comp(self, tree: TypeTree):
 
 
 def free(b, value):
-    if isinstance(value.type, VolpeClosure):
+    if isinstance(value.type, VolpeClosure.Type):
         f_func = b.extract_value(value, 2)
         env_ptr = b.extract_value(value, 3)
         b.call(f_func, [env_ptr])
-    if isinstance(value.type, VolpeObject):
+    if isinstance(value.type, VolpeObject.Type):
         for i in range(len(value.type.elements)):
             free(b, b.extract_value(value, i))
-    if isinstance(value.type, VolpeList):
+    if isinstance(value.type, VolpeList.Type):
         free_list(b, value)
 
 
 def copy(b, value):
-    if isinstance(value.type, VolpeClosure):
+    if isinstance(value.type, VolpeClosure.Type):
         env_copy = b.call(b.extract_value(value, 1), [b.extract_value(value, 3)])
         value = b.insert_value(value, env_copy, 3)
-    if isinstance(value.type, VolpeObject):
+    if isinstance(value.type, VolpeObject.Type):
         for i in range(len(value.type.elements)):
             value = b.insert_value(value, copy(b, b.extract_value(value, i)), i)
-    if isinstance(value.type, VolpeList):
+    if isinstance(value.type, VolpeList.Type):
         value = copy_list(b, value)
 
     return value
@@ -97,11 +97,11 @@ def free_environment(b: ir.IRBuilder, value_list: Iterable) -> None:
 
 
 def copy_list(b: ir.IRBuilder, list_value):
-    data_size = int64(list_value.type.element_type.get_abi_size(target_data))
+    data_size = int64(list_value.type.elements[0].pointee.get_abi_size(target_data))
     pointer = b.extract_value(list_value, 0)
     length = b.extract_value(list_value, 1)
     new_pointer = b.call(b.module.malloc, [b.mul(data_size, length)])
-    new_pointer = b.bitcast(new_pointer, list_value.type.element_type.as_pointer())
+    new_pointer = b.bitcast(new_pointer, list_value.type.elements[0])
 
     with options(b, int64) as (ret, phi):
         ret(int64(0))

@@ -17,10 +17,13 @@ from volpe_types import (
 
 
 class AnnotateScope(Interpreter):
-    def __init__(self, tree: TypeTree, scope: Callable, rules: dict, return_type):
+    def __init__(self, tree: TypeTree, scope: Callable, rules: dict, return_type, args=None):
         self.scope = scope
         self.local_scope = dict()
         self.rules = rules
+
+        if args is not None:
+            self.unify(args[0], shape(self, self.local_scope, args[1]))
 
         tree.children[-1] = TypeTree("return_n", [tree.children[-1]])
         tree.return_type = return_type
@@ -56,19 +59,18 @@ class AnnotateScope(Interpreter):
         return VolpeObject(scope)
 
     def func(self, tree: TypeTree):
-        arg_scope = dict()
-        closure = VolpeClosure(shape(self, arg_scope, tree.children[0]), var())
-        arg_scope["@"] = closure
+        closure = VolpeClosure(var(), var())
 
         tree.outside_used = set()
 
         def scope(name):
-            if name in arg_scope:
-                return arg_scope[name]
+            if name == "@":
+                return closure
             tree.outside_used.add(name)
             return self.get_scope(name)
 
-        self.rules = AnnotateScope(tree.children[1], scope, self.rules, closure.ret_type).rules
+        self.rules = AnnotateScope(tree.children[1], scope, self.rules, closure.ret_type,
+                                   (closure.arg_type, tree.children[0])).rules
         return closure
 
     def func_call(self, tree: TypeTree):

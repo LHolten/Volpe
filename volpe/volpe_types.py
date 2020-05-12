@@ -50,6 +50,9 @@ def check(value) -> bool:
 
 @unifiable
 class VolpeObject(VolpeType):
+    class Type(ir.LiteralStructType):
+        pass
+
     def __init__(self, type_dict: Dict[str, Union[ir.Type, VolpeType]]):
         self.type_dict = type_dict
 
@@ -60,7 +63,7 @@ class VolpeObject(VolpeType):
         return "{" + ", ".join(str(v) for v in self.type_dict.values()) + "}"
 
     def unwrap(self) -> ir.Type:
-        return ir.LiteralStructType(unwrap(value) for value in self.type_dict.values())
+        return self.Type(unwrap(value) for value in self.type_dict.values())
 
     def check(self) -> bool:
         return all(check(v) for v in self.type_dict.values())
@@ -68,6 +71,9 @@ class VolpeObject(VolpeType):
 
 @unifiable
 class VolpeList(VolpeType):
+    class Type(ir.LiteralStructType):
+        pass
+
     def __init__(self, element_type: Union[ir.Type, VolpeType]):
         self.element_type = element_type
 
@@ -78,7 +84,7 @@ class VolpeList(VolpeType):
         return f"[{self.element_type}]"
 
     def unwrap(self) -> ir.Type:
-        return ir.LiteralStructType([unwrap(self.element_type).as_pointer(), int64])
+        return self.Type([unwrap(self.element_type).as_pointer(), int64])
 
     def check(self) -> bool:
         return check(self.element_type)
@@ -86,6 +92,9 @@ class VolpeList(VolpeType):
 
 @unifiable
 class VolpeClosure(VolpeType):
+    class Type(ir.LiteralStructType):
+        pass
+
     def __init__(self, arg_type: Union[ir.Type, VolpeType], ret_type: Union[ir.Type, VolpeType]):
         self.arg_type = arg_type
         self.ret_type = ret_type
@@ -98,7 +107,7 @@ class VolpeClosure(VolpeType):
 
     def unwrap(self) -> ir.Type:
         func = ir.FunctionType(unwrap(self.ret_type), [pint8, unwrap(self.arg_type)])
-        return ir.LiteralStructType([func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
+        return self.Type([func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
 
     def check(self) -> bool:
         return check(self.arg_type) and check(self.ret_type)
