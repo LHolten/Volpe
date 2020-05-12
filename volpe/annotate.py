@@ -57,7 +57,7 @@ class AnnotateScope(Interpreter):
 
     def func(self, tree: TypeTree):
         arg_scope = dict()
-        closure = VolpeClosure(shape(arg_scope, tree.children[0]), var())
+        closure = VolpeClosure(shape(self, arg_scope, tree.children[0]), var())
         arg_scope["@"] = closure
 
         tree.outside_used = set()

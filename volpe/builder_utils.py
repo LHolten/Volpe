@@ -175,20 +175,20 @@ def build_closure(module, closure_type: VolpeClosure, env_types):
         b.ret_void()
 
 
-def tuple_assign(self, scope, tree: TypeTree, value):
+def tuple_assign(self, tree: TypeTree, value):
     b: ir.IRBuilder = self.builder
 
     if tree.data == "object":
         for i, child in enumerate(tree.children):
-            tuple_assign(self, scope, child, b.extract_value(value, i))
+            tuple_assign(self, child, b.extract_value(value, i))
 
     elif tree.data == "list_index":
         name = tree.children[0].value
-        if name in scope:
-            list_value = scope[name]
+        if name in self.local_scope:
+            list_value = self.local_scope[name]
         else:
             list_value = self.get_scope(name)
-        scope[name] = list_value
+        self.local_scope[name] = list_value
         i = self.visit(tree.children[1])
 
         pointer = b.extract_value(list_value, 0)
@@ -197,7 +197,7 @@ def tuple_assign(self, scope, tree: TypeTree, value):
         before_end = b.icmp_signed("<", i, length)
         more_than_0 = b.icmp_signed(">=", i, int64(0))
         in_range = b.and_(before_end, more_than_0)
-        with b.if_then(self.builder.not_(in_range)):
+        with b.if_then(b.not_(in_range)):
             b.unreachable()
 
         b.store(value, b.gep(pointer, [i]))
@@ -205,8 +205,6 @@ def tuple_assign(self, scope, tree: TypeTree, value):
     else:
         assert tree.data == "symbol"
         name = tree.children[0].value
-        if name in scope:
-            free(b, scope[name])
-        scope[name] = value
-
-    return scope
+        if name in self.local_scope:
+            free(b, self.local_scope[name])
+        self.local_scope[name] = value

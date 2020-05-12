@@ -10,10 +10,12 @@ from volpe_types import int1, int64, flt64, target_data, pint8, unwrap
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: callable, ret: Callable, rec: Callable):
+    def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: callable, ret: Callable, rec: Callable, args=None):
         self.builder = builder
         self.scope = scope
         self.local_scope = dict()
+        if args is not None:
+            tuple_assign(self, *args)
         self.ret = ret
         self.rec = rec
 
@@ -42,7 +44,7 @@ class LLVMScope(Interpreter):
         return getattr(self, tree.data)(tree)
 
     def assign(self, tree: TypeTree):
-        tuple_assign(self, self.local_scope, tree.children[0], self.visit(tree.children[1]))
+        tuple_assign(self, tree.children[0], self.visit(tree.children[1]))
         return int1(True)
 
     def symbol(self, tree: TypeTree):
@@ -62,22 +64,10 @@ class LLVMScope(Interpreter):
             env_scope = dict(zip(env_names, new_values))
             env_scope["@"] = b.insert_value(closure, args[0], 3)
 
-            arg_scope = tuple_assign(b, dict(), tree.children[0], args[1])
-
             def scope(name):
-                if name in arg_scope:
-                    return copy(b, arg_scope[name])
                 return copy(b, env_scope[name])
 
-            def ret(value):
-                free_environment(b, arg_scope.values())
-                b.ret(value)
-
-            def rec(value):
-                free_environment(b, arg_scope.values())
-                rec_ret(value)
-
-            LLVMScope(b, tree.children[-1], scope, ret, rec)
+            LLVMScope(b, tree.children[1], scope, b.ret, rec_ret, (tree.children[0], args[1]))
 
         env_ptr = write_environment(self.builder, copy_environment(self.builder, env_values))
         return self.builder.insert_value(closure, env_ptr, 3)
@@ -284,28 +274,22 @@ class LLVMScope(Interpreter):
         value = self.visit_children(tree)[0]
         return self.builder.fptosi(value, int64)
 
-    def equals_flt(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def equals_flt(self, values):
         return self.builder.fcmp_ordered("==", values[0], values[1])
 
-    def not_equals_flt(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def not_equals_flt(self, values):
         return self.builder.fcmp_ordered("!=", values[0], values[1])
 
-    def greater_flt(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def greater_flt(self, values):
         return self.builder.fcmp_ordered(">", values[0], values[1])
 
-    def less_flt(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def less_flt(self, values):
         return self.builder.fcmp_ordered("<", values[0], values[1])
 
-    def greater_equals_flt(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def greater_equals_flt(self, values):
         return self.builder.fcmp_ordered(">=", values[0], values[1])
 
-    def less_equals_flt(self, tree: TypeTree):
-        values = self.visit_children(tree)
+    def less_equals_flt(self, values):
         return self.builder.fcmp_ordered("<=", values[0], values[1])
 
     @staticmethod
