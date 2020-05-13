@@ -175,6 +175,35 @@ def build_closure(module, closure_type: VolpeClosure, env_types):
         b.ret_void()
 
 
+def check_list_index(b, list_value, i):
+    length = b.extract_value(list_value, 1)
+
+    before_end = b.icmp_signed("<", i, length)
+    more_than_0 = b.icmp_signed(">=", i, int64(0))
+    in_range = b.and_(before_end, more_than_0)
+    with b.if_then(b.not_(in_range)):
+        b.unreachable()
+
+
+def get_list(self, tree):
+    if tree.data == "symbol":
+        name = tree.children[0].value
+        if name in self.local_scope:
+            list_value = self.local_scope[name]
+        else:
+            list_value = self.get_scope(name)
+        self.local_scope[name] = list_value
+        return list_value
+
+    assert tree.data == "list_index", "can only index lists on left side of assignment"
+    list_value = get_list(self, tree.children[0])
+    i = self.visit(tree.children[1])
+    check_list_index(self.builder, list_value, i)
+
+    pointer = self.builder.extract_value(list_value, 0)
+    return self.builder.load(self.builder.gep(pointer, [i]))
+
+
 def tuple_assign(self, tree: TypeTree, value):
     b: ir.IRBuilder = self.builder
 
@@ -183,23 +212,11 @@ def tuple_assign(self, tree: TypeTree, value):
             tuple_assign(self, child, b.extract_value(value, i))
 
     elif tree.data == "list_index":
-        name = tree.children[0].value
-        if name in self.local_scope:
-            list_value = self.local_scope[name]
-        else:
-            list_value = self.get_scope(name)
-        self.local_scope[name] = list_value
+        list_value = get_list(self, tree.children[0])
         i = self.visit(tree.children[1])
+        check_list_index(self.builder, list_value, i)
 
         pointer = b.extract_value(list_value, 0)
-        length = b.extract_value(list_value, 1)
-
-        before_end = b.icmp_signed("<", i, length)
-        more_than_0 = b.icmp_signed(">=", i, int64(0))
-        in_range = b.and_(before_end, more_than_0)
-        with b.if_then(b.not_(in_range)):
-            b.unreachable()
-
         b.store(value, b.gep(pointer, [i]))
 
     else:

@@ -69,7 +69,7 @@ shapes: (_SEP* shape ("," _SEP* shape)*)? _SEP* -> object
 ?shape: symbol
     | "{" _SEP* shape "," (_SEP* shape ("," _SEP* shape)*)? _SEP* "}" -> object
     | "{" _SEP* "}" -> object
-    | CNAME "[" _SEP* value1 _SEP* "]" -> list_index
+    | shape "[" _SEP* value1 _SEP* "]" -> list_index
 
 symbol: CNAME
     | THIS_FUNC

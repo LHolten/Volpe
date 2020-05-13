@@ -4,7 +4,8 @@ from lark.visitors import Interpreter
 from llvmlite import ir
 
 from builder_utils import write_environment, free_environment, options, \
-    read_environment, tuple_assign, copy, copy_environment, build_closure, free, math, comp, unary_math
+    read_environment, tuple_assign, copy, copy_environment, build_closure, free, math, comp, unary_math, \
+    check_list_index
 from tree import TypeTree
 from volpe_types import int1, int64, flt64, target_data, pint8, unwrap
 
@@ -114,14 +115,8 @@ class LLVMScope(Interpreter):
 
     def list_index(self, tree: TypeTree):
         list_value, i = self.visit_children(tree)
+        check_list_index(self.builder, list_value, i)
         pointer = self.builder.extract_value(list_value, 0)
-        length = self.builder.extract_value(list_value, 1)
-
-        before_end = self.builder.icmp_signed("<", i, length)
-        more_than_0 = self.builder.icmp_signed(">=", i, int64(0))
-        in_range = self.builder.and_(before_end, more_than_0)
-        with self.builder.if_then(self.builder.not_(in_range)):
-            self.builder.unreachable()
 
         res = self.builder.load(self.builder.gep(pointer, [i]))
         free(self.builder, list_value)

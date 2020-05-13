@@ -60,9 +60,7 @@ def shape(self, scope: dict, tree: TypeTree):
         return tree.return_type
 
     if tree.data == "list_index":
-        tree.return_type = var()
-        self.unify(self.get_scope(tree.children[0].value), VolpeList(tree.return_type))
-        self.unify(self.visit(tree.children[1]), int64)
+        self.visit(tree)
         return tree.return_type
 
     assert tree.data == "symbol"
