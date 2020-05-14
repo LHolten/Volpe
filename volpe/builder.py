@@ -3,6 +3,7 @@ from typing import Callable
 from lark.visitors import Interpreter
 from llvmlite import ir
 
+from annotate_utils import volpe_assert
 from builder_utils import write_environment, free_environment, options, \
     read_environment, tuple_assign, copy, copy_environment, build_closure, free, math, comp, unary_math, \
     check_list_index
@@ -38,7 +39,7 @@ class LLVMScope(Interpreter):
 
     def visit(self, tree: TypeTree):
         value = getattr(self, tree.data)(tree)
-        assert not self.builder.block.is_terminated, "dead code is not allowed"
+        volpe_assert(not self.builder.block.is_terminated, "dead code is not allowed", tree)
         return value
 
     def visit_unsafe(self, tree: TypeTree):

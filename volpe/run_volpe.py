@@ -6,6 +6,7 @@ from llvmlite import ir
 from unification import var, reify
 
 from annotate import AnnotateScope
+from annotate_utils import VolpeError
 from builder import LLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
@@ -25,7 +26,11 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
             return arg_scope[name]
         assert False, f"variable `{name}` not found"
 
-    rules = AnnotateScope(tree, scope, dict(), closure.ret_type).rules
+    try:
+        rules = AnnotateScope(tree, scope, dict(), closure.ret_type).rules
+    except VolpeError as err:
+        print(err)
+        exit()
 
     failed = [False]
 
@@ -64,7 +69,11 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
                 res = ptr
             b.ret(res)
 
-        LLVMScope(b, tree, scope, ret, None)
+        try:
+            LLVMScope(b, tree, scope, ret, None)
+        except VolpeError as err:
+            print(err)
+            exit()
 
     if more_verbose:
         print(module)
@@ -74,7 +83,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
 
 def get_parser(path_to_lark):
     with open(path_to_lark) as lark_file:
-        return Lark(lark_file, start='block', parser='earley', ambiguity='explicit', tree_class=TypeTree)
+        return Lark(lark_file, start='block', parser='earley', ambiguity='explicit', tree_class=TypeTree, propagate_positions=True)
 
 
 def run(file_path, verbose=False, show_time=False):

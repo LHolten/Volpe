@@ -4,7 +4,7 @@ from lark.visitors import Interpreter
 from lark import Token
 from unification import var, unify
 
-from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, shape
+from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, shape, volpe_assert
 from tree import TypeTree
 from volpe_types import (
     int64,
@@ -29,7 +29,7 @@ class AnnotateScope(Interpreter):
         tree.return_type = return_type
 
         def ret(value_type):
-            assert self.unify(tree.return_type, value_type), "block has different return types"
+            volpe_assert(self.unify(tree.return_type, value_type), "block has different return types", tree)
         self.ret = ret
 
         self.visit_children(tree)  # sets tree.return_type
@@ -76,9 +76,9 @@ class AnnotateScope(Interpreter):
     def func_call(self, tree: TypeTree):
         closure = self.visit(tree.children[0])
         arg_type, ret_type = var(), var()
-        assert self.unify(closure, VolpeClosure(arg_type, ret_type)), "can only call closures"
+        volpe_assert(self.unify(closure, VolpeClosure(arg_type, ret_type)), "can only call closures", tree)
         new_arg_type = self.visit(tree.children[1])
-        assert self.unify(new_arg_type, arg_type), "wrong argument type"
+        volpe_assert(self.unify(new_arg_type, arg_type), "wrong argument type", tree)
         return ret_type
 
     def return_n(self, tree: TypeTree):
@@ -89,7 +89,7 @@ class AnnotateScope(Interpreter):
         return self.get_scope(tree.children[0].value)
 
     def assign(self, tree: TypeTree):
-        assert self.unify(shape(self, self.local_scope, tree.children[0]), self.visit(tree.children[1])), "assign error"
+        volpe_assert(self.unify(shape(self, self.local_scope, tree.children[0]), self.visit(tree.children[1])), "assign error", tree)
         return int1
 
     @staticmethod
@@ -116,28 +116,28 @@ class AnnotateScope(Interpreter):
     def list_index(self, tree: TypeTree):
         ret = self.visit_children(tree)
         element_type = var()
-        assert self.unify(ret[0], VolpeList(element_type)), "can only index lists"
-        assert self.unify(ret[1], int64), "can only index with an integer"
+        volpe_assert(self.unify(ret[0], VolpeList(element_type)), "can only index lists", tree)
+        volpe_assert(self.unify(ret[1], int64), "can only index with an integer", tree)
         return element_type
 
     def list_size(self, tree: TypeTree):
         ret = self.visit_children(tree)[0]
-        assert self.unify(ret, VolpeList(var())), "can only get size of lists"
+        volpe_assert(self.unify(ret, VolpeList(var())), "can only get size of lists", tree)
         return int64
 
     def list(self, tree: TypeTree):
         ret = self.visit_children(tree)
         element_type = var()
         for value_type in ret:
-            assert self.unify(element_type, value_type), "different types in list"
+            volpe_assert(self.unify(element_type, value_type), "different types in list", tree)
         return VolpeList(element_type)
 
     def convert_int(self, tree: TypeTree):
-        assert self.unify(self.visit(tree.children[0]), int64), "can only convert int"
+        volpe_assert(self.unify(self.visit(tree.children[0]), int64), "can only convert int", tree)
         return flt64
 
     def convert_flt(self, tree: TypeTree):
-        assert self.unify(self.visit(tree.children[0]), flt64), "can only convert float"
+        volpe_assert(self.unify(self.visit(tree.children[0]), flt64), "can only convert float", tree)
         return int64
 
     def if_then(self, tree: TypeTree):
