@@ -3,11 +3,10 @@ from typing import Callable
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from annotate_utils import volpe_assert
 from builder_utils import write_environment, free_environment, options, \
     read_environment, tuple_assign, copy, copy_environment, build_closure, free, math, comp, unary_math, \
     check_list_index
-from tree import TypeTree
+from tree import TypeTree, volpe_assert
 from volpe_types import int1, int64, flt64, target_data, pint8, unwrap
 
 

@@ -1,16 +1,16 @@
 import itertools
 from os import path
+import traceback
 
 from lark import Lark
 from llvmlite import ir
 from unification import var, reify
 
 from annotate import AnnotateScope
-from annotate_utils import VolpeError
 from builder import LLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
-from tree import TypeTree
+from tree import TypeTree, VolpeError
 from volpe_types import pint8, VolpeObject, VolpeList, target_data, VolpeClosure, int64, unwrap, check
 
 
@@ -24,12 +24,15 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
     def scope(name):
         if name in arg_scope:
             return arg_scope[name]
-        assert False, f"variable `{name}` not found"
+        raise VolpeError(f"variable `{name}` not found")
 
     try:
         rules = AnnotateScope(tree, scope, dict(), closure.ret_type).rules
     except VolpeError as err:
-        print(err)
+        if more_verbose:
+            traceback.print_exc()
+        else:
+            print(err)
         exit()
 
     failed = [False]
@@ -72,7 +75,10 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
         try:
             LLVMScope(b, tree, scope, ret, None)
         except VolpeError as err:
-            print(err)
+            if more_verbose:
+                traceback.print_exc()
+            else:
+                print(err)
             exit()
 
     if more_verbose:

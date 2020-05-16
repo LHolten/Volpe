@@ -3,10 +3,9 @@ from typing import List, Iterable
 
 from llvmlite import ir
 
-from tree import TypeTree
+from tree import TypeTree, volpe_assert, VolpeError
 from volpe_types import target_data, VolpeObject, VolpeClosure, copy_func, free_func, VolpeList, \
     pint8, int64, int32, flt64, char, unwrap
-from annotate_utils import VolpeError, volpe_assert
 
 
 def math(self, tree: TypeTree):

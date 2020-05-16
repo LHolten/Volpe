@@ -1,6 +1,6 @@
 from unification import var
 
-from tree import TypeTree
+from tree import TypeTree, volpe_assert
 from volpe_types import int1, VolpeObject
 
 
@@ -71,13 +71,3 @@ def shape(self, scope: dict, tree: TypeTree):
     tree.return_type = var()
     scope[tree.children[0].value] = tree.return_type
     return tree.return_type
-
-
-class VolpeError(Exception):
-    def __init__(self, message: str, tree: TypeTree):
-        error_message = message + f", line: {tree.meta.line}"
-        super().__init__(error_message)
-
-def volpe_assert(condition: bool, message: str, tree: TypeTree):
-    if not condition:
-        raise VolpeError(message, tree)

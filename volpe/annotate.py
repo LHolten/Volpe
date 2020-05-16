@@ -4,8 +4,8 @@ from lark.visitors import Interpreter
 from lark import Token
 from unification import var, unify
 
-from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, shape, volpe_assert
-from tree import TypeTree
+from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, shape
+from tree import TypeTree, volpe_assert
 from volpe_types import (
     int64,
     flt64,
