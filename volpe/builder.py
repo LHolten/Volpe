@@ -31,59 +31,73 @@ class LLVMScope(Interpreter):
 
         evaluate(tree.children)
 
-    def get_scope(self, name):
-        if name in self.local_scope:
-            return copy(self.builder, self.local_scope[name])
-        return self.scope(name)
+    def get_scope(self, name, mut):
+        if name not in self.local_scope:
+            if not mut:
+                return self.scope(name, False)
+            self.local_scope[name] = copy(self.builder, self.scope(name, False))
+        return self.local_scope[name]
+
+    def free(self, value):
+        if not value.tracked:
+            free(self.builder, value)
+
+    def copy(self, value):
+        if value.tracked:
+            value = copy(self.builder, value)
+            value.tracked = False
+        return value
 
     def visit(self, tree: TypeTree):
         value = getattr(self, tree.data)(tree)
         assert not self.builder.block.is_terminated, "dead code is not allowed"
+        value.tracked = getattr(value, "tracked", False)
         return value
 
     def visit_unsafe(self, tree: TypeTree):
         return getattr(self, tree.data)(tree)
 
     def assign(self, tree: TypeTree):
-        tuple_assign(self, tree.children[0], self.visit(tree.children[1]))
+        tuple_assign(self, tree.children[0], self.copy(self.visit(tree.children[1])))
         return int1(True)
 
     def symbol(self, tree: TypeTree):
-        return self.get_scope(tree.children[0].value)
+        value = self.get_scope(tree.children[0].value, False)
+        value.tracked = True
+        return value
 
     def func(self, tree: TypeTree):
         closure_type = tree.return_type
 
         module = self.builder.module
         env_names = list(tree.outside_used)
-        env_values = [self.get_scope(name) for name in env_names]
+        env_values = [self.get_scope(name, False) for name in env_names]
         env_types = [value.type for value in env_values]
 
-        with build_closure(module, closure_type, env_types) as (b, rec_ret, args, closure, c_func):
+        with build_closure(module, closure_type, env_types) as (b, rec, args, closure):
             new_values = read_environment(b, args[0], env_types)
 
             env_scope = dict(zip(env_names, new_values))
             env_scope["@"] = b.insert_value(closure, args[0], 3)
 
-            def scope(name):
-                return copy(b, env_scope[name])
+            def scope(name, mut):
+                assert not mut, "this scope can't ve mutated"
+                return env_scope[name]
 
-            LLVMScope(b, tree.children[1], scope, b.ret, rec_ret, (tree.children[0], args[1]))
+            LLVMScope(b, tree.children[1], scope, b.ret, rec, (tree.children[0], args[1]))
 
         env_ptr = write_environment(self.builder, copy_environment(self.builder, env_values))
         return self.builder.insert_value(closure, env_ptr, 3)
 
     def func_call(self, tree: TypeTree):
-        values = self.visit_children(tree)
-        closure = values[0]
-        args = values[1]
+        closure, args = self.visit_children(tree)
 
         func = self.builder.extract_value(closure, 0)
         env_ptr = self.builder.extract_value(closure, 3)
 
         res = self.builder.call(func, [env_ptr, args])
 
-        free(self.builder, closure)
+        self.free(closure)
         return res
 
     def return_n(self, tree: TypeTree):
@@ -92,12 +106,12 @@ class LLVMScope(Interpreter):
                 and tree.children[0].children[0].data == "symbol" \
                 and tree.children[0].children[0].children[0].value == "@" \
                 and self.rec is not None:  # prevent tail call optimization in blocks
-            value = self.visit(tree.children[0].children[1])
+            value = self.copy(self.visit(tree.children[0].children[1]))
             free_environment(self.builder, self.local_scope.values())
             self.rec(value)
             return int1
 
-        value = self.visit(tree.children[0])
+        value = self.copy(self.visit(tree.children[0]))
         free_environment(self.builder, self.local_scope.values())
         self.ret(value)
         return int1
@@ -110,7 +124,7 @@ class LLVMScope(Interpreter):
     def object(self, tree: TypeTree):
         value = unwrap(tree.return_type)(ir.Undefined)
         for i, child in enumerate(tree.children):
-            value = self.builder.insert_value(value, self.visit(child), i)
+            value = self.builder.insert_value(value, self.copy(self.visit(child)), i)
         return value
 
     def list_index(self, tree: TypeTree):
@@ -119,13 +133,13 @@ class LLVMScope(Interpreter):
         pointer = self.builder.extract_value(list_value, 0)
 
         res = self.builder.load(self.builder.gep(pointer, [i]))
-        free(self.builder, list_value)
+        self.free(list_value)
         return res
 
     def list_size(self, tree: TypeTree):
         list_value = self.visit_children(tree)[0]
         length = self.builder.extract_value(list_value, 1)
-        free(self.builder, list_value)
+        self.free(list_value)
         return length
 
     def list(self, tree: TypeTree):
@@ -155,13 +169,13 @@ class LLVMScope(Interpreter):
         new_pointer = b.call(self.builder.module.malloc, [new_length])
         b.call(b.module.memcpy, [new_pointer, pointer, length, int1(False)])
         b.call(b.module.memcpy, [b.gep(new_pointer, [length]), pointer2, length2, int1(False)])
-        b.call(b.module.free, [pointer])
-        b.call(b.module.free, [pointer2])
+        self.free(list_value)
+        self.free(other_list)
 
-        list_value = unwrap(tree.return_type)(ir.Undefined)
-        list_value = self.builder.insert_value(list_value, b.bitcast(new_pointer, element_type.as_pointer()), 0)
+        new_list = unwrap(tree.return_type)(ir.Undefined)
+        new_list = self.builder.insert_value(new_list, b.bitcast(new_pointer, element_type.as_pointer()), 0)
         new_size = b.sdiv(new_length, data_size)
-        return self.builder.insert_value(list_value, new_size, 1)
+        return self.builder.insert_value(new_list, new_size, 1)
 
     def implication(self, tree: TypeTree):
         with options(self.builder, tree.return_type) as (ret, phi):

@@ -164,7 +164,7 @@ def build_closure(module, closure_type: VolpeClosure, env_types):
         with options(b, args[1].type) as (ret, phi):
             ret(args[1])
 
-        yield b, ret, (args[0], phi), closure, c_func
+        yield b, ret, (args[0], phi), closure
 
     with build_func(c_func) as (b, args):
         b.ret(write_environment(b, copy_environment(b, read_environment(b, args[0], env_types))))
@@ -188,12 +188,7 @@ def check_list_index(b, list_value, i):
 def get_list(self, tree):
     if tree.data == "symbol":
         name = tree.children[0].value
-        if name in self.local_scope:
-            list_value = self.local_scope[name]
-        else:
-            list_value = self.get_scope(name)
-        self.local_scope[name] = list_value
-        return list_value
+        return self.get_scope(name, True)
 
     assert tree.data == "list_index", "can only index lists on left side of assignment"
     list_value = get_list(self, tree.children[0])
