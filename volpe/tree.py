@@ -25,12 +25,12 @@ class VolpeError(Exception):
         # Pretty error printing that shows the code block
         first_line = tree.meta.line
         last_line = tree.meta.end_line
-        spacing = last_line // 10
+        spacing = len(str(last_line))
 
         with open(tree.meta.file_path, "r") as f:
             text = f.readlines()    
             for i, line in enumerate(text[first_line-1 : last_line], first_line):
-                padding = " " * (spacing - i // 10)
+                padding = " " * (spacing - len(str(i)))
                 message += f"\n{padding}{i}| {line.rstrip()}"
 
         super().__init__(message)
