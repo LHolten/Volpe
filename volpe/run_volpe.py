@@ -98,6 +98,8 @@ def run(file_path, verbose=False, show_time=False):
     volpe_parser = get_parser(path_to_lark)
     with open(file_path) as vlp_file:
         parsed_tree = volpe_parser.parse(vlp_file.read())
+    # set the file_path for VolpeErrors
+    VolpeError.file_path = file_path
     # print(parsed_tree.pretty())
     volpe_llvm(parsed_tree, verbose=verbose, show_time=show_time, more_verbose=verbose)
     # llvm_ir()

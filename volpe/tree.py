@@ -12,9 +12,29 @@ class TypeTree(Tree):
 
 
 class VolpeError(Exception):
+    file_path = None
+
     def __init__(self, message: str, tree: Optional[TypeTree]=None):
-        if tree is not None:
-            message += f", line: {tree.meta.line}"
+        if tree is None:
+            super().__init__(message)
+            return
+
+        if self.file_path is None:
+            # file_path in VolpeError was not initialized
+            super().__init__(message + f", line: {tree.meta.line}")
+            return
+
+        # Pretty error printing that shows the code block
+        first_line = tree.meta.line
+        last_line = tree.meta.end_line
+        spacing = last_line // 10
+
+        with open(self.file_path, "r") as f:
+            text = f.readlines()    
+            for i, line in enumerate(text[first_line-1 : last_line], first_line):
+                padding = " " * (spacing - i // 10)
+                message += f"\n{padding}{i}| {line.rstrip()}"
+
         super().__init__(message)
 
 def volpe_assert(condition: bool, message: str, tree: Optional[TypeTree]=None):
