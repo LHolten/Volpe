@@ -1,7 +1,7 @@
 from unification import var
 
 from tree import TypeTree
-from volpe_types import int1, VolpeObject, VolpeList, int64
+from volpe_types import int1, VolpeObject
 
 
 def logic(self, tree: TypeTree):
