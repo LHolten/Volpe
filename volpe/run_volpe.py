@@ -97,7 +97,14 @@ def run(file_path, verbose=False, show_time=False):
     path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
     volpe_parser = get_parser(path_to_lark)
     with open(file_path) as vlp_file:
-        parsed_tree = volpe_parser.parse(vlp_file.read())
+        try:
+            parsed_tree = volpe_parser.parse(vlp_file.read())
+        except Exception as err:
+            if verbose:
+                traceback.print_exc()
+            else:
+                print(err)
+            exit()
     # put file_path inside tree.meta so that VolpeError can print code blocks
     for tree in parsed_tree.iter_subtrees():
         tree.meta.file_path = file_path
