@@ -1,5 +1,6 @@
 import itertools
 from os import path
+import traceback
 
 from lark import Lark
 from llvmlite import ir
@@ -9,7 +10,7 @@ from annotate import AnnotateScope
 from builder import LLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
-from tree import TypeTree
+from tree import TypeTree, VolpeError
 from volpe_types import pint8, VolpeObject, target_data, VolpeClosure, int64, unwrap
 
 
@@ -20,12 +21,19 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
     closure = VolpeClosure(VolpeObject(dict()), var())
     arg_scope = {"@": closure}
 
-    def scope(name):
+    def scope(name, tree: TypeTree):
         if name in arg_scope:
             return arg_scope[name]
-        assert False, f"variable `{name}` not found"
+        raise VolpeError(f"variable `{name}` not found", tree)
 
-    rules = AnnotateScope(tree, scope, dict(), closure.ret_type).rules
+    try:
+        rules = AnnotateScope(tree, scope, dict(), closure.ret_type).rules
+    except VolpeError as err:
+        if more_verbose:
+            traceback.print_exc()
+        else:
+            print(err)
+        return
 
     for t in tree.iter_subtrees():
         t.return_type = reify(t.return_type, rules)
@@ -53,7 +61,14 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
                 res = ptr
             b.ret(res)
 
-        LLVMScope(b, tree, scope, ret, None)
+        try:
+            LLVMScope(b, tree, scope, ret, None)
+        except VolpeError as err:
+            if more_verbose:
+                traceback.print_exc()
+            else:
+                print(err)
+            return
 
     if more_verbose:
         print(module)
@@ -63,7 +78,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
 
 def get_parser(path_to_lark):
     with open(path_to_lark) as lark_file:
-        return Lark(lark_file, start='block', parser='earley', ambiguity='explicit', tree_class=TypeTree)
+        return Lark(lark_file, start='block', parser='earley', ambiguity='explicit', tree_class=TypeTree, propagate_positions=True)
 
 
 def run(file_path, verbose=False, show_time=False):
@@ -71,8 +86,15 @@ def run(file_path, verbose=False, show_time=False):
     path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
     volpe_parser = get_parser(path_to_lark)
     with open(file_path) as vlp_file:
-        parsed_tree = volpe_parser.parse(vlp_file.read())
-    # print(parsed_tree.pretty())
+        try:
+            parsed_tree = volpe_parser.parse(vlp_file.read())
+        except Exception as err:
+            if verbose:
+                traceback.print_exc()
+            else:
+                print(err)
+            return
+    # put file_path inside tree.meta so that VolpeError can print code blocks
+    for tree in parsed_tree.iter_subtrees():
+        tree.meta.file_path = file_path
     volpe_llvm(parsed_tree, verbose=verbose, show_time=show_time, more_verbose=verbose)
-    # llvm_ir()
-

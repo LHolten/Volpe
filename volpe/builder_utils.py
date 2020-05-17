@@ -3,7 +3,7 @@ from typing import List, Iterable
 
 from llvmlite import ir
 
-from tree import TypeTree
+from tree import TypeTree, volpe_assert, VolpeError
 from volpe_types import target_data, VolpeObject, VolpeClosure, copy_func, free_func, VolpeList, \
     pint8, int64, int32, flt64, char, unwrap
 
@@ -17,17 +17,17 @@ def math(self, tree: TypeTree):
         return getattr(self, tree.data + "_flt")(values)
     if isinstance(t, VolpeList) and tree.data == "add":
         return getattr(self, "add_list")(tree, values)
-    raise AssertionError("math operations only work for integers and floats")
+    raise VolpeError("math operations only work for integers and floats", tree)
 
 
 def unary_math(self, tree: TypeTree):
     values = self.visit_children(tree)
     t = unwrap(tree.return_type)
-    if t == int64 or t == char:
+    if t == int64:
         return getattr(self, tree.data + "_int")(values)
     if t == flt64:
         return getattr(self, tree.data + "_flt")(values)
-    raise AssertionError("unary math operations only work for integers and floats")
+    raise VolpeError("unary math operations only work for integers and floats", tree)
 
 
 def comp(self, tree: TypeTree):
@@ -37,7 +37,7 @@ def comp(self, tree: TypeTree):
         return getattr(self, tree.data + "_int")(values)
     if t == flt64:
         return getattr(self, tree.data + "_flt")(values)
-    raise AssertionError("comparisons only work for integers, floats, and chars")
+    raise VolpeError("comparisons only work for integers, floats, and chars", tree)
 
 
 def free(b, value):
@@ -190,7 +190,7 @@ def get_list(self, tree):
         name = tree.children[0].value
         return self.get_scope(name, True)
 
-    assert tree.data == "list_index", "can only index lists on left side of assignment"
+    volpe_assert(tree.data == "list_index", "can only index lists on left side of assignment", tree)
     list_value = get_list(self, tree.children[0])
     i = self.visit(tree.children[1])
     check_list_index(self.builder, list_value, i)
@@ -215,7 +215,7 @@ def tuple_assign(self, tree: TypeTree, value):
         b.store(value, b.gep(pointer, [i]))
 
     else:
-        assert tree.data == "symbol"
+        assert tree.data == "symbol"  # no message?
         name = tree.children[0].value
         if name in self.local_scope:
             free(b, self.local_scope[name])

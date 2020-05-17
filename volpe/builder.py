@@ -6,7 +6,7 @@ from llvmlite import ir
 from builder_utils import write_environment, free_environment, options, \
     read_environment, tuple_assign, copy, copy_environment, build_closure, free, math, comp, unary_math, \
     check_list_index
-from tree import TypeTree
+from tree import TypeTree, volpe_assert
 from volpe_types import int1, int64, flt64, target_data, pint8, unwrap
 
 
@@ -50,7 +50,7 @@ class LLVMScope(Interpreter):
 
     def visit(self, tree: TypeTree):
         value = getattr(self, tree.data)(tree)
-        assert not self.builder.block.is_terminated, "dead code is not allowed"
+        volpe_assert(not self.builder.block.is_terminated, "dead code is not allowed", tree)
         value.tracked = getattr(value, "tracked", False)
         return value
 

@@ -1,18 +1,22 @@
 from unification import var
 
-from tree import TypeTree
+from tree import TypeTree, volpe_assert
 from volpe_types import int1, VolpeObject
 
 
 def logic(self, tree: TypeTree):
     ret = self.visit_children(tree)
-    assert self.unify(ret[0], int1) and self.unify(ret[1], int1), "logic operations only work for booleans"
+    volpe_assert(
+        self.unify(ret[0], int1) and self.unify(ret[1], int1),
+        "logic operations only work for booleans",
+        tree
+    )
     return int1
 
 
 def unary_logic(self, tree: TypeTree):
     ret = self.visit_children(tree)[0]
-    assert self.unify(ret, int1), "unary logic operations only work for booleans"
+    volpe_assert(self.unify(ret, int1), "unary logic operations only work for booleans", tree)
     return int1
 
 
@@ -20,7 +24,7 @@ def math(self, tree: TypeTree):
     children = self.visit_children(tree)
     ret0 = children[0]
     ret1 = children[1]
-    assert self.unify(ret0, ret1), "types need to match for math operations"
+    volpe_assert(self.unify(ret0, ret1), "types need to match for math operations", tree)
     return ret0
 
 
@@ -46,7 +50,7 @@ def comp(self, tree: TypeTree):
     children = self.visit_children(tree)
     ret0 = children[0]
     ret1 = children[1]
-    assert self.unify(ret0, ret1), "types need to match for comparison operations"
+    volpe_assert(self.unify(ret0, ret1), "types need to match for comparison operations", tree)
     return int1
 
 
@@ -63,7 +67,7 @@ def shape(self, scope: dict, tree: TypeTree):
         self.visit(tree)
         return tree.return_type
 
-    assert tree.data == "symbol"
+    assert tree.data == "symbol"  # no message?
     tree.return_type = var()
     scope[tree.children[0].value] = tree.return_type
     return tree.return_type
