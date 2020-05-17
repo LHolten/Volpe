@@ -10,10 +10,10 @@ from volpe_types import target_data, VolpeObject, VolpeClosure, copy_func, free_
 
 def math(self, tree: TypeTree):
     values = self.visit_children(tree)
-    t = unwrap(tree.return_type)
-    if t == int64:
+    t = tree.return_type
+    if unwrap(t) == int64:
         return getattr(self, tree.data + "_int")(values)
-    if t == flt64:
+    if unwrap(t) == flt64:
         return getattr(self, tree.data + "_flt")(values)
     if isinstance(t, VolpeList) and tree.data == "add":
         return getattr(self, "add_list")(tree, values)
