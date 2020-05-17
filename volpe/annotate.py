@@ -25,7 +25,7 @@ class AnnotateScope(Interpreter):
         if args is not None:
             self.unify(args[0], shape(self, self.local_scope, args[1]))
 
-        tree.children[-1] = TypeTree("return_n", [tree.children[-1]])
+        tree.children[-1] = TypeTree("return_n", [tree.children[-1]], tree.meta)
         tree.return_type = return_type
 
         def ret(value_type):
@@ -110,7 +110,7 @@ class AnnotateScope(Interpreter):
         text = eval(tree.children[0])
         tree.children = []
         for eval_character in text:
-            tree.children.append(TypeTree("character", [Token("CHARACTER", "'" + eval_character + "'")]))
+            tree.children.append(TypeTree("character", [Token("CHARACTER", "'" + eval_character + "'")], tree.meta))
         self.visit_children(tree)
         return VolpeList(char)
 
@@ -150,7 +150,7 @@ class AnnotateScope(Interpreter):
 
     def if_then(self, tree: TypeTree):
         tree.data = "implication"
-        tree.children[1] = TypeTree("return_n", [tree.children[1]])
+        tree.children[1] = TypeTree("return_n", [tree.children[1]], tree.meta)
         return self.visit(tree)
 
     # Boolean logic

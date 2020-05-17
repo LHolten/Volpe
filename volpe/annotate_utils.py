@@ -41,7 +41,7 @@ def math_assign(self, tree: TypeTree):
     tree.data = "assign"
 
     # Make a child node with the math operation.
-    tree.children[1] = TypeTree(operation, [symbol, expression])
+    tree.children[1] = TypeTree(operation, [symbol, expression], tree.meta)
 
     return self.visit(tree)
 

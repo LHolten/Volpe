@@ -6,7 +6,7 @@ class TypeTree(Tree):
     return_type = None
 
     def __init__(self, data, children, meta=None):
-        super().__init__(data, children, meta=None)
+        super().__init__(data, children, meta)
         self.outside_used = None
 
     def _pretty_label(self):
