@@ -23,7 +23,7 @@ def math(self, tree: TypeTree):
 def unary_math(self, tree: TypeTree):
     values = self.visit_children(tree)
     t = unwrap(tree.return_type)
-    if t == int64 or t == char:
+    if t == int64:
         return getattr(self, tree.data + "_int")(values)
     if t == flt64:
         return getattr(self, tree.data + "_flt")(values)
