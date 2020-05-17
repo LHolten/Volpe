@@ -15,8 +15,6 @@ def math(self, tree: TypeTree):
         return getattr(self, tree.data + "_int")(values)
     if unwrap(t) == flt64:
         return getattr(self, tree.data + "_flt")(values)
-    if isinstance(t, VolpeList) and tree.data == "add":
-        return getattr(self, "add_list")(tree, values)
     raise VolpeError("math operations only work for integers and floats", tree)
 
 

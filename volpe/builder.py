@@ -155,11 +155,12 @@ class LLVMScope(Interpreter):
         list_value = self.builder.insert_value(list_value, pointer, 0)
         return self.builder.insert_value(list_value, int64(len(tree.children)), 1)
 
-    def add_list(self, tree: TypeTree, values):
-        b = self.builder
+    def concatenate(self, tree: TypeTree):
         element_type = unwrap(tree.return_type.element_type)
-        list_value, other_list = values
+        list_value, other_list = self.visit_children(tree)
         data_size = int64(element_type.get_abi_size(target_data))
+
+        b = self.builder
         pointer = b.bitcast(b.extract_value(list_value, 0), pint8)
         length = b.mul(b.extract_value(list_value, 1), data_size)
         pointer2 = b.bitcast(b.extract_value(other_list, 0), pint8)

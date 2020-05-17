@@ -132,6 +132,13 @@ class AnnotateScope(Interpreter):
             volpe_assert(self.unify(element_type, value_type), "different types in list", tree)
         return VolpeList(element_type)
 
+    def concatenate(self, tree: TypeTree):
+        ret = self.visit_children(tree)
+        list_type = VolpeList(var())
+        assert self.unify(ret[0], list_type) and self.unify(ret[1], list_type), \
+            "can only concatenate lists of same type"
+        return list_type
+
     def convert_int(self, tree: TypeTree):
         volpe_assert(self.unify(self.visit(tree.children[0]), int64), "can only convert int", tree)
         return flt64
