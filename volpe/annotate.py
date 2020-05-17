@@ -89,7 +89,7 @@ class AnnotateScope(Interpreter):
         return self.get_scope(tree.children[0].value, tree)
 
     def assign(self, tree: TypeTree):
-        volpe_assert(self.unify(shape(self, self.local_scope, tree.children[0]), self.visit(tree.children[1])),
+        volpe_assert(self.unify(self.visit(tree.children[1]), shape(self, self.local_scope, tree.children[0])),
                      "assign error", tree)
         return int1
 
