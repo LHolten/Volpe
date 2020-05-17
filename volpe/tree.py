@@ -5,6 +5,10 @@ from lark import Tree
 class TypeTree(Tree):
     return_type = None
 
+    def __init__(self, data, children, meta=None):
+        super().__init__(data, children, meta=None)
+        self.outside_used = None
+
     def _pretty_label(self):
         if self.return_type is not None:
             return f'{self.data}: {self.return_type}'
@@ -12,7 +16,7 @@ class TypeTree(Tree):
 
 
 class VolpeError(Exception):
-    def __init__(self, message: str, tree: Optional[TypeTree]=None):
+    def __init__(self, message: str, tree: Optional[TypeTree] = None):
         if tree is None:
             super().__init__(message)
             return
@@ -29,12 +33,13 @@ class VolpeError(Exception):
 
         with open(tree.meta.file_path, "r") as f:
             text = f.readlines()    
-            for i, line in enumerate(text[first_line-1 : last_line], first_line):
+            for i, line in enumerate(text[first_line-1: last_line], first_line):
                 padding = " " * (spacing - len(str(i)))
                 message += f"\n{padding}{i}| {line.rstrip()}"
 
         super().__init__(message)
 
-def volpe_assert(condition: bool, message: str, tree: Optional[TypeTree]=None):
+
+def volpe_assert(condition: bool, message: str, tree: Optional[TypeTree] = None):
     if not condition:
         raise VolpeError(message, tree)

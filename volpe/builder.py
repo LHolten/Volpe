@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Optional, Tuple
 
 from lark.visitors import Interpreter
 from llvmlite import ir
@@ -7,11 +7,12 @@ from builder_utils import write_environment, free_environment, options, \
     read_environment, tuple_assign, copy, copy_environment, build_closure, free, math, comp, unary_math, \
     check_list_index
 from tree import TypeTree, volpe_assert
-from volpe_types import int1, int64, flt64, target_data, pint8, unwrap
+from volpe_types import int1, int64, flt64, target_data, pint8, unwrap, VolpeObject
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: callable, ret: Callable, rec: Callable, args=None):
+    def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: callable, ret: Callable, rec: Optional[Callable],
+                 args: Optional[Tuple[TypeTree, VolpeObject]] = None):
         self.builder = builder
         self.scope = scope
         self.local_scope = dict()

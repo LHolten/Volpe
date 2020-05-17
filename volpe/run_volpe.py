@@ -21,10 +21,10 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
     closure = VolpeClosure(VolpeObject(dict()), var())
     arg_scope = {"@": closure}
 
-    def scope(name, tree: TypeTree):
+    def scope(name, local_tree: TypeTree):
         if name in arg_scope:
             return arg_scope[name]
-        raise VolpeError(f"variable `{name}` not found", tree)
+        raise VolpeError(f"variable `{name}` not found", local_tree)
 
     try:
         rules = AnnotateScope(tree, scope, dict(), closure.ret_type).rules
@@ -78,7 +78,8 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
 
 def get_parser(path_to_lark):
     with open(path_to_lark) as lark_file:
-        return Lark(lark_file, start='block', parser='earley', ambiguity='explicit', tree_class=TypeTree, propagate_positions=True)
+        return Lark(lark_file, start='block', parser='earley', ambiguity='explicit', tree_class=TypeTree,
+                    propagate_positions=True)
 
 
 def run(file_path, verbose=False, show_time=False):

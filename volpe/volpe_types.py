@@ -1,10 +1,8 @@
-from typing import Dict, Callable, Union
+from typing import Dict, Union
 
 import llvmlite.binding as llvm
 from llvmlite import ir
 from unification import unifiable, Var
-
-from tree import TypeTree
 
 llvm.initialize()
 llvm.initialize_native_target()

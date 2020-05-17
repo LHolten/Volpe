@@ -89,19 +89,20 @@ class AnnotateScope(Interpreter):
         return self.get_scope(tree.children[0].value, tree)
 
     def assign(self, tree: TypeTree):
-        volpe_assert(self.unify(shape(self, self.local_scope, tree.children[0]), self.visit(tree.children[1])), "assign error", tree)
+        volpe_assert(self.unify(shape(self, self.local_scope, tree.children[0]), self.visit(tree.children[1])),
+                     "assign error", tree)
         return int1
 
     @staticmethod
-    def integer(tree: TypeTree):
+    def integer(_: TypeTree):
         return int64
 
     @staticmethod
-    def character(tree: TypeTree):
+    def character(_: TypeTree):
         return char
 
     @staticmethod
-    def escaped_character(tree: TypeTree):
+    def escaped_character(_: TypeTree):
         return char
 
     def string(self, tree: TypeTree):
