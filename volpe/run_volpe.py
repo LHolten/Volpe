@@ -21,10 +21,10 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
     closure = VolpeClosure(VolpeObject(dict()), var())
     arg_scope = {"@": closure}
 
-    def scope(name):
+    def scope(name, tree: TypeTree):
         if name in arg_scope:
             return arg_scope[name]
-        raise VolpeError(f"variable `{name}` not found")
+        raise VolpeError(f"variable `{name}` not found", tree)
 
     try:
         rules = AnnotateScope(tree, scope, dict(), closure.ret_type).rules
@@ -33,7 +33,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
             traceback.print_exc()
         else:
             print(err)
-        exit()
+        return
 
     for t in tree.iter_subtrees():
         t.return_type = reify(t.return_type, rules)
@@ -68,7 +68,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
                 traceback.print_exc()
             else:
                 print(err)
-            exit()
+            return
 
     if more_verbose:
         print(module)
@@ -93,7 +93,7 @@ def run(file_path, verbose=False, show_time=False):
                 traceback.print_exc()
             else:
                 print(err)
-            exit()
+            return
     # put file_path inside tree.meta so that VolpeError can print code blocks
     for tree in parsed_tree.iter_subtrees():
         tree.meta.file_path = file_path

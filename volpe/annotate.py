@@ -42,10 +42,10 @@ class AnnotateScope(Interpreter):
         tree.return_type = getattr(self, tree.data)(tree)
         return tree.return_type
 
-    def get_scope(self, name):
+    def get_scope(self, name, tree: TypeTree):
         if name in self.local_scope:
             return self.local_scope[name]
-        return self.scope(name)
+        return self.scope(name, tree)
 
     def block(self, tree: TypeTree):
         self.rules = AnnotateScope(tree, self.get_scope, self.rules, var()).rules
@@ -63,11 +63,11 @@ class AnnotateScope(Interpreter):
 
         tree.outside_used = set()
 
-        def scope(name):
+        def scope(name, t_tree: TypeTree):
             if name == "@":
                 return closure
             tree.outside_used.add(name)
-            return self.get_scope(name)
+            return self.get_scope(name, t_tree)
 
         self.rules = AnnotateScope(tree.children[1], scope, self.rules, closure.ret_type,
                                    (closure.arg_type, tree.children[0])).rules
@@ -86,7 +86,7 @@ class AnnotateScope(Interpreter):
         return int1
 
     def symbol(self, tree: TypeTree):
-        return self.get_scope(tree.children[0].value)
+        return self.get_scope(tree.children[0].value, tree)
 
     def assign(self, tree: TypeTree):
         volpe_assert(self.unify(shape(self, self.local_scope, tree.children[0]), self.visit(tree.children[1])), "assign error", tree)
