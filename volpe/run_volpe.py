@@ -11,7 +11,7 @@ from builder import LLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
 from tree import TypeTree, VolpeError
-from volpe_types import pint8, VolpeObject, VolpeList, target_data, VolpeClosure, int64, unwrap, check
+from volpe_types import pint8, VolpeObject, target_data, VolpeClosure, int64, unwrap
 
 
 def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=False):
@@ -35,22 +35,11 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
             print(err)
         exit()
 
-    failed = [False]
-
-    def update(t: TypeTree):
+    for t in tree.iter_subtrees():
         t.return_type = reify(t.return_type, rules)
-        if not check(t.return_type):
-            failed[0] = True
-        for child in t.children:
-            if isinstance(child, TypeTree):
-                update(child)
-
-    update(tree)
 
     if verbose:
         print(tree.pretty())
-
-    assert not failed[0], "Some value has not been typed, run with verbose to see which"
 
     module = ir.Module("program")
     module.func_count = itertools.count()

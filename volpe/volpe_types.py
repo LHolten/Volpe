@@ -2,7 +2,7 @@ from typing import Dict, Callable, Union
 
 import llvmlite.binding as llvm
 from llvmlite import ir
-from unification import unifiable
+from unification import unifiable, Var
 
 from tree import TypeTree
 
@@ -30,22 +30,13 @@ class VolpeType:
     def unwrap(self) -> ir.Type:
         raise NotImplementedError()
 
-    def check(self) -> bool:
-        raise NotImplementedError()
-
 
 def unwrap(value: Union[ir.Type, VolpeType]) -> ir.Type:
     if isinstance(value, VolpeType):
         return value.unwrap()
+    if isinstance(value, Var):
+        return int64
     return value
-
-
-def check(value) -> bool:
-    if isinstance(value, VolpeType):
-        return value.check()
-    if isinstance(value, ir.Type):
-        return True
-    return False
 
 
 @unifiable
@@ -65,9 +56,6 @@ class VolpeObject(VolpeType):
     def unwrap(self) -> ir.Type:
         return self.Type(unwrap(value) for value in self.type_dict.values())
 
-    def check(self) -> bool:
-        return all(check(v) for v in self.type_dict.values())
-
 
 @unifiable
 class VolpeList(VolpeType):
@@ -85,9 +73,6 @@ class VolpeList(VolpeType):
 
     def unwrap(self) -> ir.Type:
         return self.Type([unwrap(self.element_type).as_pointer(), int64])
-
-    def check(self) -> bool:
-        return check(self.element_type)
 
 
 @unifiable
@@ -108,6 +93,3 @@ class VolpeClosure(VolpeType):
     def unwrap(self) -> ir.Type:
         func = ir.FunctionType(unwrap(self.ret_type), [pint8, unwrap(self.arg_type)])
         return self.Type([func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
-
-    def check(self) -> bool:
-        return check(self.arg_type) and check(self.ret_type)
