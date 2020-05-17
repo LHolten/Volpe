@@ -10,7 +10,7 @@ from volpe_types import target_data, VolpeObject, VolpeClosure, copy_func, free_
 
 def math(self, tree: TypeTree):
     values = self.visit_children(tree)
-    t = tree.return_type
+    t = unwrap(tree.return_type)
     if t == int64:
         return getattr(self, tree.data + "_int")(values)
     if t == flt64:
@@ -22,7 +22,7 @@ def math(self, tree: TypeTree):
 
 def unary_math(self, tree: TypeTree):
     values = self.visit_children(tree)
-    t = tree.return_type
+    t = unwrap(tree.return_type)
     if t == int64 or t == char:
         return getattr(self, tree.data + "_int")(values)
     if t == flt64:
@@ -32,7 +32,7 @@ def unary_math(self, tree: TypeTree):
 
 def comp(self, tree: TypeTree):
     values = self.visit_children(tree)
-    t = tree.children[0].return_type
+    t = unwrap(tree.children[0].return_type)
     if t == int64 or t == char:
         return getattr(self, tree.data + "_int")(values)
     if t == flt64:
