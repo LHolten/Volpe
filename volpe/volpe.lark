@@ -45,7 +45,7 @@ block: _LINE_SEP* (value_ass _LINE_SEP+)* value1 _LINE_SEP*
     | "-" value9 -> negate
     | "!" value9 -> logic_not
     | "~" value9 -> convert_flt
-    | value10 "." INTEGER -> convert_int
+    | value9 "." INTEGER -> convert_int
     | "|" value10 "|" -> list_size
     | value9 "::" value10 -> concatenate
 

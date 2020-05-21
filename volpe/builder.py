@@ -135,6 +135,7 @@ class LLVMScope(Interpreter):
 
         res = self.builder.load(self.builder.gep(pointer, [i]))
         self.free(list_value)
+        res.tracked = list_value.tracked
         return res
 
     def list_size(self, tree: TypeTree):
