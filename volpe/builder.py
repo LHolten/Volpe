@@ -82,7 +82,7 @@ class LLVMScope(Interpreter):
             env_scope["@"] = b.insert_value(closure, args[0], 3)
 
             def scope(name, mut):
-                assert not mut, "this scope can't ve mutated"
+                assert not mut, "this scope can't be mutated"
                 return env_scope[name]
 
             LLVMScope(b, tree.children[1], scope, b.ret, rec, (tree.children[0], args[1]))
@@ -150,15 +150,18 @@ class LLVMScope(Interpreter):
         pointer = self.builder.bitcast(pointer, element_type.as_pointer())
 
         for i, ret in enumerate(self.visit_children(tree)):
-            self.builder.store(ret, self.builder.gep(pointer, [int64(i)]))
+            self.builder.store(self.copy(ret), self.builder.gep(pointer, [int64(i)]))
 
         list_value = unwrap(tree.return_type)(ir.Undefined)
         list_value = self.builder.insert_value(list_value, pointer, 0)
         return self.builder.insert_value(list_value, int64(len(tree.children)), 1)
 
     def concatenate(self, tree: TypeTree):
-        element_type = unwrap(tree.return_type.element_type)
         list_value, other_list = self.visit_children(tree)
+        list_value = self.copy(list_value)
+        other_list = self.copy(other_list)
+
+        element_type = unwrap(tree.return_type.element_type)
         data_size = int64(element_type.get_abi_size(target_data))
 
         b = self.builder
@@ -171,8 +174,8 @@ class LLVMScope(Interpreter):
         new_pointer = b.call(self.builder.module.malloc, [new_length])
         b.call(b.module.memcpy, [new_pointer, pointer, length, int1(False)])
         b.call(b.module.memcpy, [b.gep(new_pointer, [length]), pointer2, length2, int1(False)])
-        self.free(list_value)
-        self.free(other_list)
+        b.call(b.module.free, [pointer])
+        b.call(b.module.free, [pointer2])
 
         new_list = unwrap(tree.return_type)(ir.Undefined)
         new_list = self.builder.insert_value(new_list, b.bitcast(new_pointer, element_type.as_pointer()), 0)

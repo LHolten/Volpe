@@ -4,10 +4,10 @@ from lark import Tree
 
 class TypeTree(Tree):
     return_type = None
+    outside_used = None
 
     def __init__(self, data, children, meta=None):
         super().__init__(data, children, meta)
-        self.outside_used = None
 
     def _pretty_label(self):
         if self.return_type is not None:
