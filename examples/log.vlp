@@ -1,0 +1,60 @@
+# recursive factorial of x
+factorial := (x) {
+    x < 2 -> 1.0
+    x.0 * @(x - 1)
+}
+
+# a^n (a is flt, n is int)
+pow := (base, power) {
+    # repeated multiplication
+    power > 0 -> (base, product, i) {
+        i = 1 -> product
+        @(base, product*base, i - 1)
+    } (base, base, power)
+    # repeated division (also covers a^0 = 1)
+    (base, quotient, i) {
+        i = 0 -> quotient
+        @(base, quotient / base, i + 1)
+    } (base, 1.0, power)
+}
+
+# calculate euler's constant
+e := (sum, i) {
+    i = 100 -> sum
+    term := 1.0 / factorial(i)
+    @(sum + term, i + 1)
+} (1.0, 1)
+
+# e^x (x is flt)
+exp := (x) {
+    x < -15.0 -> pow(e, ~x) # use int power approximation
+    (sum, i) {
+        i = 100 -> sum
+        term := pow(x, i) / factorial(i)
+        @(sum + term, i + 1)
+    } (1.0, 1)
+}
+
+# natural logarithm
+precision := 100
+# ln(a) = root of (e^x - a)
+ln := (a) {
+    #! newton-raphson method
+    x_(n+1) = x_n - (f(x_n) / f'(x_n))
+    x_(n+1) = x_n - ((e^x_n - a) / e^x_n)
+    x_(n+1) = x_n - 1 + (a / e^x_n) !#
+    (x, i) {
+        i >= precision -> x
+        @(x - 1.0 + (a / exp(x)), i + 1)
+    } (1.0, 0)
+}
+
+# logarith (base a) of b
+log := (a, b) {
+    b = 1.0 -> 0.0
+    a > 1.0!
+    b > 1.0!
+    ln(b) / ln(a)
+}
+
+log(7.0, 30.0)

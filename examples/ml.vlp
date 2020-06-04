@@ -1,0 +1,457 @@
+### math funcs ###
+
+# recursive factorial of x
+factorial := (x) {
+    x < 2 -> 1.0
+    x.0 * @(x - 1)
+}
+
+# a^n (a is flt, n is int)
+pow := (base, power) {
+    # repeated multiplication
+    power > 0 -> (base, product, i) {
+        i = 1 -> product
+        @(base, product*base, i - 1)
+    } (base, base, power)
+    # repeated division (also covers a^0 = 1)
+    (base, quotient, i) {
+        i = 0 -> quotient
+        @(base, quotient / base, i + 1)
+    } (base, 1.0, power)
+}
+
+# calculate euler's constant
+e := (sum, i) {
+    i = 100 -> sum
+    term := 1.0 / factorial(i)
+    @(sum + term, i + 1)
+} (1.0, 1)
+
+# e^x (x is flt)
+exp := (x) {
+    x < -15.0 -> pow(e, ~x) # use int power approximation
+    (sum, i) {
+        i = 100 -> sum
+        term := pow(x, i) / factorial(i)
+        @(sum + term, i + 1)
+    } (1.0, 1)
+}
+
+### list functions ###
+
+# func is type (flt) {flt}
+map := (list, func) {
+    (new_list) {
+        i := |new_list|
+        i = |list| -> new_list
+        @(new_list :: [func(list[i])])
+    } ([])
+}
+
+#! 
+# could be better in the future
+map := (list, func) {
+    (i, list) {
+        i = |list| -> list
+        list[i] := func(list[i])
+        @(i + 1, list)
+    } (0, list)
+}
+!#
+
+smaller := (a, b) {a > b -> b; a}
+greater := (a, b) {a > b -> a; b}
+
+# zip two lists(flt) together
+zip := (a, b) {
+    len := smaller(|a|, |b|)
+    (i, zipped) {
+        i = len -> zipped
+        @(i + 1, zipped :: [{a[i], b[i]}])
+    } (0, [])
+}
+
+# zip two lists(int) together
+zip_ := (a, b) {
+    len := smaller(|a|, |b|)
+    (i, zipped) {
+        i = len -> zipped
+        @(i + 1, zipped :: [{a[i], b[i]}])
+    } (0, [])
+}
+
+# get a slice of a list
+slice := (list, start, end) {
+    (start >= 0 && start < |list|)!
+    (end >= start && end <= |list|)!
+    (i, new_list) {
+        i = end -> new_list
+        @(i + 1, new_list :: [list[i]])
+    } (start, [])
+}
+
+# get a list of zeros
+zeros := (len) {
+    len >= 0!
+    (list) {|list| = len -> list; @(list :: [0.0])} ([])
+}
+
+# get a matrix of zeros
+zeros_mat := ({rows, cols}) {
+    rows >= 0!
+    (matrix) {|matrix| = rows -> matrix; @(matrix :: [zeros(cols)])} ([])
+}
+
+### linear algebra ###
+
+# dot product between two vectors (lists)
+dot := (a, b) {
+    zipped := zip(a, b)
+    (i, result) {
+        i = |zipped| -> result
+        {x, y} := zipped[i]
+        @(i + 1, result + x * y)
+    } (0, 0.0)
+}
+
+# matrix multiply a column vector
+matrix_mul_col := (matrix, list) {
+    |matrix[0]| = |list|!
+    (i, result) {
+        i = |matrix| -> result
+        @(i + 1, result :: [dot(matrix[i], list)])
+    } (0, [])
+}
+
+# add two vectors (lists) by element
+vec_add := (a, b) {
+    |a| = |b|!
+    zipped := zip(a, b)
+    (i, result) {
+        i = |zipped| -> result
+        {x, y} := zipped[i]
+        @(i + 1, result :: [x + y])
+    } (0, [])
+}
+
+# add two matrices (lists of lists) by element
+mat_add := (a, b) {
+    rows := |a|
+    cols := |a[0]|
+    (i, matrix) {
+        i = rows -> matrix
+        list := (j, list) {
+            j = cols -> list
+            @(j + 1, list :: [a[i][j] + b[i][j]])
+        } (0, [])
+        @(i + 1, matrix :: [list])
+    } (0, [])
+}
+
+### random number generation ###
+
+abs := (x) {x >= 0 -> x; -x}
+
+# get a "random" number from [0.0, 1.0)
+rng := (seed) {
+    new_seed := abs((78034219765 * seed + 3426978127) % 323819779)
+    {new_seed, new_seed.0 / 323819779.0}
+}
+
+# make a list of random numbers
+rng_list := (seed, len) {
+    len >= 0!
+    (seed, list) {
+        |list| = len -> {seed, list}
+        {seed, num} := rng(seed)
+        @(seed, list :: [num])
+    } (seed, [])
+}
+
+# make an matrix of random numbers
+rng_mat := (seed, {rows, cols}) {
+    (rows >= 0 && cols >= 0)!
+    (seed, matrix) {
+        |matrix| = rows -> {seed, matrix}
+        {seed, list} := rng_list(seed, cols)
+        @(seed, matrix :: [list])
+    } (seed, [])
+}
+
+### activation functions ###
+
+sigmoid := (x) {
+    e_x := exp(x)
+    e_x / (e_x + 1.0)
+}
+
+sigmoid_derivative := (x) {
+    e_x := exp(x)
+    e_x / ((e_x + 1.0) * (e_x + 1.0))
+}
+
+reLU := (x) {
+    x >= 0.0 -> x
+    0.0
+}
+
+reLU_derivative := (x) {
+    x >= 0.0 -> 1.0
+    0.0
+}
+
+### parameters ###
+
+seed := 5435234643
+layer_sizes := [2, 2, 1]
+learning_rate := 0.05
+repeat := 20000
+progress_report_after := 1000
+
+activation_func := sigmoid
+activation_derivative := sigmoid_derivative
+
+# list of {input, expected output}
+# in this case xor of first two values
+test_data := [
+    {[1.0, 1.0], [0.0]},
+    {[1.0, 0.0], [1.0]},
+    {[0.0, 1.0], [1.0]},
+    {[0.0, 0.0], [0.0]}
+]
+
+### machine learning ###
+
+# lightweight feedforward for testing
+feedforward := (input, weights, biases) {
+    (layer, a) {
+        layer = |biases| -> a
+        sum := vec_add(matrix_mul_col(weights[layer], a), biases[layer])
+        @(layer + 1, map(sum, activation_func))
+    } (0, input)
+}
+
+# feedforward with extra tracking for backprop
+feedforward_track := (input, weights, biases) {
+    num_connections := |biases|
+    (layer, activations, z_vecs) {
+        layer = num_connections -> {activations, z_vecs}
+        # get the last activation
+        a := activations[|activations|-1]
+        # perform feedforward
+        z := vec_add(matrix_mul_col(weights[layer], a), biases[layer])
+        # track activations and z (the sum) for later
+        z_vecs := z_vecs :: [z]
+        activations := activations :: [map(z, activation_func)]
+        @(layer + 1, activations, z_vecs)
+    } (0, [input], [])
+}
+
+# lighweight cost function
+cost := (expected, real) {
+    |expected| = |real|!
+    (i, cost) {
+        i = |real| -> cost
+        diff := expected[i] - real[i] 
+        @(i + 1, cost + diff * diff)
+    } (0, 0.0)
+}
+
+# https://youtu.be/tIeHLnjs5U8
+backprop := (input, expected, weights, biases) {
+    num_layers := |biases| + 1
+
+    # feedforward with extra tracking
+    {activations, z_vecs} := feedforward_track(input, weights, biases)
+
+    # del(C) / del(a) for last layer
+    neurons_in_last_layer := |biases[|biases|-1]|
+    first_prev := (i, diffs) {
+        i = neurons_in_last_layer -> diffs
+        # d(a - y)^2 / da = 2*(a - y)
+        diff := 2.0 * (activations[num_layers-1][i] - expected[i])
+        @(i + 1, diffs :: [diff])
+    } (0, [])
+
+    # backpropagate desired changes
+    {del_weights, del_biases} := (layer, del_weights, del_biases, prev) {
+        rows := |weights[layer]| # also number of neurons in this layer
+        cols := |weights[layer][0]| # number of neurons in previous layer
+
+        rows = |prev|!
+
+        # calculate derivatives for each neuron in this layer
+        {weights_L, biases_L} := (i, weights_L, biases_L) {
+            i = rows -> {weights_L, biases_L}
+            
+            del_C_del_a := prev[i]
+            del_a_del_z := activation_derivative(z_vecs[layer][i])
+
+            # calculate derivates for weights coming from each neuron
+            neuron_weights := (j, neuron_weights) {
+                j = cols -> neuron_weights
+                # del(C) / del(w_ij)
+                weight := del_C_del_a * del_a_del_z * activations[layer][j]
+                @(j + 1, neuron_weights :: [weight])
+            } (0, [])
+
+            # del(C) / del(b_i)
+            neuron_bias := del_C_del_a * del_a_del_z
+
+            @(i + 1, weights_L :: [neuron_weights], biases_L :: [neuron_bias])
+        } (0, [], [])
+
+        # prepend because working backwards
+        del_weights := [weights_L] :: del_weights
+        del_biases := [biases_L] :: del_biases
+
+        # exit out once we went through all layers
+        layer = 0 -> {del_weights, del_biases}
+
+        # for previous layer
+        # del(C) / del(a)
+        prev := (j, new_prev) {
+            j = cols -> new_prev
+            # sum up the influences for each neuron in the previous layer
+            sum := (i, sum) {
+                i = rows -> sum
+                sum += weights[layer][i][j] * activation_derivative(z_vecs[layer][i]) * prev[i]
+                @(i + 1, sum)
+            } (0, 0.0)
+            @(j + 1, new_prev :: [sum])
+        } (0, [])
+        
+        @(layer - 1, del_weights, del_biases, prev)
+    } (num_layers - 2, [], [], first_prev)
+    # num_layers - 2 because the number of connections is num_layers - 1
+    # and lists are zero indexed, so the last connection is index = num_layers - 2
+
+    {del_weights, del_biases}
+}
+
+### initialization ###
+
+# check that data matches network size
+(i) {
+    i = |test_data| -> (1 > 0)
+    {input, output} := test_data[i]
+    |input| = layer_sizes[0]!
+    |output| = layer_sizes[|layer_sizes|-1]!
+    @(i + 1)
+} (0)!
+
+# weights and biases
+len := |layer_sizes|
+weight_shapes := zip_(slice(layer_sizes, 1, len), slice(layer_sizes, 0, len-1))
+
+# generate random weights
+{seed, weights} := (seed, weights) {
+    i := |weights|
+    i = |weight_shapes| -> {seed, weights}
+    {seed, layer} := rng_mat(seed, weight_shapes[i])
+    @(seed, weights :: [layer])
+} (seed, [])
+
+# generate random biases
+{seed, biases} := (seed, biases) {
+    i := |biases|
+    i = |weight_shapes| -> {seed, biases}
+    {size, _} := weight_shapes[i]
+    {seed, layer} := rng_list(seed, size)
+    @(seed, biases :: [layer])
+} (seed, [])
+
+### main loop ###
+
+progress := (i, progress, weights, biases) {
+    i >= repeat -> progress
+
+    # do a test to track if the net is improving
+    progress := {
+        i % progress_report_after = 0 -> {
+            # find average cost over all training data
+            current_cost := (test_i, sum) {
+                test_i = |test_data| -> sum
+                {input, expected} := test_data[test_i]
+                sum += cost(expected, feedforward(input, weights, biases))
+                @(test_i + 1, sum)
+            } (0, 0.0)
+            current_cost /= |test_data|.0
+            progress :: [current_cost]
+        }
+        progress
+    }
+
+    # matrix of zeros the shape of weights
+    blank_weights := (weights) {
+        i := |weights|
+        i = |weight_shapes| -> weights 
+        layer := zeros_mat(weight_shapes[i])
+        @(weights :: [layer])
+    } ([])
+
+    # make matrix of zeros the shape of biases 
+    blank_biases := (biases) {
+        i := |biases|
+        i = |weight_shapes| -> biases
+        {size, _} := weight_shapes[i]
+        layer := zeros(size)
+        @(biases :: [layer])
+    } ([])
+
+    # do a batch (in this case all of the data available) to get an estimate of the gradient
+    # returns the actual nudges we want to make to the weights and biases
+    {weight_nudge, bias_nudge} := (test_i, weight_nudge, bias_nudge) {
+        test_i = |test_data| -> {weight_nudge, bias_nudge}
+
+        test := test_data[test_i]
+        {input, expected} := test
+
+        {del_weights, del_biases} := backprop(input, expected, weights, biases)
+
+        # add the negative of the gradient * learning rate to nudges
+        {weight_nudge, bias_nudge} := (new_weight_nudge, new_bias_nudge) {
+            layer := |new_bias_nudge|
+            layer = |del_biases| -> {new_weight_nudge, new_bias_nudge}
+
+            weight_layer := (matrix) {
+                i := |matrix|
+                i = |del_weights[layer]| -> matrix
+                row := (row) {
+                    j := |row|
+                    j = |del_weights[layer][i]| -> row
+                    @(row :: [weight_nudge[layer][i][j] - learning_rate * del_weights[layer][i][j]])
+                } ([])
+                @(matrix :: [row])
+            } ([])
+
+            bias_layer := (list) {
+                i := |list|
+                i = |del_biases[layer]| -> list
+                @(list :: [bias_nudge[layer][i] - learning_rate * del_biases[layer][i]])
+            } ([])
+            
+            @(new_weight_nudge :: [weight_layer], new_bias_nudge :: [bias_layer])
+        } ([], [])
+
+        @(test_i + 1, weight_nudge, bias_nudge)
+    } (0, blank_weights, blank_biases)
+
+    # update weights and biases with calculated nudges
+    weights := (new_weights) {
+        i := |new_weights|
+        i = |weights| -> new_weights
+        @(new_weights :: [mat_add(weights[i], weight_nudge[i])])
+    } ([])
+
+    biases := (new_biases) {
+        i := |new_biases|
+        i = |biases| -> new_biases
+        @(new_biases :: [vec_add(biases[i], bias_nudge[i])])
+    } ([])
+
+    @(i + 1, progress, weights, biases)
+} (0, [], weights, biases)
+
+# return report
+progress

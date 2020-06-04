@@ -4,20 +4,131 @@ false := !true
 
 # tests whether an element is in a list
 in := (list, elem) {
-    loop := (i) {
+    (i) {
         i = |list| -> false
         list[i] = elem -> true
         @(i + 1)
-    }
-    loop(0)
+    } (0)
+}
+
+# check if two list are the same
+equal := (list1, list2) {
+    |list1| = |list2| && (index) {
+        index = |list1| -> true
+        list1[index] != list2[index] -> false
+        @(index + 1)
+    } (0)
+}
+
+# for lists of lists
+list_in := (list, elem) {
+    (i) {
+        i = |list| -> false
+        equal(list[i], elem) -> true
+        @(i + 1)
+    } (0)
 }
 
 # returns the first index which matches the element
 index := (list, elem) {
-    loop := (i) {
-        i != |list|!
+    (i) {
+        i >= |list| -> -1
         list[i] = elem -> i
         @(i + 1)
-    }
-    loop(0)
+    } (0)
 }
+
+smaller := (a, b) {a > b -> b; a}
+greater := (a, b) {a > b -> a; b}
+
+# get smallest element in list
+min := (list) {
+    (i, min) {
+        i = |list| -> min
+        @(i + 1, smaller(min, list[i]))
+    } (1, list[0])
+}
+
+# get largest element in list
+max := (list) {
+    (i, max) {
+        i = |list| -> max
+        @(i + 1, greater(max, list[i]))
+    } (1, list[0])
+}
+
+# zip two lists together
+zip := (a, b) {
+    len := smaller(|a|, |b|)
+    (list) {
+        i := |list|
+        i = len -> list
+        @(list :: [{a[i], b[i]}])
+    } ([])
+}
+
+reverse := (list) {
+    (reversed) {
+        index := |reversed|
+        index = |list| -> reversed
+        @([list[index]] :: reversed)
+    } ([])
+}
+
+remove := (list, elem) {
+    (i, return) {
+        i = |list| -> return
+        list[i] = elem -> @(i + 1, return)
+        @(i + 1, return :: [list[i]])
+    } (0, [])
+}
+
+assign := (list, index, value) {
+    (i, new_list) {
+        i = |list| -> new_list
+        i = index -> @(i + 1, new_list :: [value])
+        @(i + 1, new_list :: [list[i]])
+    } (0, [])
+}
+
+merge := (a, b) {
+    {larger, smaller} := {|a| > |b| -> {a, b}; {b, a}}
+    (i, return) {
+        i = |smaller| -> return
+        elem := smaller[i]
+        list_in(return, elem) -> @(i + 1, return)
+        @(i + 1, return :: [elem])
+    } (0, larger)
+}
+
+# get a slice of a list
+slice := (list, start, end) {
+    (start >= 0 && start < |list|)!
+    (end >= start && end <= |list|)!
+    (i, new_list) {
+        i = end -> new_list
+        @(i + 1, new_list :: [list[i]])
+    } (start, [])
+}
+
+# find the position of a slice in a list
+find := (slice, list) {
+    (i, found) {
+        i = |list| -> -1
+        found = |slice| -> i - found
+        elem := list[i]
+        @(i + 1, {elem = slice[found] -> found + 1; elem = slice[0] -> 1; 0})
+    } (0, 0)
+}
+
+# replace all occurences of one element with another
+replace := (list, to_replace, with_what) {
+    (new_list) {
+        i := |new_list|
+        i = |list| -> new_list
+        elem := list[i]
+        @(new_list :: [{elem = to_replace -> with_what; elem}])
+    } ([])
+}
+
+"ok"

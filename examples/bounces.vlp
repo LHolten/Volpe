@@ -1,22 +1,21 @@
 g := 9.81 # m/s^2
 bounce_threshold := 1.0 # J
 
-# a^n
+# a^n for positive n
 pow := (a, n) {
     n > 0!
-    loop := (x, a, n) {
-        n = 1 -> a
-        @(x, a*x, n-1)
-    }
-    loop(a, a, n)
+    (base, product, power) {
+        power = 1 -> product
+        @(base, product * base, power - 1)
+    } (a, a, n)
 }
 
 # calculate the amount of times a ball bounces
-calc_bounces := (ball,) {
+calc_bounces := (ball) {
     # deconstruct ball object
-    (state, properties) := ball
-    (height, vel) := state
-    (mass, bounciness) := properties
+    {state, properties} := ball
+    {height, vel} := state
+    {mass, bounciness} := properties
     # make sure bounciness doesn't violate laws of thermodynamics
     bounciness < 1.0!
     bounciness >= 0.0!
@@ -40,5 +39,5 @@ initial_height := 10.0 # m
 vertical_velocity := 3.0 # m/s
 mass := 0.1 # kg
 bounciness := 0.8 # coefficient
-ball := ((initial_height, vertical_velocity), (mass, bounciness))
-calc_bounces(ball,)
+ball := {{initial_height, vertical_velocity}, {mass, bounciness}}
+calc_bounces(ball)
