@@ -8,11 +8,11 @@ from unification import var, reify, unify
 
 from annotate import AnnotateScope
 from builder import LLVMScope
-from builder_utils import build_func
+from builder_utils import build_func, build_closure, free
 from command_line import build_main, string_obj, string_type
 from compile import compile_and_run
 from tree import TypeTree, VolpeError
-from volpe_types import pint8, VolpeObject, target_data, VolpeClosure, int64, unwrap, char, size
+from volpe_types import pint8, VolpeObject, VolpeClosure, int64, unwrap, char, size, int32, VolpeList, int1
 
 
 def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=False, console=False):
@@ -20,7 +20,8 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
         print(tree.pretty())
 
     closure = VolpeClosure(VolpeObject(dict()), var())
-    arg_scope = {"@": closure}
+    printf = VolpeClosure(VolpeObject({"_0": VolpeList(char)}), int64)
+    arg_scope = {"$printf": printf}
 
     def scope(name, local_tree: TypeTree):
         if name in arg_scope:
@@ -45,6 +46,19 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
     module.malloc = ir.Function(module, ir.FunctionType(pint8, [int64]), "malloc")
     module.free = ir.Function(module, ir.FunctionType(ir.VoidType(), [pint8]), "free")
     module.memcpy = module.declare_intrinsic('llvm.memcpy', [pint8, pint8, int64])
+    module.printf = ir.Function(module, ir.FunctionType(int32, [char.as_pointer()]), "printf")
+
+    with build_closure(module, printf, []) as (b, _, args, printf_func):
+        string = b.extract_value(args[1], 0)
+        res_len = b.extract_value(string, 1)
+        new_string = b.call(module.malloc, [b.add(res_len, int64(1))])
+        b.call(module.memcpy, [new_string, b.extract_value(string, 0), res_len, int1(False)])
+        b.store(char(0), b.gep(new_string, [res_len]))
+        free(b, string)
+
+        code = b.call(module.printf, [new_string])
+        b.call(module.free, [new_string])
+        b.ret(b.zext(code, int64))
 
     return_type = unwrap(tree.return_type)
     # return as pointer so they can be printed more easily
@@ -53,6 +67,11 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
 
     run_func = ir.Function(module, ir.FunctionType(return_type, []), "run")
     with build_func(run_func) as (b, _):
+        arg_scope = {"$printf": printf_func}
+
+        def scope(name, mut):
+            return arg_scope[name]
+
         def ret(res):
             if isinstance(res.type, ir.LiteralStructType) and not console:
                 ptr = b.bitcast(b.call(module.malloc, [size(res.type)]), return_type)
@@ -63,7 +82,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
         LLVMScope(b, tree, scope, ret, None)
 
     if console:
-        build_main(module, run_func)
+        build_main(module, run_func, printf_func)
 
     if more_verbose:
         print(module)

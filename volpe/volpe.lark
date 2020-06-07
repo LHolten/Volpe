@@ -74,6 +74,7 @@ shapes: (_SEP* shape ("," _SEP* shape)*)? _SEP* -> object
 
 symbol: CNAME
     | THIS_FUNC
+    | IMPORT
 
 %import common.ESCAPED_STRING
 %import common.INT
@@ -93,6 +94,7 @@ COMMENT: "#" /.*/
 NEWLINE: (CR? LF)
 
 THIS_FUNC: "@"
+IMPORT: "$" CNAME
 
 _LINE_SEP: _SEP
     | ";"

@@ -1,16 +1,14 @@
 from llvmlite import ir
 
 from builder_utils import build_func, free, options
-from volpe_types import int64, char, VolpeList, VolpeObject, size, int32, int1
+from volpe_types import int64, char, VolpeList, VolpeObject, size, int32, pint8
 
 string_type = VolpeList(char)
 string_list = VolpeList(string_type)
 string_obj = VolpeObject({'_0': string_list})
 
 
-def build_main(module, run_func):
-    printf = ir.Function(module, ir.FunctionType(int32, [char.as_pointer()]), "printf")
-
+def build_main(module, run_func, printf_func):
     main_func = ir.Function(module, ir.FunctionType(int32, [int32, char.as_pointer().as_pointer()]), "main")
     with build_func(main_func) as (b, args):
         num_args = b.zext(args[0], int64)
@@ -41,14 +39,9 @@ def build_main(module, run_func):
         res = b.call(func, [env_ptr, arg_obj])
         free(b, closure)
 
-        res_len = b.extract_value(res, 1)
-        new_res = b.call(module.malloc, [b.add(res_len, int64(1))])
-        b.call(module.memcpy, [new_res, b.extract_value(res, 0), res_len, int1(False)])
-        b.store(char(0), b.gep(new_res, [res_len]))
-        free(b, res)
-
-        b.call(printf, [b.extract_value(res, 0)])
-        b.call(module.free, [new_res])
+        print_obj = VolpeObject({"_0": string_type}).unwrap()(ir.Undefined)
+        print_obj = b.insert_value(print_obj, res, 0)
+        b.call(b.extract_value(printf_func, 0), [pint8(ir.Undefined), print_obj])
 
         b.ret(int32(0))
 
