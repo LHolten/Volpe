@@ -4,21 +4,13 @@ factorial := (x,) {
     x.0 * @(x - 1,)
 }
 
-# using block to calculate e
-e := {
-    # e := sum of 1 / i! for each i -> inf
-    precision := 100
-    calc_e := (e, i) {
-        # exit condition
-        i >= precision -> e
-        # calculate next term
-        term := 1.0 / factorial(i,)
-        # recursively call self with updated args
-        @(e + term, i + 1)
-    }
-    # call the function and return the result
-    calc_e(0.0, 0)
-}
+# calculate euler's constant
+precision = 100
+e := (sum, i) {
+    i >= precision -> sum
+    term := 1.0 / factorial(i)
+    @(sum + term, i + 1)
+} (1.0, 1)
 
 # return e
 e

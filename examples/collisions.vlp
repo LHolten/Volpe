@@ -5,84 +5,34 @@
 true := 1 > 0
 false := !true
 
-# checks if elem in list
-in := (elem, list) {
-    loop := (i,) {
+# tests whether an element is in a list
+in := (list, elem) {
+    (i) {
         i = |list| -> false
         list[i] = elem -> true
         @(i + 1)
-    }
-    loop(0)
+    } (0)
 }
 
-# will's version
-
-collisions := (inp,) {
-    # create a list of elements that appear at least twice
-    get_double := (i, seen, double) {
-        # exit condition
-        i = |inp| -> double
-        # get the element at current index
-        elem := inp[i]
-        (double, seen) := {
-            # check whether elem is in seen and add it to it if it's not
-            # if it is there, add it to double if it isn't there already
-            in(seen, elem) -> {in(double, elem) -> (double, seen); (double + [elem], seen)}
-            (double, seen + [elem])
+collisions := (input) {
+    # get all elements that appear more than once
+    double := (i, seen, double) {
+        # exit when we reached the end of the input list
+        i = |input| -> double
+        # get the elem at the current index
+        elem := input[i]
+        # update seen and double
+        {seen, double} := {
+            !in(seen, elem) -> {double, seen :: [elem]}
+            !in(double, elem) -> {double :: [elem], seen}
+            {seen, double}
         }
-        # recurively call self, but with a higher index and updated lists
         @(i + 1, seen, double)
-    }
-    double := get_double(0, [], [])
-
-    # extract the indices
-    get_indices := (i, collisions) {
-        # exit condition
-        i = |inp| -> collisions
-        # get the element at current index
-        elem := inp[i]
-        # if the elem is in double, add the index to collisions
-        collisions := {in(double, elem) -> collisions + [i]; collisions}
-        @(i + 1, collisions)
-    }
-    get_indices(0, [])
-}
-
-
-# hytak's version
-
-# define a generic loop function
-for_elem := (inp, var, func) {
-    # if the input list is empty, return var
-    inp = [] -> var
-    # split the list, update var with the first element,
-    # call self with the rest of the list
-    @(inp[1:], func(inp[0], var), func)
-}
-
-collisions := (inp,) {
-    # get a list of elements that appear twice
-    (double, _) := for_elem(inp, ([], []), (elem, (double, seen)) {
-        in(seen, elem) -> {in(double, elem) -> (double, seen); (double + [elem], seen)}
-        (double, seen + [elem])
-    })
-    # get the indices of elements that appear in double
-    for_elem(enumerate(inp), [], ((i, elem), collisions) {
-        in(double, elem) -> collisions + [i]
-        collisions
-    })
-}
-
-
-# with sets
-
-collisions := (inp,) {
-    (double, _) := for_elem(inp, (set(), set()), (elem, (double, seen)) {
-        seen.has(elem) -> (double.add(elem), seen)
-        (double, seen.add(elem))
-    })
-    for_elem(enumerate(inp), set(), ((i, elem), collisions) {
-        double.has(elem) -> collisions.add(i)
-        collisions
-    })
+    } (0, [], [])
+    # get indices of collisions
+    (i, output) {
+        i = |input| -> output
+        in(double, input[i]) -> @(i + 1, output :: [i])
+        @(i + 1, output)
+    } (0, [])
 }

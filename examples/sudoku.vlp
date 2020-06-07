@@ -1,0 +1,95 @@
+true := 1 > 0
+false := !true
+
+in := (list, elem) {
+    (i) {
+        i = |list| -> false
+        list[i] = elem -> true
+        @(i + 1)
+    } (0)
+}
+
+get_possible := (board, pos) {
+    x := pos % 9
+    y := pos / 9
+    square_x := (x / 3) * 3
+    square_y := (y / 3) * 3
+
+    # get a list of all digits which are not possible
+    # (because they are already in a row, column, or square)
+    seen := {
+        # row pass
+        seen := (i, seen) {
+            i >= 9 -> seen
+            num := board[y*9 + i]
+            num != 0 && !in(seen, num) -> @(i + 1, seen :: [num])
+            @(i + 1, seen)
+        } (0, [])
+        # column pass
+        seen := (i, seen) {
+            i >= 9 -> seen
+            num := board[i*9 + x]
+            num != 0 && !in(seen, num) -> @(i + 1, seen :: [num])
+            @(i + 1, seen)
+        } (0, seen)
+        # square pass
+        (i, seen) {
+            i >= 3 -> seen
+            seen := (j, seen) {
+                j >= 3 -> seen
+                num := board[(square_y + i)*9 + (square_x + j)]
+                num != 0 && !in(seen, num) -> @(i + 1, seen :: [num])
+                @(j + 1, seen)
+            } (0, seen)
+            @(i + 1, seen)
+        } (0, seen)
+    }
+
+    (i, possible) {
+        i > 9 -> possible
+        in(seen, i) -> @(i + 1, possible)
+        @(i + 1, possible :: [i])
+    } (1, [])
+}
+
+solve := (board) {
+    solve := @
+    false -> {false, [-1]}
+    (pos) {
+        # no zeros found, we have a solution!
+        pos = |board| -> {true, board}
+        # look for unfilled spot
+        board[pos] = 0 -> {
+            possible := get_possible(board, pos)
+            (i) {
+                # we tried all possible and none of them led to solutions
+                # so one of the previous steps was bad
+                i = |possible| -> {false, [-1]}
+                # try one of the possible numbers
+                board[pos] := possible[i]
+                {found_solution, solution} := solve(board)
+                # we found a solution!
+                found_solution -> {true, solution}
+                # try again with a different number
+                @(i + 1)
+            } (0)
+        }
+        @(pos + 1)
+    } (0)
+}
+
+sudoku := [
+    5,3,0, 0,7,0, 0,0,0,
+    6,0,0, 1,9,5, 0,0,0,
+    0,9,8, 0,0,0, 0,6,0,
+
+    8,0,0, 0,6,0, 0,0,3,
+    4,0,0, 8,0,3, 0,0,1,
+    7,0,0, 0,2,0, 0,0,6,
+
+    0,6,0, 0,0,0, 2,8,0,
+    0,0,0, 4,1,9, 0,0,5,
+    0,0,0, 0,8,0, 0,7,9
+]
+
+solve(sudoku)

@@ -13,10 +13,10 @@ check_primality := (number, test) {
 }
 
 # call check_primality with starting "test"
-is_prime := (n,) {
+is_prime := (n) {
     n > 0! # assert that n is a positive integer
     n = 1 -> false
     check_primality(n, n / 2)
 }
 
-is_prime(7789,)
+is_prime(7789)

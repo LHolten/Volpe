@@ -1,32 +1,33 @@
 # constants
 dt := 1.0 / 120.0
-g := (0.0, 0.0, -9.81)
+g := {0.0, 0.0, -9.81}
 
 # "vector" functions
-add := ((x1, y1, z1), (x2, y2, z2)) (x1+x2, y1+y2, z1+z2)
-mult_dt := ((x, y, z),) (x*dt, y*dt, z*dt)
+add := ({x1, y1, z1}, {x2, y2, z2}) {{x1+x2, y1+y2, z1+z2}}
+mult_dt := ({x, y, z}) {{x*dt, y*dt, z*dt}}
 
 # time step
-step := ((pos, vel),) {
-    vel := add(vel, mult_dt(g,))
-    pos := add(pos, mult_dt(vel,))
-    (pos, vel)
+step := ({pos, vel}) {
+    vel := add(vel, mult_dt(g))
+    pos := add(pos, mult_dt(vel))
+    {pos, vel}
 } 
 
 # check for ground hit
-done := ((pos, vel),) {
-    (x, y, z) := pos
+done := ({pos, vel}) {
+    {x, y, z} := pos
     z <= 0.0
 }
 
-landing_pos := (state,) {
-    new_state := step(state,)
-    done(new_state,) -> {
-        (pos, vel) := new_state
-        pos
+landing_pos := (state, time) {
+    new_state := step(state)
+    time += dt
+    done(new_state) -> {
+        {pos, vel} := new_state
+        {pos, time}
     }
-    @(new_state,)
+    @(new_state, time)
 }
 
-initial_state := ((0.0, 0.0, 100.0), (32.0, -5.0, 20.0))
-landing_pos(initial_state,)
+initial_state := {{0.0, 0.0, 100.0}, {32.0, -5.0, 20.0}}
+landing_pos(initial_state, 0.0)
