@@ -23,6 +23,7 @@ def compile_and_run(llvm_ir, result_type, show_time=False, console=False):
     target_machine = target.create_target_machine(codemodel="default")
     # And an execution engine with an empty backing module
     mod = llvm.parse_assembly(llvm_ir)
+    mod.triple = llvm.get_process_triple()
     mod.verify()
 
     if console:
