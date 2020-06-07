@@ -37,6 +37,12 @@ def unwrap(value: Union[ir.Type, VolpeType]) -> ir.Type:
     return value
 
 
+def size(value: Union[ir.Type, VolpeType]) -> ir.Value:
+    if isinstance(value, VolpeType):
+        value = value.unwrap()
+    return int64(value.get_abi_size(target_data))
+
+
 @unifiable
 class VolpeObject(VolpeType):
     class Type(ir.LiteralStructType):

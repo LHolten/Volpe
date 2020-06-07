@@ -1,3 +1,4 @@
+import io
 import time
 from ctypes import *
 
@@ -20,7 +21,7 @@ llvm.initialize_native_target()
 llvm.initialize_native_asmprinter()  # yes, even this one
 
 
-def compile_and_run(llvm_ir, result_type, show_time=False):
+def compile_and_run(llvm_ir, result_type, show_time=False, console=False):
     """
     Create an ExecutionEngine suitable for JIT code generation on
     the host CPU.  The engine is reusable for an arbitrary number of
@@ -28,15 +29,20 @@ def compile_and_run(llvm_ir, result_type, show_time=False):
     """
     # Create a target machine representing the host
     target = llvm.Target.from_default_triple()
-    target_machine = target.create_target_machine()
+    target_machine = target.create_target_machine(codemodel='default')
     # And an execution engine with an empty backing module
     mod = llvm.parse_assembly(llvm_ir)
     mod.verify()
+
+    if console:
+        with io.open("output.obj", 'wb') as file:
+            file.write(target_machine.emit_object(mod))
+
     engine = llvm.create_mcjit_compiler(mod, target_machine)
     engine.finalize_object()
     engine.run_static_constructors()
 
-    func_ptr = engine.get_function_address("main")
+    func_ptr = engine.get_function_address("run")
 
     func = CFUNCTYPE(determine_c_type(result_type))(func_ptr)
     start_time = time.perf_counter_ns()

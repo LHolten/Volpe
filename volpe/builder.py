@@ -7,7 +7,7 @@ from builder_utils import write_environment, free_environment, options, \
     read_environment, tuple_assign, copy, copy_environment, build_closure, free, math, comp, unary_math, \
     check_list_index
 from tree import TypeTree, volpe_assert
-from volpe_types import int1, int64, flt64, target_data, pint8, unwrap, VolpeObject
+from volpe_types import int1, int64, flt64, target_data, pint8, unwrap, VolpeObject, size
 
 
 class LLVMScope(Interpreter):
@@ -163,7 +163,7 @@ class LLVMScope(Interpreter):
         other_list = self.copy(other_list)
 
         element_type = unwrap(tree.return_type.element_type)
-        data_size = int64(element_type.get_abi_size(target_data))
+        data_size = size(element_type)
 
         b = self.builder
         pointer = b.bitcast(b.extract_value(list_value, 0), pint8)

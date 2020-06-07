@@ -3,12 +3,13 @@
 Usage:
     volpe -h | --help
     volpe add-path
-    volpe <file_path> [-v | --verbose] [-t | --time]
+    volpe <file_path> [-v | --verbose] [-t | --time] [-c | --console]
 
 Options:
     -h --help     Show this screen.
     -v --verbose  Print out the parsed tree and code.
     -t --time     Shows execution time.
+    -c --console  Compile to object file.
 """
 
 import os
@@ -49,13 +50,13 @@ def install():
         print("Please restart this console for changes to take effect.")
 
 
-def compile_and_run(file_path, verbose=False, show_time=False):
+def compile_and_run(file_path, verbose=False, show_time=False, console=False):
     from run_volpe import run
 
     assert file_path.split(".")[-1] == "vlp", "Volpe files have the file ending .vlp"
     assert os.path.exists(file_path), f"Could not find file: {file_path}"
 
-    run(file_path, verbose=verbose, show_time=show_time)
+    run(file_path, verbose=verbose, show_time=show_time, console=console)
 
 
 if __name__ == '__main__':
@@ -66,4 +67,4 @@ if __name__ == '__main__':
     if args["add-path"]:
         install()
     else:
-        compile_and_run(args["<file_path>"], verbose=args["--verbose"], show_time=args["--time"])
+        compile_and_run(args["<file_path>"], args["--verbose"], args["--time"], args["--console"])

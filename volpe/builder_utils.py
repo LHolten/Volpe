@@ -4,8 +4,8 @@ from typing import List, Iterable
 from llvmlite import ir
 
 from tree import TypeTree, volpe_assert, VolpeError
-from volpe_types import target_data, VolpeObject, VolpeClosure, copy_func, free_func, VolpeList, \
-    pint8, int64, int32, flt64, char, unwrap
+from volpe_types import VolpeObject, VolpeClosure, copy_func, free_func, VolpeList, \
+    pint8, int64, int32, flt64, char, unwrap, size
 
 
 def math(self, tree: TypeTree):
@@ -65,7 +65,7 @@ def copy(b, value):
 
 def write_environment(b: ir.IRBuilder, value_list: List):
     env_type = ir.LiteralStructType([value.type for value in value_list])
-    untyped_ptr = b.call(b.module.malloc, [int64(env_type.get_abi_size(target_data))])
+    untyped_ptr = b.call(b.module.malloc, [size(env_type)])
     ptr = b.bitcast(untyped_ptr, env_type.as_pointer())
 
     for i, value in enumerate(value_list):
@@ -95,7 +95,7 @@ def free_environment(b: ir.IRBuilder, value_list: Iterable) -> None:
 
 
 def copy_list(b: ir.IRBuilder, list_value):
-    data_size = int64(list_value.type.elements[0].pointee.get_abi_size(target_data))
+    data_size = size(list_value.type.elements[0].pointee)
     pointer = b.extract_value(list_value, 0)
     length = b.extract_value(list_value, 1)
     new_pointer = b.call(b.module.malloc, [b.mul(data_size, length)])

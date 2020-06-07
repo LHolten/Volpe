@@ -4,17 +4,18 @@ import traceback
 
 from lark import Lark
 from llvmlite import ir
-from unification import var, reify
+from unification import var, reify, unify
 
 from annotate import AnnotateScope
 from builder import LLVMScope
 from builder_utils import build_func
+from command_line import build_main, string_obj, string_type
 from compile import compile_and_run
 from tree import TypeTree, VolpeError
-from volpe_types import pint8, VolpeObject, target_data, VolpeClosure, int64, unwrap
+from volpe_types import pint8, VolpeObject, target_data, VolpeClosure, int64, unwrap, char, size
 
 
-def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=False):
+def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=False, console=False):
     if more_verbose:
         print(tree.pretty())
 
@@ -26,14 +27,12 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
             return arg_scope[name]
         raise VolpeError(f"variable `{name}` not found", local_tree)
 
-    try:
-        rules = AnnotateScope(tree, scope, dict(), closure.ret_type).rules
-    except VolpeError as err:
-        if more_verbose:
-            traceback.print_exc()
-        else:
-            print(err)
-        return
+    rules = AnnotateScope(tree, scope, dict(), closure.ret_type).rules
+
+    if console:
+        rules = unify(tree.return_type, VolpeClosure(string_obj, string_type), rules)
+        assert rules is not False, "command line scripts should return a function that takes as list of strings " \
+                                   "and returns a string"
 
     for t in tree.iter_subtrees():
         t.return_type = reify(t.return_type, rules)
@@ -49,31 +48,27 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
 
     return_type = unwrap(tree.return_type)
     # return as pointer so they can be printed more easily
-    if isinstance(return_type, ir.LiteralStructType):
+    if isinstance(return_type, ir.LiteralStructType) and not console:
         return_type = return_type.as_pointer()
 
-    main_func = ir.Function(module, ir.FunctionType(return_type, []), "main")
-    with build_func(main_func) as (b, _):
+    run_func = ir.Function(module, ir.FunctionType(return_type, []), "run")
+    with build_func(run_func) as (b, _):
         def ret(res):
-            if isinstance(res.type, ir.LiteralStructType):
-                ptr = b.bitcast(b.call(module.malloc, [int64(res.type.get_abi_size(target_data))]), return_type)
+            if isinstance(res.type, ir.LiteralStructType) and not console:
+                ptr = b.bitcast(b.call(module.malloc, [size(res.type)]), return_type)
                 b.store(res, ptr)
                 res = ptr
             b.ret(res)
 
-        try:
-            LLVMScope(b, tree, scope, ret, None)
-        except VolpeError as err:
-            if more_verbose:
-                traceback.print_exc()
-            else:
-                print(err)
-            return
+        LLVMScope(b, tree, scope, ret, None)
+
+    if console:
+        build_main(module, run_func)
 
     if more_verbose:
         print(module)
 
-    compile_and_run(str(module), tree.return_type, show_time=show_time)
+    compile_and_run(str(module), tree.return_type, show_time, console)
 
 
 def get_parser(path_to_lark):
@@ -82,7 +77,7 @@ def get_parser(path_to_lark):
                     propagate_positions=True)
 
 
-def run(file_path, verbose=False, show_time=False):
+def run(file_path, verbose=False, show_time=False, console=False):
     base_path = path.dirname(__file__)
     path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
     volpe_parser = get_parser(path_to_lark)
@@ -98,4 +93,11 @@ def run(file_path, verbose=False, show_time=False):
     # put file_path inside tree.meta so that VolpeError can print code blocks
     for tree in parsed_tree.iter_subtrees():
         tree.meta.file_path = file_path
-    volpe_llvm(parsed_tree, verbose=verbose, show_time=show_time, more_verbose=verbose)
+
+    try:
+        volpe_llvm(parsed_tree, verbose, show_time, verbose, console)
+    except VolpeError as err:
+        if verbose:
+            traceback.print_exc()
+        else:
+            print(err)
