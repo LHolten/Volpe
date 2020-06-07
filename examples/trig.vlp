@@ -1,37 +1,38 @@
 pi := 3.14159265359
 
 # recursive factorial of x
-factorial := (x,) {
+factorial := (x) {
     x < 2 -> 1.0
-    x.0 * @(x - 1,)
+    x.0 * @(x - 1)
 }
 
-# a^n
-pow := (a, n) {
-    n > 0!
-    loop := (x, a, n) {
-        n = 1 -> a
-        @(x, a*x, n-1)
-    }
-    loop(a, a, n)
+# a^n (a is flt, n is int)
+pow := (base, power) {
+    # repeated multiplication
+    power > 0 -> (base, product, i) {
+        i = 1 -> product
+        @(base, product*base, i - 1)
+    } (base, base, power)
+    # repeated division (also covers a^0 = 1)
+    (base, quotient, i) {
+        i = 0 -> quotient
+        @(base, quotient / base, i + 1)
+    } (base, 1.0, power)
 }
 
 precision := 20
 
 # Maclaurin expansion of sin x
-sin := (x,) {
+sin := (x) {
     x %= (2.0 * pi)
-    add_terms := (sum, i) {
+    # sum of ((-1)^(2i) * x^(2i)) / (2i)!
+    (sum, i) {
         i >= precision -> sum
-        term := 1.0 / factorial(2*i + 1,)
-        term *= {
-            i % 2 = 0 -> 1.0
-            -1.0
-        }
+        term := 1.0 / factorial(2*i + 1)
+        term *= {i % 2 = 0 -> 1.0; -1.0}
         term *= pow(x, 2*i + 1)
         @(sum + term, i + 1)
-    }
-    add_terms(0.0, 0)
+    } (0.0, 0)
 }
 
-sin(6.0,)
+sin(6.0)

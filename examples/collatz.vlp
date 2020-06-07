@@ -1,4 +1,4 @@
-collatz := (x,) {
+collatz := (x) {
     x % 2 = 0 -> x / 2
     3 * x + 1
 }
@@ -7,27 +7,26 @@ collatz := (x,) {
 get_len_of_sequence := (x, len) {
     x > 0! # assert that overflow has not occured
     x = 1 -> len
-    @(collatz(x,), len + 1)
+    @(collatz(x), len + 1)
 }
 
 # get the longest sequence, testing integers up to n
-get_longest_sequence := (n,) {
-    loop := (i, longest) {
+get_longest_sequence := (n) {
+    (i, longest) {
         # end loop
         i > n -> longest
         # calculate length
         new_len := get_len_of_sequence(i, 0)
         # compare if longer than previous longest
         # save the length and the number
-        (num, len) := longest
+        {num, len} := longest
         longest := {
-            new_len > len -> (i, new_len)
-            (num, len)
+            new_len > len -> {i, new_len}
+            {num, len}
         }
         # repeat for i + 1
         @(i + 1, longest)
-    }
-    loop(1, (0, 0))
+    } (1, {0, 0})
 }
 
-get_longest_sequence(100000,)
+get_longest_sequence(100000)
