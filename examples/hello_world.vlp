@@ -1,0 +1,2 @@
+print := $printf
+print("Hello, world!\n")

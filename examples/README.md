@@ -11,6 +11,8 @@ Sometimes examples might become outdated because of syntax changes.
 - calc_e
 - collatz
 - collisions
+- fizzbuzz (intended as command line app)
+- hello_world
 - hello
 - is_prime
 - list_funcs
