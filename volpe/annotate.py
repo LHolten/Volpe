@@ -1,3 +1,4 @@
+from os import path
 from typing import Callable
 
 from lark.visitors import Interpreter
@@ -14,6 +15,8 @@ from volpe_types import (
     VolpeClosure,
     VolpeList, int1
 )
+from run_volpe import get_parser
+from tree import VolpeError
 
 
 class AnnotateScope(Interpreter):
@@ -152,6 +155,44 @@ class AnnotateScope(Interpreter):
         tree.data = "implication"
         tree.children[1] = TypeTree("return_n", [tree.children[1]], tree.meta)
         return self.visit(tree)
+
+    def import_(self, tree: TypeTree):
+        # HACK
+        if tree.children[0] == "printf":
+            tree.data = "symbol"
+            tree.children[0].value = "$printf"
+            return self.get_scope("$printf", tree)
+
+        directory = path.dirname(tree.meta.file_path)
+        import_path = path.join(directory, *[child.value for child in tree.children])
+        import_path += ".vlp"
+        volpe_assert(path.isfile(import_path), f"could not find the file: {import_path}", tree)
+        
+        # TEMPORARY HACK, parts should be moved elsewhere since I am reusing code
+        # parse the imported file
+        base_path = path.dirname(__file__)
+        path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
+        volpe_parser = get_parser(path_to_lark)
+        with open(import_path) as vlp_file:
+            parsed_tree = volpe_parser.parse(vlp_file.read())
+
+        # put file_path inside tree.meta so that VolpeError can print code blocks
+        for subtree in parsed_tree.iter_subtrees():
+            subtree.meta.file_path = import_path
+
+        printf = VolpeClosure(VolpeObject({"_0": VolpeList(char)}), int64)
+        arg_scope = {"$printf": printf}
+        def scope(name, local_tree: TypeTree):
+            if name in arg_scope:
+                return arg_scope[name]
+            raise VolpeError(f"variable `{name}` not found", local_tree)
+
+        self.rules = AnnotateScope(parsed_tree, scope, self.rules, var()).rules
+
+        tree.data = "block"
+        tree.children = parsed_tree.children
+
+        return parsed_tree.return_type
 
     # Boolean logic
     implication = logic
