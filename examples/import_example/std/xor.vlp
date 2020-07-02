@@ -1,0 +1,5 @@
+(a, b) {
+    _ := $printf("xor ran\n") # testing whether printf works
+    a -> !b
+    b
+}

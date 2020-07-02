@@ -1,0 +1,4 @@
+true := 1 > 0
+false := !true
+
+{true, false, $std\xor}
