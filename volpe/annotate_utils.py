@@ -67,7 +67,7 @@ def shape(self, scope: dict, tree: TypeTree):
         self.visit(tree)
         return tree.return_type
 
-    assert tree.data == "symbol"  # no message?
+    volpe_assert(tree.data == "symbol", "you cannot assign to this expression", tree)
     tree.return_type = var()
     scope[tree.children[0].value] = tree.return_type
     return tree.return_type
