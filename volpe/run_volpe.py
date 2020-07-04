@@ -12,7 +12,7 @@ from builder_utils import build_func, build_closure, free
 from command_line import build_main, string_obj, string_type
 from compile import compile_and_run
 from tree import TypeTree, VolpeError
-from volpe_types import pint8, VolpeObject, VolpeClosure, int64, unwrap, char, size, int32, VolpeList, int1
+from volpe_types import pint8, VolpeObject, VolpeClosure, int64, unwrap, char, size, int32, VolpeArray, int1
 
 
 def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=False, console=False):
@@ -20,7 +20,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
         print(tree.pretty())
 
     closure = VolpeClosure(VolpeObject(dict()), var())
-    printf = VolpeClosure(VolpeObject({"_0": VolpeList(char)}), int64)
+    printf = VolpeClosure(VolpeObject({"_0": VolpeArray(char)}), int64)
     arg_scope = {"$printf": printf}
 
     def scope(name, local_tree: TypeTree):

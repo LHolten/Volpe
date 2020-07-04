@@ -14,7 +14,7 @@ from volpe_types import (
     char,
     VolpeObject,
     VolpeClosure,
-    VolpeList
+    VolpeArray
 )
 
 def determine_c_type(volpe_type, depth=0):
@@ -42,7 +42,7 @@ def determine_c_type(volpe_type, depth=0):
 
         return POINTER(CTuple) if depth == 0 else CTuple
 
-    if isinstance(volpe_type, VolpeList):
+    if isinstance(volpe_type, VolpeArray):
         element_type = determine_c_type(volpe_type.element_type, depth+1)
 
         class CList(Structure):
@@ -92,7 +92,7 @@ def get_type_name(volpe_type):
         res = "{" + ", ".join([get_type_name(elem) for elem in elems])
         return res + ",}" if len(elems) == 1 else res + "}"
 
-    if isinstance(volpe_type, VolpeList):
+    if isinstance(volpe_type, VolpeArray):
         return f"list<{get_type_name(volpe_type.element_type)}>"
    
     if isinstance(volpe_type, VolpeClosure):

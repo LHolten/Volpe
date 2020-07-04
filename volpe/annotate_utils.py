@@ -1,23 +1,23 @@
 from unification import var
 
 from tree import TypeTree, volpe_assert
-from volpe_types import int1, VolpeObject
+from volpe_types import int1, VolpeObject, Referable
 
 
 def logic(self, tree: TypeTree):
     ret = self.visit_children(tree)
     volpe_assert(
-        self.unify(ret[0], int1) and self.unify(ret[1], int1),
+        self.unify(ret[0], Referable(int1)) and self.unify(ret[1], Referable(int1)),
         "logic operations only work for booleans",
         tree
     )
-    return int1
+    return Referable(int1)
 
 
 def unary_logic(self, tree: TypeTree):
     ret = self.visit_children(tree)[0]
     volpe_assert(self.unify(ret, int1), "unary logic operations only work for booleans", tree)
-    return int1
+    return Referable(int1)
 
 
 def math(self, tree: TypeTree):
@@ -51,7 +51,7 @@ def comp(self, tree: TypeTree):
     ret0 = children[0]
     ret1 = children[1]
     volpe_assert(self.unify(ret0, ret1), "types need to match for comparison operations", tree)
-    return int1
+    return Referable(int1)
 
 
 def shape(self, scope: dict, tree: TypeTree):
@@ -60,7 +60,7 @@ def shape(self, scope: dict, tree: TypeTree):
         for i, child in enumerate(tree.children):
             name = f"_{i}"
             obj_scope[name] = shape(self, scope, child)
-        tree.return_type = VolpeObject(obj_scope)
+        tree.return_type = Referable(VolpeObject(obj_scope), var())
         return tree.return_type
 
     if tree.data == "list_index":

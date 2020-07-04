@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Dict, Union
 
 import llvmlite.binding as llvm
@@ -44,15 +45,12 @@ def size(value: Union[ir.Type, VolpeType]) -> ir.Value:
 
 
 @unifiable
+@dataclass
 class VolpeObject(VolpeType):
+    type_dict: Dict[str, Union[ir.Type, VolpeType]]
+
     class Type(ir.LiteralStructType):
         pass
-
-    def __init__(self, type_dict: Dict[str, Union[ir.Type, VolpeType]]):
-        self.type_dict = type_dict
-
-    def __eq__(self, other):
-        return isinstance(other, VolpeObject) and self.type_dict == other.type_dict
 
     def __repr__(self):
         return "{" + ", ".join(str(v) for v in self.type_dict.values()) + "}"
@@ -62,15 +60,12 @@ class VolpeObject(VolpeType):
 
 
 @unifiable
-class VolpeList(VolpeType):
+@dataclass
+class VolpeArray(VolpeType):
+    element_type: Union[ir.Type, VolpeType]
+
     class Type(ir.LiteralStructType):
         pass
-
-    def __init__(self, element_type: Union[ir.Type, VolpeType]):
-        self.element_type = element_type
-
-    def __eq__(self, other):
-        return isinstance(other, VolpeList) and self.element_type == other.element_type
 
     def __repr__(self):
         return f"[{self.element_type}]"
@@ -80,20 +75,33 @@ class VolpeList(VolpeType):
 
 
 @unifiable
+@dataclass
 class VolpeClosure(VolpeType):
+    arg_type: Union[ir.Type, VolpeType]
+    ret_type: Union[ir.Type, VolpeType]
+
     class Type(ir.LiteralStructType):
         pass
-
-    def __init__(self, arg_type: Union[ir.Type, VolpeType], ret_type: Union[ir.Type, VolpeType]):
-        self.arg_type = arg_type
-        self.ret_type = ret_type
-
-    def __eq__(self, other):
-        return isinstance(other, VolpeClosure) and (self.arg_type, self.ret_type) == (other.arg_type, other.ret_type)
 
     def __repr__(self):
         return f"({self.arg_type})" + "{" + str(self.ret_type) + "}"
 
     def unwrap(self) -> ir.Type:
         func = ir.FunctionType(unwrap(self.ret_type), [pint8, unwrap(self.arg_type)])
-        return self.Type([func.as_pointer(), copy_func.as_pointer(), free_func.as_pointer(), pint8])
+        return self.Type([pint8, func.as_pointer(), free_func.as_pointer()])
+
+
+@unifiable
+@dataclass
+class Referable(VolpeType):
+    volpe_type: Union[ir.Type, VolpeType]
+    is_ref: bool = False
+
+    def __repr__(self):
+        prefix = "&" if self.is_ref else ""
+        if isinstance(self.is_ref, Var):
+            prefix = "?"
+        return f"{prefix}{self.volpe_type}"
+
+    def unwrap(self) -> ir.Type:
+        return unwrap(self.volpe_type)

@@ -4,7 +4,7 @@ from typing import List, Iterable
 from llvmlite import ir
 
 from tree import TypeTree, volpe_assert, VolpeError
-from volpe_types import VolpeObject, VolpeClosure, copy_func, free_func, VolpeList, \
+from volpe_types import VolpeObject, VolpeClosure, copy_func, free_func, VolpeArray, \
     pint8, int64, int32, flt64, char, unwrap, size
 
 
@@ -46,7 +46,7 @@ def free(b, value):
     if isinstance(value.type, VolpeObject.Type):
         for i in range(len(value.type.elements)):
             free(b, b.extract_value(value, i))
-    if isinstance(value.type, VolpeList.Type):
+    if isinstance(value.type, VolpeArray.Type):
         free_list(b, value)
 
 
@@ -57,7 +57,7 @@ def copy(b, value):
     if isinstance(value.type, VolpeObject.Type):
         for i in range(len(value.type.elements)):
             value = b.insert_value(value, copy(b, b.extract_value(value, i)), i)
-    if isinstance(value.type, VolpeList.Type):
+    if isinstance(value.type, VolpeArray.Type):
         value = copy_list(b, value)
 
     return value

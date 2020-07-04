@@ -1,10 +1,10 @@
 from llvmlite import ir
 
 from builder_utils import build_func, free, options
-from volpe_types import int64, char, VolpeList, VolpeObject, size, int32, pint8
+from volpe_types import int64, char, VolpeArray, VolpeObject, size, int32, pint8
 
-string_type = VolpeList(char)
-string_list = VolpeList(string_type)
+string_type = VolpeArray(char)
+string_list = VolpeArray(string_type)
 string_obj = VolpeObject({'_0': string_list})
 
 
