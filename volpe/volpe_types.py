@@ -95,11 +95,11 @@ class VolpeClosure(VolpeType):
 @dataclass
 class Referable(VolpeType):
     volpe_type: Union[ir.Type, VolpeType]
-    is_ref: bool = False
+    is_mut: bool = False
 
     def __repr__(self):
-        prefix = "&" if self.is_ref else ""
-        if isinstance(self.is_ref, Var):
+        prefix = "&" if self.is_mut else ""
+        if isinstance(self.is_mut, Var):
             prefix = "?"
         return f"{prefix}{self.volpe_type}"
 

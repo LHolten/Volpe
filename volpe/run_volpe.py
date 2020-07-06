@@ -23,7 +23,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
     printf = VolpeClosure(VolpeObject({"_0": VolpeArray(char)}), int64)
     arg_scope = {"$printf": printf}
 
-    def scope(name, local_tree: TypeTree):
+    def scope(name, local_tree: TypeTree, ref):
         if name in arg_scope:
             return arg_scope[name]
         raise VolpeError(f"variable `{name}` not found", local_tree)

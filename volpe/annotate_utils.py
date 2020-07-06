@@ -1,7 +1,7 @@
 from unification import var
 
 from tree import TypeTree, volpe_assert
-from volpe_types import int1, VolpeObject, Referable
+from volpe_types import int1, VolpeObject, Referable, VolpeArray, int64
 
 
 def logic(self, tree: TypeTree):
@@ -16,7 +16,7 @@ def logic(self, tree: TypeTree):
 
 def unary_logic(self, tree: TypeTree):
     ret = self.visit_children(tree)[0]
-    volpe_assert(self.unify(ret, int1), "unary logic operations only work for booleans", tree)
+    volpe_assert(self.unify(ret, Referable(int1)), "unary logic operations only work for booleans", tree)
     return Referable(int1)
 
 
@@ -64,10 +64,14 @@ def shape(self, scope: dict, tree: TypeTree):
         return tree.return_type
 
     if tree.data == "list_index":
-        self.visit(tree)
+        volpe_list = shape(self, scope, tree.children[0])
+        index = self.visit(tree.children[1])
+        tree.return_type = var()
+        volpe_assert(self.unify(volpe_list, Referable(VolpeArray(tree.return_type), True)),
+                     "can only mutate mutable lists", tree)
+        volpe_assert(self.unify(index, Referable(int64)), "can only index with an integer", tree)
         return tree.return_type
 
     assert tree.data == "symbol"  # no message?
-    tree.return_type = var()
-    scope[tree.children[0].value] = tree.return_type
+    tree.return_type = scope[tree.children[0].value] = var()
     return tree.return_type
