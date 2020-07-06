@@ -95,13 +95,17 @@ class VolpeClosure(VolpeType):
 @dataclass
 class Referable(VolpeType):
     volpe_type: Union[ir.Type, VolpeType]
-    is_mut: bool = False
+    is_linear: bool = False
+    is_poisoned: bool = False
 
     def __repr__(self):
-        prefix = "&" if self.is_mut else ""
-        if isinstance(self.is_mut, Var):
+        prefix = "&" if self.is_linear else ""
+        if isinstance(self.is_linear, Var):
             prefix = "?"
         return f"{prefix}{self.volpe_type}"
 
     def unwrap(self) -> ir.Type:
         return unwrap(self.volpe_type)
+
+    def __hash__(self):
+        return hash(self.__repr__())
