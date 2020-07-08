@@ -49,8 +49,8 @@ class AnnotateScope(Interpreter):
     def get_scope(self, name, tree: TypeTree, mut: bool):
         if name in self.local_scope:
             value = self.local_scope[name]
+            volpe_assert(value not in self.used, "this value has already been used", tree)
             if mut:
-                volpe_assert(value not in self.used, "this value has already been used", tree)
                 self.used.add(value)
             return value
         return self.scope(name, tree, mut)
@@ -81,16 +81,20 @@ class AnnotateScope(Interpreter):
     def func(self, tree: TypeTree):
         closure = VolpeClosure(var(), var())
         tree.outside_used = set()
+        poisoned = var()
 
         def scope(name, t_tree: TypeTree, own):
             if name == "@":
-                return Referable(closure)
+                return Referable(closure, True, poisoned)
             tree.outside_used.add(name)
-            return self.get_scope(name, t_tree, own)
+            value = self.get_scope(name, t_tree, own)
+            volpe_assert(self.unify(value, Referable(var(), var(), poisoned)),
+                         "all captures must have the same poison", t_tree)
+            return value
 
         self.rules = AnnotateScope(tree.children[1], scope, self.rules, closure.ret_type,
                                    (closure.arg_type, tree.children[0])).rules
-        return Referable(closure, True)
+        return Referable(closure, True, poisoned)
 
     def func_call(self, tree: TypeTree):
         closure, args = self.visit_children(tree)

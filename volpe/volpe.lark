@@ -1,4 +1,4 @@
-block: _LINE_SEP* (value_ass _LINE_SEP+)* value1 _LINE_SEP*
+block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
 
 ?value_ass: value1 "!"
     | value10 ":=" value1 -> assign
@@ -90,9 +90,8 @@ NEWLINE: (CR? LF)
 THIS_FUNC: "@"
 IMPORT: "$" CNAME
 
-_LINE_SEP: _SEP
-    | ";"
+_COM: COMMENT
+    | MULTILINE_COMMENT
 
-_SEP: MULTILINE_COMMENT NEWLINE
-    | COMMENT NEWLINE
-    | NEWLINE
+_SEP: NEWLINE
+    | ";"
