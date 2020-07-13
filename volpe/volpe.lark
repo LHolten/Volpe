@@ -66,7 +66,7 @@ values: (_SEP* value1 ("," _SEP* value1)*)? _SEP* -> object
 shapes: (_SEP* value10 ("," _SEP* value10)*)? _SEP* -> object
 
 symbol: CNAME
-    | "&" CNAME -> mut
+    | "&" CNAME -> linear
     | THIS_FUNC
     | IMPORT
 

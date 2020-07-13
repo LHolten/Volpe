@@ -56,13 +56,13 @@ class AnnotateScope(Interpreter):
         return self.scope(name, tree, mut)
 
     def symbol(self, tree: TypeTree):
-        volpe_type, poisoned = var(), var()
-        self.unify(self.get_scope(tree.children[0].value, tree, False), Referable(volpe_type, poisoned))
-        return Referable(volpe_type, False, poisoned)
+        volpe_type, linear = var(), var()
+        self.unify(self.get_scope(tree.children[0].value, tree, False), Referable(volpe_type, linear, var()))
+        return Referable(volpe_type, linear, linear)
 
-    def mut(self, tree: TypeTree):
+    def linear(self, tree: TypeTree):
         value = self.get_scope(tree.children[0].value, tree, True)
-        volpe_assert(self.unify(value, Referable(var(), True)), "var is not mutable", tree)
+        volpe_assert(self.unify(value, Referable(var(), True)), "var is not linear", tree)
         return value
 
     def block(self, tree: TypeTree):
@@ -138,12 +138,11 @@ class AnnotateScope(Interpreter):
 
     def list_index(self, tree: TypeTree):
         volpe_list, index = self.visit_children(tree)
-        volpe_type, mut, poisoned = var(), var(), var()
-        volpe_assert(self.unify(volpe_list,
-                                Referable(VolpeArray(Referable(volpe_type, mut, var())), var(), poisoned)),
+        volpe_type = var()
+        volpe_assert(self.unify(volpe_list, Referable(VolpeArray(volpe_type), var(), var())),
                      "can only index lists", tree)
         volpe_assert(self.unify(index, Referable(int64)), "can only index with an integer", tree)
-        return Referable(volpe_type, mut, poisoned)
+        return volpe_type
 
     def list_size(self, tree: TypeTree):
         ret = self.visit_children(tree)[0]

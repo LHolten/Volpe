@@ -59,7 +59,7 @@ def shape(self, scope: dict, tree: TypeTree):
         obj_scope = dict()
         for i, child in enumerate(tree.children):
             obj_scope[f"_{i}"] = shape(self, scope, child)
-        tree.return_type = Referable(VolpeObject(obj_scope), var(), var())
+        tree.return_type = Referable(VolpeObject(obj_scope), True, var())
         return tree.return_type
 
     if tree.data == "list_index":
@@ -72,7 +72,5 @@ def shape(self, scope: dict, tree: TypeTree):
         return tree.return_type
 
     assert tree.data == "symbol"  # no message?
-    volpe_type, mut = var(), var()
-    scope[tree.children[0].value] = Referable(volpe_type, mut, False)
-    tree.return_type = Referable(volpe_type, mut, var())
+    tree.return_type = scope[tree.children[0].value] = var()
     return tree.return_type
