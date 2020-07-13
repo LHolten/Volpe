@@ -59,7 +59,7 @@ def shape(self, scope: dict, tree: TypeTree):
         obj_scope = dict()
         for i, child in enumerate(tree.children):
             obj_scope[f"_{i}"] = shape(self, scope, child)
-        tree.return_type = Referable(VolpeObject(obj_scope), True, var())
+        tree.return_type = Referable(VolpeObject(obj_scope), True)
         return tree.return_type
 
     if tree.data == "list_index":

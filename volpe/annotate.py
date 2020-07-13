@@ -26,7 +26,9 @@ class AnnotateScope(Interpreter):
         self.rules = rules
 
         if args is not None:
-            self.unify(args[0], shape(self, self.local_scope, args[1]))
+            arg_type, linear = var(), var()
+            self.unify(args[0], Referable(arg_type, linear, var()))
+            self.unify(Referable(arg_type, linear, False), shape(self, self.local_scope, args[1]))
 
         tree.children[-1] = TypeTree("return_n", [tree.children[-1]], tree.meta)
         tree.return_type = return_type
@@ -110,9 +112,8 @@ class AnnotateScope(Interpreter):
 
     def assign(self, tree: TypeTree):
         value = self.visit(tree.children[1])
-        volpe_assert(self.unify(value, Referable(var(), var(), False)), "can not assign ref from current scope", tree)
         volpe_assert(self.unify(value, shape(self, self.local_scope, tree.children[0])),
-                     "assign error", tree)
+                     "assign error (cannot deconstruct, or tried to assign a ref)", tree)
         return Referable(int1)
 
     @staticmethod
@@ -138,11 +139,12 @@ class AnnotateScope(Interpreter):
 
     def list_index(self, tree: TypeTree):
         volpe_list, index = self.visit_children(tree)
-        volpe_type = var()
-        volpe_assert(self.unify(volpe_list, Referable(VolpeArray(volpe_type), var(), var())),
+        volpe_type, linear = var(), var()
+        volpe_assert(self.unify(volpe_list, Referable(
+            VolpeArray(Referable(volpe_type, linear, var())), var(), var())),
                      "can only index lists", tree)
         volpe_assert(self.unify(index, Referable(int64)), "can only index with an integer", tree)
-        return volpe_type
+        return Referable(volpe_type, linear, linear)
 
     def list_size(self, tree: TypeTree):
         ret = self.visit_children(tree)[0]
