@@ -2,7 +2,7 @@ from typing import Callable
 
 from lark.visitors import Interpreter
 from lark import Token
-from unification import var, unify
+from unification import var, unify, reify
 
 from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, shape
 from tree import TypeTree, volpe_assert
@@ -33,7 +33,7 @@ class AnnotateScope(Interpreter):
 
         def ret(value_type):
             volpe_assert(self.unify(value_type, Referable(var(), var(), False)), "cannot return poisoned value", tree)
-            volpe_assert(self.unify(tree.return_type, value_type), "block has different return types", tree)
+            volpe_assert(self.unify(return_type, value_type), "block has different return types", tree)
         self.ret = ret
 
         self.visit_children(tree)  # sets tree.return_type
@@ -42,7 +42,7 @@ class AnnotateScope(Interpreter):
         self.rules = unify(a, b, self.rules)
         return self.rules is not False
 
-    def visit(self, tree: TypeTree) -> Referable:
+    def visit(self, tree: TypeTree):
         tree.return_type = getattr(self, tree.data)(tree)
         return tree.return_type
 
@@ -79,30 +79,30 @@ class AnnotateScope(Interpreter):
         return Referable(VolpeObject(scope), True, poisoned)
 
     def func(self, tree: TypeTree):
-        closure = VolpeClosure(var(), var())
+        arg_type, ret_type, poisoned = var(), var(), var()
+        closure = Referable(VolpeClosure(arg_type, ret_type), True, poisoned)
         tree.outside_used = set()
-        poisoned = var()
 
         def scope(name, t_tree: TypeTree, own):
             if name == "@":
-                return Referable(closure, True, poisoned)
+                return closure
             tree.outside_used.add(name)
             value = self.get_scope(name, t_tree, own)
             volpe_assert(self.unify(value, Referable(var(), var(), poisoned)),
                          "all captures must have the same poison", t_tree)
             return value
 
-        self.rules = AnnotateScope(tree.children[1], scope, self.rules, closure.ret_type,
-                                   (closure.arg_type, tree.children[0])).rules
-        return Referable(closure, True, poisoned)
+        self.rules = AnnotateScope(tree.children[1], scope, self.rules, ret_type, (arg_type, tree.children[0])).rules
+        return closure
 
     def func_call(self, tree: TypeTree):
         closure, args = self.visit_children(tree)
         arg_type, ret_type = var(), var()
         volpe_assert(self.unify(closure, Referable(VolpeClosure(arg_type, ret_type), var(), var())),
                      "can only call closures", tree)
-        volpe_assert(self.unify(args, arg_type), "wrong argument type", tree)
-        return ret_type
+        rules = unify(args, arg_type, self.rules)
+        volpe_assert(rules is not False, "wrong arguments for function", tree)
+        return reify(ret_type, rules)
 
     def return_n(self, tree: TypeTree):
         self.ret(self.visit(tree.children[0]))
