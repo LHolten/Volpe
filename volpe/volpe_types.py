@@ -1,9 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Union
 
 import llvmlite.binding as llvm
 from llvmlite import ir
-from unification import unifiable, Var
+from unification import unifiable, Var, var
+
+from tree import TypeTree
 
 llvm.initialize()
 llvm.initialize_native_target()
@@ -23,6 +25,10 @@ free_func = ir.FunctionType(unknown, [pint8])
 unknown_func = ir.FunctionType(unknown, [pint8, pint8])
 
 target_data = llvm.Target.from_default_triple().create_target_machine().target_data
+
+
+def vary():
+    return field(default_factory=var)
 
 
 class VolpeType:
@@ -77,30 +83,33 @@ class VolpeArray(VolpeType):
 @unifiable
 @dataclass
 class VolpeClosure(VolpeType):
-    arg_type: Union[ir.Type, VolpeType]
-    ret_type: Union[ir.Type, VolpeType]
+    arg: Union[ir.Type, VolpeType] = vary()
+    ret: Union[ir.Type, VolpeType] = vary()
+    env: Dict[str, Union[ir.Type, VolpeType]] = vary()
+    tree: TypeTree = vary()
 
     class Type(ir.LiteralStructType):
         pass
 
     def __repr__(self):
-        return f"({self.arg_type})" + "{" + str(self.ret_type) + "}"
+        if self.tree is None:
+            return "func"
+        return f"({self.arg})" + "{" + str(self.ret) + "}"
 
     def unwrap(self) -> ir.Type:
-        func = ir.FunctionType(unwrap(self.ret_type), [pint8, unwrap(self.arg_type)])
-        return self.Type([pint8, func.as_pointer(), free_func.as_pointer()])
+        return self.Type(unwrap(value) for value in self.type_dict.values())
 
 
 @unifiable
 @dataclass
 class Referable(VolpeType):
-    volpe_type: Union[ir.Type, VolpeType]
-    is_linear: bool = False
-    is_poisoned: bool = False
+    volpe_type: Union[ir.Type, VolpeType] = vary()
+    linear: bool = vary()
+    poison: bool = vary()
 
     def __repr__(self):
-        prefix = "&" if self.is_linear else ""
-        if isinstance(self.is_linear, Var):
+        prefix = "&" if self.linear else ""
+        if isinstance(self.linear, Var):
             prefix = "?"
         return f"{prefix}{self.volpe_type}"
 

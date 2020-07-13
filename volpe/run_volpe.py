@@ -19,7 +19,6 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
     if more_verbose:
         print(tree.pretty())
 
-    closure = VolpeClosure(VolpeObject(dict()), var())
     printf = VolpeClosure(VolpeObject({"_0": VolpeArray(char)}), int64)
     arg_scope = {"$printf": printf}
 
@@ -28,10 +27,10 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
             return arg_scope[name]
         raise VolpeError(f"variable `{name}` not found", local_tree)
 
-    rules = AnnotateScope(tree, scope, dict(), closure.ret_type).rules
+    rules = AnnotateScope(tree, scope, dict()).rules
 
     if console:
-        rules = unify(tree.return_type, VolpeClosure(string_obj, string_type), rules)
+        rules = unify(tree.return_type, VolpeClosure(string_obj, string_type, var(), var()), rules)
         assert rules is not False, "command line scripts should return a function that takes as list of strings " \
                                    "and returns a string"
 

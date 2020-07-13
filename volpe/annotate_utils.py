@@ -7,17 +7,17 @@ from volpe_types import int1, VolpeObject, Referable, VolpeArray, int64
 def logic(self, tree: TypeTree):
     ret = self.visit_children(tree)
     volpe_assert(
-        self.unify(ret[0], Referable(int1)) and self.unify(ret[1], Referable(int1)),
+        self.unify(ret[0], Referable(int1, False, False)) and self.unify(ret[1], Referable(int1, False, False)),
         "logic operations only work for booleans",
         tree
     )
-    return Referable(int1)
+    return Referable(int1, False, False)
 
 
 def unary_logic(self, tree: TypeTree):
     ret = self.visit_children(tree)[0]
-    volpe_assert(self.unify(ret, Referable(int1)), "unary logic operations only work for booleans", tree)
-    return Referable(int1)
+    volpe_assert(self.unify(ret, Referable(int1, False, False)), "unary logic operations only work for booleans", tree)
+    return Referable(int1, False, False)
 
 
 def math(self, tree: TypeTree):
@@ -51,24 +51,24 @@ def comp(self, tree: TypeTree):
     ret0 = children[0]
     ret1 = children[1]
     volpe_assert(self.unify(ret0, ret1), "types need to match for comparison operations", tree)
-    return Referable(int1)
+    return Referable(int1, False, False)
 
 
-def shape(self, scope: dict, tree: TypeTree):
+def shape(self, scope: dict, tree: TypeTree, allow=False):
     if tree.data == "object":
         obj_scope = dict()
         for i, child in enumerate(tree.children):
             obj_scope[f"_{i}"] = shape(self, scope, child)
-        tree.return_type = Referable(VolpeObject(obj_scope), True)
+        tree.return_type = Referable(VolpeObject(obj_scope), True, var() if allow else False)
         return tree.return_type
 
     if tree.data == "list_index":
         volpe_list = shape(self, scope, tree.children[0])
         index = self.visit(tree.children[1])
         tree.return_type = var()
-        volpe_assert(self.unify(volpe_list, Referable(VolpeArray(tree.return_type), True)),
+        volpe_assert(self.unify(volpe_list, Referable(VolpeArray(tree.return_type), True, False)),
                      "can only mutate mutable lists", tree)
-        volpe_assert(self.unify(index, Referable(int64)), "can only index with an integer", tree)
+        volpe_assert(self.unify(index, Referable(int64, False, False)), "can only index with an integer", tree)
         return tree.return_type
 
     assert tree.data == "symbol"  # no message?
