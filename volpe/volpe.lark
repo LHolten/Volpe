@@ -1,7 +1,6 @@
 block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
 
-?value_ass: value1 "!"
-    | value10 ":=" value1 -> assign
+?value_ass: value10 ":=" value1 -> assign
     | value10 "+=" value1 -> add_assign
     | value10 "-=" value1 -> sub_assign
     | value10 "/=" value1 -> div_assign
@@ -66,7 +65,6 @@ values: (_SEP* value1 ("," _SEP* value1)*)? _SEP* -> object
 shapes: (_SEP* value10 ("," _SEP* value10)*)? _SEP* -> object
 
 symbol: CNAME
-    | "&" CNAME -> linear
     | THIS_FUNC
     | IMPORT
 

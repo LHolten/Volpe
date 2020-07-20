@@ -2,10 +2,12 @@ from typing import Callable
 
 from lark.visitors import Interpreter
 from lark import Token
-from unification import var, unify, reify
+from unification import unify
+from copy import deepcopy
 
 from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, shape
 from tree import TypeTree, volpe_assert
+from unification_copy import var
 from volpe_types import (
     int64,
     flt64,
@@ -14,7 +16,6 @@ from volpe_types import (
     VolpeClosure,
     VolpeArray,
     int1,
-    Referable
 )
 
 
@@ -26,13 +27,12 @@ class AnnotateScope(Interpreter):
         self.rules = rules
 
         if args is not None:
-            shape(self, self.local_scope, args, True)
+            shape(self, self.local_scope, args)
 
         tree.children[-1] = TypeTree("return_n", [tree.children[-1]], tree.meta)
         tree.return_type = var()
 
         def ret(value_type):
-            volpe_assert(self.unify(value_type, Referable(var(), var(), False)), "cannot return poisoned value", tree)
             volpe_assert(self.unify(tree.return_type, value_type), "block has different return types", tree)
         self.ret = ret
 
@@ -44,26 +44,17 @@ class AnnotateScope(Interpreter):
 
     def visit(self, tree: TypeTree):
         tree.return_type = getattr(self, tree.data)(tree)
+        if tree.return_type is None:
+            tree.return_type = int1
         return tree.return_type
 
-    def get_scope(self, name, tree: TypeTree, mut: bool):
+    def get_scope(self, name, tree: TypeTree):
         if name in self.local_scope:
-            value = self.local_scope[name]
-            volpe_assert(value not in self.used, "this value has already been used", tree)
-            if mut:
-                self.used.add(value)
-            return value
-        return self.scope(name, tree, mut)
+            return self.local_scope[name]
+        return self.scope(name, tree)
 
     def symbol(self, tree: TypeTree):
-        volpe_type, linear = var(), var()
-        self.unify(self.get_scope(tree.children[0].value, tree, False), Referable(volpe_type, linear))
-        return Referable(volpe_type, linear, linear)
-
-    def linear(self, tree: TypeTree):
-        value = self.get_scope(tree.children[0].value, tree, True)
-        volpe_assert(self.unify(value, Referable(linear=True, poison=False)), "var is not linear", tree)
-        return value
+        return self.get_scope(tree.children[0].value, tree)
 
     def block(self, tree: TypeTree):
         self.rules = AnnotateScope(tree, self.get_scope, self.rules, var()).rules
@@ -71,64 +62,60 @@ class AnnotateScope(Interpreter):
 
     def object(self, tree: TypeTree):
         scope = dict()
-        poisoned = var()
         for i, child in enumerate(tree.children):
             scope[f"_{i}"] = self.visit(child)
-            volpe_assert(self.unify(scope[f"_{i}"], Referable(var(), var(), poisoned)),
-                         "all attributes must have the same poison", child)
-        return Referable(VolpeObject(scope), True, poisoned)
+        return VolpeObject(scope)
 
     def func(self, tree: TypeTree):
-        closure = Referable(VolpeClosure(tree=tree), True)
+        closure = VolpeClosure(tree=tree)
         tree.outside_used = set()
 
-        def scope(name, t_tree: TypeTree, own):
+        def scope(name, t_tree: TypeTree):
             if name == "@":
                 return closure
             tree.outside_used.add(name)
-            value = self.get_scope(name, t_tree, own)
-            volpe_assert(self.unify(value, Referable(poison=closure.poison)),
-                         "all captures must have the same poison", t_tree)
-            return value
+            return self.get_scope(name, t_tree)
 
         self.rules = AnnotateScope(tree.children[1], scope, self.rules, tree.children[0]).rules
 
-        outside_types = {k: self.get_scope(k, tree, False) for k in tree.outside_used}
-        self.unify(closure, Referable(
-            VolpeClosure(arg=tree.children[0].return_type, ret=tree.children[1].return_type, env=outside_types)))
+        outside_types = {k: self.get_scope(k, tree) for k in tree.outside_used}
+        assert self.unify(closure, VolpeClosure(env=outside_types))
+        assert self.unify(closure, VolpeClosure(arg=tree.children[0].return_type, ret=tree.children[1].return_type))
 
         return closure
 
     def func_call(self, tree: TypeTree):
         closure, args = self.visit_children(tree)
-        arg_type, ret_type = var(), var()
-        volpe_assert(self.unify(closure, Referable(VolpeClosure(arg=arg_type, ret=ret_type))),
-                     "can only call closures", tree)
-        rules = unify(args, arg_type, self.rules)
-        volpe_assert(rules is not False, "wrong arguments for function", tree)
-        return reify(ret_type, rules)
+        env, ret_type = var(), var()
+
+        if not tree.children[0].data == "symbol" or not tree.children[0].children[0].value == "@":
+            volpe_assert(self.unify(closure, VolpeClosure(env=env)), "can only call closures", tree)
+
+            rules, closure = deepcopy((self.rules, closure))
+            self.rules.update(rules)
+
+        volpe_assert(self.unify(closure, VolpeClosure(arg=args, ret=ret_type, env=env)),
+                     "wrong arguments for function", tree)
+        return ret_type
 
     def return_n(self, tree: TypeTree):
         self.ret(self.visit(tree.children[0]))
-        return Referable(int1, False, False)
 
     def assign(self, tree: TypeTree):
         value = self.visit(tree.children[1])
-        volpe_assert(self.unify(value, shape(self, self.local_scope, tree.children[0])),
-                     "assign error (cannot deconstruct, or tried to assign a ref)", tree)
-        return Referable(int1, False, False)
+        volpe_assert(self.unify(shape(self, self.local_scope, tree.children[0]), value), "assign error", tree)
 
     @staticmethod
     def integer(_: TypeTree):
-        return Referable(int64, False, False)
+        return int64
 
     @staticmethod
     def character(_: TypeTree):
-        return Referable(char, False, False)
+        return char
 
     @staticmethod
     def escaped_character(_: TypeTree):
-        return Referable(char, False, False)
+        return char
 
     def string(self, tree: TypeTree):
         tree.data = "list"
@@ -137,49 +124,38 @@ class AnnotateScope(Interpreter):
         for eval_character in text:
             tree.children.append(TypeTree("character", [Token("CHARACTER", "'" + eval_character + "'")], tree.meta))
         self.visit_children(tree)
-        return Referable(VolpeArray(char), True, False)
+        return VolpeArray(char)
 
     def list_index(self, tree: TypeTree):
-        volpe_list, index = self.visit_children(tree)
-        volpe_type, linear = var(), var()
-        volpe_assert(self.unify(volpe_list, Referable(VolpeArray(Referable(volpe_type, linear)))),
-                     "can only index lists", tree)
-        volpe_assert(self.unify(index, Referable(int64, False, False)), "can only index with an integer", tree)
-        return Referable(volpe_type, linear, linear)
+        volpe_array, index = self.visit_children(tree)
+        volpe_type = var()
+        volpe_assert(self.unify(volpe_array, VolpeArray(volpe_type)), "can only index arrays", tree)
+        volpe_assert(self.unify(index, int64), "can only index with an integer", tree)
+        return volpe_type
 
     def list_size(self, tree: TypeTree):
-        ret = self.visit_children(tree)[0]
-        volpe_assert(self.unify(ret, Referable(VolpeArray(var()))), "can only get size of lists", tree)
-        return Referable(int64, False, False)
+        volpe_array = self.visit_children(tree)[0]
+        volpe_assert(self.unify(volpe_array, VolpeArray()), "can only get size of arrays", tree)
+        return int64
 
     def list(self, tree: TypeTree):
-        ret = self.visit_children(tree)
-        element_type = Referable()
-        for value_type in ret:
-            volpe_assert(self.unify(element_type, value_type),
-                         "different types in list", tree)
-        return Referable(VolpeArray(element_type), True, element_type.poison)
+        element_type = var()
+        for child in tree.children:
+            volpe_assert(self.unify(element_type, self.visit(child)), "different types in list", tree)
+        return VolpeArray(element_type, len(tree.children))
 
     def convert_int(self, tree: TypeTree):
-        volpe_assert(self.unify(self.visit(tree.children[0]), Referable(int64)),
-                     "can only convert int", tree)
-        return Referable(flt64, False, False)
+        volpe_assert(self.unify(self.visit(tree.children[0]), int64), "can only convert int", tree)
+        return flt64
 
     def convert_flt(self, tree: TypeTree):
-        volpe_assert(self.unify(self.visit(tree.children[0]), Referable(flt64)),
-                     "can only convert float", tree)
-        return Referable(int64, False, False)
+        volpe_assert(self.unify(self.visit(tree.children[0]), flt64), "can only convert float", tree)
+        return int64
 
     def if_then(self, tree: TypeTree):
         tree.data = "implication"
-        old_used = self.used
-        self.used = self.used.copy()
-
         tree.children[1] = TypeTree("return_n", [tree.children[1]], tree.meta)
-        value = self.visit(tree)
-
-        self.used = old_used
-        return value
+        return self.visit(tree)
 
     # Boolean logic
     implication = logic

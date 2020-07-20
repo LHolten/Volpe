@@ -43,7 +43,7 @@ def determine_c_type(volpe_type, depth=0):
         return POINTER(CTuple) if depth == 0 else CTuple
 
     if isinstance(volpe_type, VolpeArray):
-        element_type = determine_c_type(volpe_type.element_type, depth+1)
+        element_type = determine_c_type(volpe_type.element, depth + 1)
 
         class CList(Structure):
             _fields_ = [("elems", POINTER(element_type)), ("length", c_int64)]
@@ -93,7 +93,7 @@ def get_type_name(volpe_type):
         return res + ",}" if len(elems) == 1 else res + "}"
 
     if isinstance(volpe_type, VolpeArray):
-        return f"list<{get_type_name(volpe_type.element_type)}>"
+        return f"list<{get_type_name(volpe_type.element)}>"
    
     if isinstance(volpe_type, VolpeClosure):
         input_type = remove_obj_brackets(get_type_name(volpe_type.arg_type))

@@ -1,23 +1,22 @@
-from unification import var
-
 from tree import TypeTree, volpe_assert
-from volpe_types import int1, VolpeObject, Referable, VolpeArray, int64
+from unification_copy import var
+from volpe_types import int1, VolpeObject, VolpeArray, int64
 
 
 def logic(self, tree: TypeTree):
     ret = self.visit_children(tree)
     volpe_assert(
-        self.unify(ret[0], Referable(int1, False, False)) and self.unify(ret[1], Referable(int1, False, False)),
+        self.unify(ret[0], int1) and self.unify(ret[1], int1),
         "logic operations only work for booleans",
         tree
     )
-    return Referable(int1, False, False)
+    return int1
 
 
 def unary_logic(self, tree: TypeTree):
     ret = self.visit_children(tree)[0]
-    volpe_assert(self.unify(ret, Referable(int1, False, False)), "unary logic operations only work for booleans", tree)
-    return Referable(int1, False, False)
+    volpe_assert(self.unify(ret, int1), "unary logic operations only work for booleans", tree)
+    return int1
 
 
 def math(self, tree: TypeTree):
@@ -51,26 +50,30 @@ def comp(self, tree: TypeTree):
     ret0 = children[0]
     ret1 = children[1]
     volpe_assert(self.unify(ret0, ret1), "types need to match for comparison operations", tree)
-    return Referable(int1, False, False)
+    return int1
 
 
-def shape(self, scope: dict, tree: TypeTree, allow=False):
+def shape(self, scope: dict, tree: TypeTree):
     if tree.data == "object":
         obj_scope = dict()
         for i, child in enumerate(tree.children):
             obj_scope[f"_{i}"] = shape(self, scope, child)
-        tree.return_type = Referable(VolpeObject(obj_scope), True, var() if allow else False)
-        return tree.return_type
+        tree.return_type = VolpeObject(obj_scope)
 
-    if tree.data == "list_index":
+    elif tree.data == "list":
+        element_type = var()
+        for child in tree.children:
+            volpe_assert(self.unify(element_type, shape(self, scope, child)), "different types in list", tree)
+        tree.return_type = VolpeArray(element_type, len(tree.children))
+
+    elif tree.data == "list_index":
         volpe_list = shape(self, scope, tree.children[0])
         index = self.visit(tree.children[1])
         tree.return_type = var()
-        volpe_assert(self.unify(volpe_list, Referable(VolpeArray(tree.return_type), True, False)),
-                     "can only mutate mutable lists", tree)
-        volpe_assert(self.unify(index, Referable(int64, False, False)), "can only index with an integer", tree)
-        return tree.return_type
+        volpe_assert(self.unify(volpe_list, VolpeArray(tree.return_type)), "can only mutate arrays", tree)
+        volpe_assert(self.unify(index, int64), "can only index with an integer", tree)
 
-    assert tree.data == "symbol"  # no message?
-    tree.return_type = scope[tree.children[0].value] = var()
+    else:
+        assert tree.data == "symbol"  # no message?
+        tree.return_type = scope[tree.children[0].value] = var()
     return tree.return_type

@@ -1,13 +1,13 @@
+from copy import deepcopy
 from typing import Callable, Optional, Tuple
 
 from lark.visitors import Interpreter
 from llvmlite import ir
+from unification import unify, reify
 
-from builder_utils import write_environment, free_environment, options, \
-    read_environment, tuple_assign, copy, copy_environment, build_closure, free, math, comp, unary_math, \
-    check_list_index
+from builder_utils import options, assign, math, comp, unary_math, build_func
 from tree import TypeTree, volpe_assert
-from volpe_types import int1, int64, flt64, target_data, pint8, unwrap, VolpeObject, size
+from volpe_types import int1, int64, flt64, unwrap, VolpeObject, VolpeClosure
 
 
 class LLVMScope(Interpreter):
@@ -17,7 +17,7 @@ class LLVMScope(Interpreter):
         self.scope = scope
         self.local_scope = dict()
         if args is not None:
-            tuple_assign(self, *args)
+            assign(self, *args)
         self.ret = ret
         self.rec = rec
 
@@ -25,81 +25,71 @@ class LLVMScope(Interpreter):
             if len(children) == 1:
                 self.visit_unsafe(children[0])
             else:
-                success = self.visit(children[0])
-                with self.builder.if_then(success):
-                    evaluate(children[1:])
-                builder.unreachable()
+                self.visit(children[0])
+                evaluate(children[1:])
 
         evaluate(tree.children)
 
-    def get_scope(self, name, mut):
+    def get_scope(self, name):
         if name not in self.local_scope:
-            if not mut:
-                return self.scope(name, False)
-            self.local_scope[name] = copy(self.builder, self.scope(name, False))
+            return self.scope(name)
         return self.local_scope[name]
 
-    def free(self, value):
-        if not value.tracked:
-            free(self.builder, value)
-
-    def copy(self, value):
-        if value.tracked:
-            value = copy(self.builder, value)
-            value.tracked = False
-        return value
-
-    def visit(self, tree: TypeTree):
+    def visit(self, tree: TypeTree, safe=True):
         value = getattr(self, tree.data)(tree)
-        volpe_assert(not self.builder.block.is_terminated, "dead code is not allowed", tree)
-        value.tracked = getattr(value, "tracked", False)
+        if safe:
+            volpe_assert(not self.builder.block.is_terminated, "dead code is not allowed", tree)
         return value
 
     def visit_unsafe(self, tree: TypeTree):
         return getattr(self, tree.data)(tree)
 
     def assign(self, tree: TypeTree):
-        tuple_assign(self, tree.children[0], self.copy(self.visit(tree.children[1])))
+        value = self.visit(tree.children[1])
+        assign(self, tree.children[0], value)
         return int1(True)
 
     def symbol(self, tree: TypeTree):
-        value = self.get_scope(tree.children[0].value, False)
-        value.tracked = True
+        value = self.get_scope(tree.children[0].value)
         return value
 
     def func(self, tree: TypeTree):
-        closure_type = tree.return_type
-
-        module = self.builder.module
-        env_names = list(tree.outside_used)
-        env_values = [self.get_scope(name, False) for name in env_names]
-        env_types = [value.type for value in env_values]
-
-        with build_closure(module, closure_type, env_types) as (b, rec, args, closure):
-            new_values = read_environment(b, args[0], env_types)
-
-            env_scope = dict(zip(env_names, new_values))
-            env_scope["@"] = b.insert_value(closure, args[0], 3)
-
-            def scope(name, mut):
-                assert not mut, "this scope can't be mutated"
-                return env_scope[name]
-
-            LLVMScope(b, tree.children[1], scope, b.ret, rec, (tree.children[0], args[1]))
-
-        env_ptr = write_environment(self.builder, copy_environment(self.builder, env_values))
-        return self.builder.insert_value(closure, env_ptr, 3)
+        closure = unwrap(tree.return_type)(ir.Undefined)
+        for i, name in enumerate(tree.return_type.env.keys()):
+            closure = self.builder.insert_value(closure, self.get_scope(name), i)
+        return closure
 
     def func_call(self, tree: TypeTree):
-        closure, args = self.visit_children(tree)
+        closure, new_args = self.visit_children(tree)
+        closure_type = tree.children[0].return_type
+        arg_type = tree.children[1].return_type
 
-        func = self.builder.extract_value(closure, 0)
-        env_ptr = self.builder.extract_value(closure, 3)
+        rules = unify(closure_type, VolpeClosure(arg=arg_type))
+        closure_type = reify(closure_type, rules)
+        new_tree = deepcopy(closure_type.tree)
+        for t in new_tree.iter_subtrees():
+            t.return_type = reify(t.return_type, rules)
 
-        res = self.builder.call(func, [env_ptr, args])
+        module = self.builder.module
+        func_name = str(next(module.func_count))
+        func_type = ir.FunctionType(unwrap(closure_type.ret), [unwrap(closure_type), unwrap(closure_type.arg)])
+        func = ir.Function(module, func_type, func_name)
 
-        self.free(closure)
-        return res
+        with build_func(func) as (b, args):
+            b: ir.IRBuilder
+            with options(b, args[1].type) as (rec, phi):
+                rec(args[1])
+
+            new_values = [b.extract_value(args[0], i) for i in range(len(closure_type.env))]
+            env_scope = dict(zip(closure_type.env.keys(), new_values))
+            env_scope["@"] = closure
+
+            def scope(name):
+                return env_scope[name]
+
+            LLVMScope(b, new_tree.children[1], scope, b.ret, rec, (new_tree.children[0], phi))
+
+        return self.builder.call(func, [closure, new_args])
 
     def return_n(self, tree: TypeTree):
         # recursive tail call
@@ -107,15 +97,9 @@ class LLVMScope(Interpreter):
                 and tree.children[0].children[0].data == "symbol" \
                 and tree.children[0].children[0].children[0].value == "@" \
                 and self.rec is not None:  # prevent tail call optimization in blocks
-            value = self.copy(self.visit(tree.children[0].children[1]))
-            free_environment(self.builder, self.local_scope.values())
-            self.rec(value)
-            return int1
-
-        value = self.copy(self.visit(tree.children[0]))
-        free_environment(self.builder, self.local_scope.values())
-        self.ret(value)
-        return int1
+            self.rec(self.visit(tree.children[0].children[1]))
+        else:
+            self.ret(self.visit(tree.children[0]))
 
     def block(self, tree: TypeTree):
         with options(self.builder, unwrap(tree.return_type)) as (ret, phi):
@@ -125,63 +109,22 @@ class LLVMScope(Interpreter):
     def object(self, tree: TypeTree):
         value = unwrap(tree.return_type)(ir.Undefined)
         for i, child in enumerate(tree.children):
-            value = self.builder.insert_value(value, self.copy(self.visit(child)), i)
+            value = self.builder.insert_value(value, self.visit(child), i)
         return value
 
     def list_index(self, tree: TypeTree):
-        list_value, i = self.visit_children(tree)
-        check_list_index(self.builder, list_value, i)
-        pointer = self.builder.extract_value(list_value, 0)
+        array_value, i = self.visit_children(tree)
+        return self.builder.extract_element(array_value, i)
 
-        res = self.builder.load(self.builder.gep(pointer, [i]))
-        self.free(list_value)
-        res.tracked = list_value.tracked
-        return res
-
-    def list_size(self, tree: TypeTree):
-        list_value = self.visit_children(tree)[0]
-        length = self.builder.extract_value(list_value, 1)
-        self.free(list_value)
-        return length
+    @staticmethod
+    def list_size(tree: TypeTree):
+        return int64(tree.children[0].return_type.count)
 
     def list(self, tree: TypeTree):
-        element_type = unwrap(tree.return_type.element_type)
-        data_size = int64(element_type.get_abi_size(target_data) * len(tree.children))
-        pointer = self.builder.call(self.builder.module.malloc, [data_size])
-        pointer = self.builder.bitcast(pointer, element_type.as_pointer())
-
+        array_value = unwrap(tree.return_type)(ir.Undefined)
         for i, ret in enumerate(self.visit_children(tree)):
-            self.builder.store(self.copy(ret), self.builder.gep(pointer, [int64(i)]))
-
-        list_value = unwrap(tree.return_type)(ir.Undefined)
-        list_value = self.builder.insert_value(list_value, pointer, 0)
-        return self.builder.insert_value(list_value, int64(len(tree.children)), 1)
-
-    def concatenate(self, tree: TypeTree):
-        list_value, other_list = self.visit_children(tree)
-        list_value = self.copy(list_value)
-        other_list = self.copy(other_list)
-
-        element_type = unwrap(tree.return_type.element_type)
-        data_size = size(element_type)
-
-        b = self.builder
-        pointer = b.bitcast(b.extract_value(list_value, 0), pint8)
-        length = b.mul(b.extract_value(list_value, 1), data_size)
-        pointer2 = b.bitcast(b.extract_value(other_list, 0), pint8)
-        length2 = b.mul(b.extract_value(other_list, 1), data_size)
-
-        new_length = b.add(length, length2)
-        new_pointer = b.call(self.builder.module.malloc, [new_length])
-        b.call(b.module.memcpy, [new_pointer, pointer, length, int1(False)])
-        b.call(b.module.memcpy, [b.gep(new_pointer, [length]), pointer2, length2, int1(False)])
-        b.call(b.module.free, [pointer])
-        b.call(b.module.free, [pointer2])
-
-        new_list = unwrap(tree.return_type)(ir.Undefined)
-        new_list = self.builder.insert_value(new_list, b.bitcast(new_pointer, element_type.as_pointer()), 0)
-        new_size = b.sdiv(new_length, data_size)
-        return self.builder.insert_value(new_list, new_size, 1)
+            array_value = self.builder.insert_element(array_value, ret, int64(i))
+        return array_value
 
     def implication(self, tree: TypeTree):
         with options(self.builder, tree.return_type) as (ret, phi):
