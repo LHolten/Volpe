@@ -1,13 +1,11 @@
-from copy import deepcopy
 from typing import Callable, Optional, Tuple
 
 from lark.visitors import Interpreter
 from llvmlite import ir
-from unification import unify, reify
 
-from builder_utils import options, assign, math, comp, unary_math, build_func
+from builder_utils import options, assign, math, comp, unary_math, build_or_get_function
 from tree import TypeTree, volpe_assert
-from volpe_types import int1, int64, flt64, unwrap, VolpeObject, VolpeClosure
+from volpe_types import int1, int64, flt64, unwrap, VolpeObject
 
 
 class LLVMScope(Interpreter):
@@ -60,39 +58,11 @@ class LLVMScope(Interpreter):
         return closure
 
     def func_call(self, tree: TypeTree):
-        closure, new_args = self.visit_children(tree)
-        closure_type = tree.children[0].return_type
-        arg_type = tree.children[1].return_type
-
-        rules = unify(closure_type, VolpeClosure(arg=arg_type))
-        closure_type = reify(closure_type, rules)
-        new_tree = deepcopy(closure_type.tree)
-        for t in new_tree.iter_subtrees():
-            t.return_type = reify(t.return_type, rules)
-
-        module = self.builder.module
-        func_name = str(next(module.func_count))
-        func_type = ir.FunctionType(unwrap(closure_type.ret), [unwrap(closure_type), unwrap(closure_type.arg)])
-        func = ir.Function(module, func_type, func_name)
-
-        with build_func(func) as (b, args):
-            b: ir.IRBuilder
-            with options(b, args[1].type) as (rec, phi):
-                rec(args[1])
-
-            new_values = [b.extract_value(args[0], i) for i in range(len(closure_type.env))]
-            env_scope = dict(zip(closure_type.env.keys(), new_values))
-            env_scope["@"] = closure
-
-            def scope(name):
-                return env_scope[name]
-
-            LLVMScope(b, new_tree.children[1], scope, b.ret, rec, (new_tree.children[0], phi))
-
-        return self.builder.call(func, [closure, new_args])
+        closure, args = self.visit_children(tree)
+        func = build_or_get_function(self, tree)
+        return self.builder.call(func, [closure, args])
 
     def return_n(self, tree: TypeTree):
-        # recursive tail call
         if tree.children[0].data == "func_call" \
                 and tree.children[0].children[0].data == "symbol" \
                 and tree.children[0].children[0].children[0].value == "@" \

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Union
 
 from llvmlite import ir
-from unification import unifiable
+from unification import unifiable, isvar
 
 from tree import TypeTree
 from unification_copy import var
@@ -23,7 +23,13 @@ def vary():
 
 
 class VolpeType:
+    def __repr__(self):
+        raise NotImplementedError()
+
     def unwrap(self) -> ir.Type:
+        raise NotImplementedError()
+
+    def __hash__(self):
         raise NotImplementedError()
 
 
@@ -44,6 +50,9 @@ class VolpeObject(VolpeType):
     def unwrap(self) -> ir.Type:
         return ir.LiteralStructType(unwrap(value) for value in self.type_dict.values())
 
+    def __hash__(self):
+        return hash(tuple(self.type_dict.values()))
+
 
 @unifiable
 @dataclass
@@ -52,24 +61,32 @@ class VolpeArray(VolpeType):
     count: int = vary()
 
     def __repr__(self):
-        return f"[{self.element} x {self.count}]"
+        return f"[{self.count} x {self.element}]"
 
     def unwrap(self) -> ir.Type:
         return ir.VectorType(unwrap(self.element), self.count)
+
+    def __hash__(self):
+        return hash((self.element, self.count))
 
 
 @unifiable
 @dataclass
 class VolpeClosure(VolpeType):
-    arg: Union[ir.Type, VolpeType] = vary()
-    ret: Union[ir.Type, VolpeType] = vary()
-    env: Dict[str, Union[ir.Type, VolpeType]] = vary()
     tree: TypeTree = vary()
+    scope: callable = vary()
+    env: Dict[str, Union[ir.Type, VolpeType]] = vary()
 
     def __repr__(self):
-        if self.tree is None:
-            return "func"
-        return f"({self.arg})" + "{" + str(self.ret) + "}"
+        if isvar(self.env):
+            return "{?}"
+        return "{" + ", ".join(f"{k}: {v}" for k, v in self.env.items()) + "}"
 
     def unwrap(self) -> ir.Type:
         return ir.LiteralStructType(unwrap(value) for value in self.env.values())
+
+    def __hash__(self):
+        return hash(self.scope)
+
+    def __eq__(self, other):
+        return isinstance(other, VolpeClosure) and self.scope is other.scope

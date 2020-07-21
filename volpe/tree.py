@@ -1,21 +1,15 @@
-from copy import deepcopy
 from typing import Optional
 from lark import Tree
 
 
 class TypeTree(Tree):
     return_type = None
-    outside_used = None
+    instances = None
 
     def _pretty_label(self):
         if self.return_type is not None:
             return f'{self.data}: {self.return_type}'
         return self.data
-
-    def __deepcopy__(self, memo):
-        new_tree = type(self)(self.data, deepcopy(self.children, memo))
-        new_tree.return_type, new_tree.outside_used = self.return_type, self.outside_used
-        return new_tree
 
 
 class VolpeError(Exception):

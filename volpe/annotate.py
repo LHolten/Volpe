@@ -2,7 +2,7 @@ from typing import Callable
 
 from lark.visitors import Interpreter
 from lark import Token
-from unification import unify
+from unification import unify, reify
 from copy import deepcopy
 
 from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, shape
@@ -27,7 +27,7 @@ class AnnotateScope(Interpreter):
         self.rules = rules
 
         if args is not None:
-            shape(self, self.local_scope, args)
+            self.unify(shape(self, self.local_scope, args[0]), args[1])
 
         tree.children[-1] = TypeTree("return_n", [tree.children[-1]], tree.meta)
         tree.return_type = var()
@@ -48,16 +48,20 @@ class AnnotateScope(Interpreter):
             tree.return_type = int1
         return tree.return_type
 
-    def get_scope(self, name, tree: TypeTree):
-        if name in self.local_scope:
-            return self.local_scope[name]
-        return self.scope(name, tree)
+    def get_scope(self):
+        local_scope = self.local_scope.copy()
+
+        def scope(name, tree: TypeTree):
+            if name in local_scope:
+                return local_scope[name]
+            return self.scope(name, tree)
+        return scope
 
     def symbol(self, tree: TypeTree):
-        return self.get_scope(tree.children[0].value, tree)
+        return self.get_scope()(tree.children[0].value, tree)
 
     def block(self, tree: TypeTree):
-        self.rules = AnnotateScope(tree, self.get_scope, self.rules, var()).rules
+        self.rules = AnnotateScope(tree, self.get_scope(), self.rules, var()).rules
         return tree.return_type
 
     def object(self, tree: TypeTree):
@@ -67,36 +71,30 @@ class AnnotateScope(Interpreter):
         return VolpeObject(scope)
 
     def func(self, tree: TypeTree):
-        closure = VolpeClosure(tree=tree)
-        tree.outside_used = set()
-
-        def scope(name, t_tree: TypeTree):
-            if name == "@":
-                return closure
-            tree.outside_used.add(name)
-            return self.get_scope(name, t_tree)
-
-        self.rules = AnnotateScope(tree.children[1], scope, self.rules, tree.children[0]).rules
-
-        outside_types = {k: self.get_scope(k, tree) for k in tree.outside_used}
-        assert self.unify(closure, VolpeClosure(env=outside_types))
-        assert self.unify(closure, VolpeClosure(arg=tree.children[0].return_type, ret=tree.children[1].return_type))
-
-        return closure
+        tree.children = [TypeTree("inst", tree.children, tree.meta)]
+        tree.instances = dict()
+        return VolpeClosure(tree=tree, scope=self.get_scope())
 
     def func_call(self, tree: TypeTree):
-        closure, args = self.visit_children(tree)
-        env, ret_type = var(), var()
+        closure, args = reify(self.visit_children(tree), self.rules)
 
-        if not tree.children[0].data == "symbol" or not tree.children[0].children[0].value == "@":
-            volpe_assert(self.unify(closure, VolpeClosure(env=env)), "can only call closures", tree)
+        if args not in closure.tree.instances:
+            new_tree = closure.tree.instances[args] = deepcopy(closure.tree.children[0])
+            closure.tree.children.append(new_tree)
 
-            rules, closure = deepcopy((self.rules, closure))
-            self.rules.update(rules)
+            outside_used = set()
 
-        volpe_assert(self.unify(closure, VolpeClosure(arg=args, ret=ret_type, env=env)),
-                     "wrong arguments for function", tree)
-        return ret_type
+            def scope(name, t_tree: TypeTree):
+                if name == "@":
+                    return closure
+                outside_used.add(name)
+                return closure.scope(name, t_tree)
+
+            self.rules = AnnotateScope(new_tree.children[1], scope, self.rules, (new_tree.children[0], args)).rules
+
+            closure.env = {k: closure.scope(k, tree) for k in outside_used}
+
+        return closure.tree.instances[args].children[1].return_type
 
     def return_n(self, tree: TypeTree):
         self.ret(self.visit(tree.children[0]))
