@@ -17,7 +17,7 @@ from volpe_types import (
     VolpeArray
 )
 
-def determine_c_type(volpe_type, depth=0):
+def determine_c_type(volpe_type):
     """Interpret the volpe type and return a corresponding C type."""
     # Simple types:
     if volpe_type == int1:
@@ -31,41 +31,37 @@ def determine_c_type(volpe_type, depth=0):
     
     # Aggregate types:
     if isinstance(volpe_type, VolpeObject):
-        elems = volpe_type.type_dict.values()
-
-        class CTuple(Structure):
-            _fields_ = [(f"elem{i}", determine_c_type(elem, depth+1)) for i, elem in enumerate(elems)]
+        class CObject(Structure):
+            _fields_ = [(key, determine_c_type(value)) for key, value in volpe_type.type_dict.items()]
             def __repr__(self):
-                res = "{" + ", ".join([str(getattr(self, tup[0])) for tup in self._fields_])
+                res = "{" + ", ".join([key + ": " + str(getattr(self, key)) for (key, _) in self._fields_])
                 return res + ",}" if len(self._fields_) == 1 else res + "}"
                     
 
-        return POINTER(CTuple) if depth == 0 else CTuple
+        return CObject
 
     if isinstance(volpe_type, VolpeArray):
-        element_type = determine_c_type(volpe_type.element, depth + 1)
+        element_type = determine_c_type(volpe_type.element)
+        length = volpe_type.count
 
-        class CList(Structure):
-            _fields_ = [("elems", POINTER(element_type)), ("length", c_int64)]
+        class CArray(Structure):
+            _fields_ = [(f"elem{i}", element_type) for i in range(length)] 
 
-            def __repr__(self):
-                elems = getattr(self, "elems")
-                length = getattr(self, "length")
-                
+            def __repr__(self):               
                 # Special case if elements are chars -> string
                 if element_type == c_char:
                     if length == 0:
                         return "\"\""
-                    return "\"" + "".join([chr(elem) for elem in elems[:length]]) + "\""
+                    return "\"" + "".join([chr(getattr(self, tup[0])) for tup in self._fields_]) + "\""
                 if length == 0:
                     return "[]"
-                return "[" + ", ".join([str(elem) for elem in elems[:length]]) + "]"
+                return "[" + ", ".join([str(getattr(self, tup[0])) for tup in self._fields_]) + "]"
 
-        return POINTER(CList) if depth == 0 else CList
+        return CArray
 
     if isinstance(volpe_type, VolpeClosure):
         class CFunc(Structure):
-            _fields_ = [("func", POINTER(None)), ("c_func", POINTER(None)), ("f_func", POINTER(None)), ("env", POINTER(None))]
+            _fields_ = [(key, determine_c_type(value)) for key, value in volpe_type.env.items()]
             def __repr__(self):
                 return get_type_name(volpe_type)
         return CFunc
@@ -96,8 +92,8 @@ def get_type_name(volpe_type):
         return f"list<{get_type_name(volpe_type.element)}>"
    
     if isinstance(volpe_type, VolpeClosure):
-        input_type = remove_obj_brackets(get_type_name(volpe_type.arg_type))
-        return_type = get_type_name(volpe_type.ret_type)
+        input_type = remove_obj_brackets(get_type_name(volpe_type.arg))
+        return_type = get_type_name(volpe_type.ret)
         return f"func ({input_type}) " + "{" + return_type + "}"
 
     # Unknown type
