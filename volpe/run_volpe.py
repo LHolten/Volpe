@@ -83,8 +83,8 @@ def run(file_path, verbose=False, show_time=False, console=False):
             error_message = f"unexpected symbol '{symbol}'"
             error_message += f"\n{err.line}| {line}"
             # Add the cursor.
-            padding = " " * (len(str(err.line)) + len(line) - 1)
-            error_message += f"\n{padding}  ^"
+            padding = " " * (len(str(err.line)) + err.column)
+            error_message += f"\n{padding} ^"
             print(error_message)
             return
 
