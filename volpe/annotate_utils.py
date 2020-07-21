@@ -67,11 +67,7 @@ def shape(self, scope: dict, tree: TypeTree):
         tree.return_type = VolpeArray(element_type, len(tree.children))
 
     elif tree.data == "list_index":
-        volpe_list = shape(self, scope, tree.children[0])
-        index = self.visit(tree.children[1])
-        tree.return_type = var()
-        volpe_assert(self.unify(volpe_list, VolpeArray(tree.return_type)), "can only mutate arrays", tree)
-        volpe_assert(self.unify(index, int64), "can only index with an integer", tree)
+        self.visit(tree)
 
     else:
         assert tree.data == "symbol"  # no message?
