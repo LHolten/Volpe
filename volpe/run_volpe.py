@@ -3,6 +3,7 @@ from os import path
 import traceback
 
 from lark import Lark
+from lark.exceptions import UnexpectedEOF, UnexpectedCharacters
 from llvmlite import ir
 from unification import reify
 
@@ -68,12 +69,32 @@ def run(file_path, verbose=False, show_time=False, console=False):
     with open(file_path) as vlp_file:
         try:
             parsed_tree = volpe_parser.parse(vlp_file.read())
+
+        except UnexpectedEOF:
+            print("unexpected end-of-input")
+            return
+
+        except UnexpectedCharacters as err:
+            # Return cursor to start of file.
+            vlp_file.seek(0)
+            line = vlp_file.readlines()[err.line - 1]
+            symbol = line[err.column - 1]
+            # Print the line.
+            error_message = f"unexpected symbol '{symbol}'"
+            error_message += f"\n{err.line}| {line}"
+            # Add the cursor.
+            padding = " " * (len(str(err.line)) + len(line) - 1)
+            error_message += f"\n{padding}  ^"
+            print(error_message)
+            return
+
         except Exception as err:
             if verbose:
                 traceback.print_exc()
             else:
                 print(err)
             return
+
     # put file_path inside tree.meta so that VolpeError can print code blocks
     for tree in parsed_tree.iter_subtrees():
         tree.meta.file_path = file_path
