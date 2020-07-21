@@ -83,6 +83,8 @@ class VolpeClosure(VolpeType):
         return "{" + ", ".join(f"{k}: {v}" for k, v in self.env.items()) + "}"
 
     def unwrap(self) -> ir.Type:
+        if isvar(self.env):
+            self.env = dict()  # fix for passing around functions that are never called
         return ir.LiteralStructType(unwrap(value) for value in self.env.values())
 
     def __hash__(self):

@@ -61,7 +61,7 @@ class AnnotateScope(Interpreter):
         return self.get_scope()(tree.children[0].value, tree)
 
     def block(self, tree: TypeTree):
-        self.rules = AnnotateScope(tree, self.get_scope(), self.rules, var()).rules
+        self.rules = AnnotateScope(tree, self.get_scope(), self.rules).rules
         return tree.return_type
 
     def object(self, tree: TypeTree):
