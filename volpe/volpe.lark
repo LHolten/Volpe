@@ -56,7 +56,7 @@ block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
     | "{" _SEP* "}" -> object
     | "{" block "}"
     | "(" value1 ")"
-    | "[" (_SEP* value1 ("," _SEP* value1)*)? _SEP* "]" -> list
+    | "[" _SEP* value1 ("," _SEP* value1)* _SEP* "]" -> list
     | value10 "." CNAME -> attribute
     | value10 "(" values ")" -> func_call
     | value10 "[" _SEP* value1 _SEP* "]" -> list_index
