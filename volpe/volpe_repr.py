@@ -28,9 +28,11 @@ def determine_c_type(volpe_type):
     if volpe_type == flt64:
         return c_double
     if volpe_type == char:
-        # Use python byte repr but "cut-off" the b.
-        c_char.__repr__ = lambda self: str(bytes(self))[1:]
-        return c_char
+        class c_char_wrapper(c_char):
+            # Use Python byte repr but cut off the `b` preffix.
+            def __repr__(self):
+                return repr(bytes(self))[1:]
+        return c_char_wrapper
     
     # Aggregate types:
     if isinstance(volpe_type, VolpeObject):
@@ -38,8 +40,15 @@ def determine_c_type(volpe_type):
             _fields_ = [(key, determine_c_type(value)) for key, value in volpe_type.type_dict.items()]
 
             def __repr__(self):
-                res = "{" + ", ".join([key + ": " + str(getattr(self, key)) for (key, _) in self._fields_])
-                return res + ",}" if len(self._fields_) == 1 else res + "}"
+                # Field names are being shown only if they don't begin with an underscore.
+                res = "{" + ", ".join(
+                    [
+                        ("" if key[0] == "_" else f"{key}: ") + str(getattr(self, key)) 
+                        for (key, _) in self._fields_
+                    ]
+                )
+                res += ",}" if len(self._fields_) == 1 else "}"
+                return res
 
         return CObject
 
