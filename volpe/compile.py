@@ -45,14 +45,6 @@ def compile_and_run(llvm_ir, result_type, show_time=False, console=False):
     func(byref(res))
     end_time = time.perf_counter_ns()
 
-    # Properly decode strings and chars.
-    if result_type == char:
-        res = bytes(res).decode("ascii")
-        res = f"\'{res}\'"
-    elif isinstance(result_type, VolpeArray) and result_type.element == char:
-        res = bytes(res).decode("ascii")
-        res = f"\"{res}\""
-
     print("main() =", res)
     
     if show_time:

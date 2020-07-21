@@ -16,6 +16,7 @@ from volpe_types import (
     VolpeArray
 )
 
+ENCODING = "ascii"
 
 def determine_c_type(volpe_type):
     """Interpret the volpe type and return a corresponding C type."""
@@ -27,6 +28,8 @@ def determine_c_type(volpe_type):
     if volpe_type == flt64:
         return c_double
     if volpe_type == char:
+        # Use python byte repr but "cut-off" the b.
+        c_char.__repr__ = lambda self: str(bytes(self))[1:]
         return c_char
     
     # Aggregate types:
@@ -44,7 +47,10 @@ def determine_c_type(volpe_type):
         class CArray(Structure):
             _fields_ = [("elements", determine_c_type(volpe_type.element) * volpe_type.count)]
             def __repr__(self):
-                return repr(self.elements[:])
+                if volpe_type.element == char:
+                    return f"\"{bytes(self).decode(ENCODING)}\""
+                else:
+                    return repr(self.elements[:])
 
         return CArray
 
