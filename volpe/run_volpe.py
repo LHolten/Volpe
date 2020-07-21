@@ -11,7 +11,7 @@ from builder import LLVMScope
 from builder_utils import build_func
 from compile import compile_and_run
 from tree import TypeTree, VolpeError
-from volpe_types import unwrap
+from volpe_types import unwrap, unknown
 
 
 def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=False, console=False):
@@ -36,14 +36,18 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
     module = ir.Module("program")
     module.func_count = itertools.count()
 
-    run_func = ir.Function(module, ir.FunctionType(unwrap(tree.return_type), []), "run")
-    with build_func(run_func) as (b, _):
+    run_func = ir.Function(module, ir.FunctionType(unknown, [unwrap(tree.return_type).as_pointer()]), "run")
+    with build_func(run_func) as (b, args):
         arg_scope = {}
 
         def scope(name):
             return arg_scope[name]
 
-        LLVMScope(b, tree, scope, b.ret, None)
+        def ret(value):
+            b.store(value, args[0])
+            b.ret_void()
+
+        LLVMScope(b, tree, scope, ret, None)
 
     if more_verbose:
         print(module)

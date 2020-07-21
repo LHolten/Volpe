@@ -1,6 +1,6 @@
 import io
 import time
-from ctypes import CFUNCTYPE
+from ctypes import CFUNCTYPE, POINTER, byref
 
 import llvmlite.binding as llvm
 
@@ -36,9 +36,12 @@ def compile_and_run(llvm_ir, result_type, show_time=False, console=False):
 
     func_ptr = engine.get_function_address("run")
 
-    func = CFUNCTYPE(determine_c_type(result_type))(func_ptr)
+    c_type = determine_c_type(result_type)
+    func = CFUNCTYPE(None, POINTER(c_type))(func_ptr)
+    res = c_type()
+
     start_time = time.perf_counter_ns()
-    res = func()
+    func(byref(res))
     end_time = time.perf_counter_ns()
 
     if hasattr(res, "contents"):

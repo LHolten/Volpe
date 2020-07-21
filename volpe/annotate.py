@@ -122,7 +122,7 @@ class AnnotateScope(Interpreter):
         for eval_character in text:
             tree.children.append(TypeTree("character", [Token("CHARACTER", "'" + eval_character + "'")], tree.meta))
         self.visit_children(tree)
-        return VolpeArray(char)
+        return VolpeArray(char, len(tree.children))
 
     def list_index(self, tree: TypeTree):
         volpe_array, index = self.visit_children(tree)
