@@ -41,12 +41,8 @@ def determine_c_type(volpe_type):
         return CObject
 
     if isinstance(volpe_type, VolpeArray):
-        element_type = determine_c_type(volpe_type.element)
-        length = volpe_type.count
-
         class CArray(Structure):
-            _fields_ = [(f"elements", element_type * length)]
-
+            _fields_ = [("elements", determine_c_type(volpe_type.element) * volpe_type.count)]
             def __repr__(self):
                 return repr(self.elements[:])
 

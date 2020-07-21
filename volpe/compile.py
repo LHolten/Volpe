@@ -5,6 +5,7 @@ from ctypes import CFUNCTYPE, POINTER, byref
 import llvmlite.binding as llvm
 
 from volpe_repr import determine_c_type
+from volpe_types import char, VolpeArray
 
 # All these initializations are required for code generation!
 llvm.initialize()
@@ -44,10 +45,15 @@ def compile_and_run(llvm_ir, result_type, show_time=False, console=False):
     func(byref(res))
     end_time = time.perf_counter_ns()
 
-    if hasattr(res, "contents"):
-        print("main() =", res.contents)
-    else:
-        print("main() =", res)
+    # Properly decode strings and chars.
+    if result_type == char:
+        res = bytes(res).decode("ascii")
+        res = f"\'{res}\'"
+    elif isinstance(result_type, VolpeArray) and result_type.element == char:
+        res = bytes(res).decode("ascii")
+        res = f"\"{res}\""
+
+    print("main() =", res)
     
     if show_time:
         time_taken = end_time - start_time
