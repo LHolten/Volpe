@@ -3,7 +3,7 @@ from typing import Callable, Optional, Tuple
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from builder_utils import options, assign, math, comp, unary_math, build_or_get_function
+from builder_utils import options, assign, math, comp, build_or_get_function
 from tree import TypeTree, volpe_assert
 from volpe_types import int1, int64, flt64, unwrap, VolpeObject
 
@@ -237,7 +237,7 @@ class LLVMScope(Interpreter):
     sub = math
     div = math
     # power = math
-    negate = unary_math
+    negate = math
 
     # Comparison
     equals = comp

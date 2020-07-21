@@ -8,22 +8,12 @@ from volpe_types import int64, flt64, char, unwrap
 
 def math(self, tree: TypeTree):
     values = self.visit_children(tree)
-    t = tree.return_type
-    if unwrap(t) == int64:
+    t = unwrap(tree.return_type)
+    if t == int64 or isinstance(t, ir.VectorType) and t.element == int64:
         return getattr(self, tree.data + "_int")(values)
-    if unwrap(t) == flt64:
+    if t == flt64 or isinstance(t, ir.VectorType) and t.element == flt64:
         return getattr(self, tree.data + "_flt")(values)
     raise VolpeError("math operations only work for integers and floats", tree)
-
-
-def unary_math(self, tree: TypeTree):
-    values = self.visit_children(tree)
-    t = unwrap(tree.return_type)
-    if t == int64:
-        return getattr(self, tree.data + "_int")(values)
-    if t == flt64:
-        return getattr(self, tree.data + "_flt")(values)
-    raise VolpeError("unary math operations only work for integers and floats", tree)
 
 
 def comp(self, tree: TypeTree):
