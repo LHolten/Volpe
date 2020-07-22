@@ -5,7 +5,6 @@ from ctypes import CFUNCTYPE, POINTER, byref
 import llvmlite.binding as llvm
 
 from volpe_repr import determine_c_type
-from volpe_types import char, VolpeArray
 
 # All these initializations are required for code generation!
 llvm.initialize()

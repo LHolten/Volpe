@@ -1,5 +1,7 @@
 from ctypes import (
+    sizeof,
     c_bool,
+    c_uint8,
     c_int64,
     c_double,
     c_char,
@@ -17,9 +19,13 @@ from volpe_types import (
 )
 
 ENCODING = "ascii"
+DEBUG_BUFFER = False
 
 def determine_c_type(volpe_type):
     """Interpret the volpe type and return a corresponding C type."""
+    if DEBUG_BUFFER:
+        return get_padding(64)
+
     # Simple types:
     if volpe_type == int1:
         return c_bool
@@ -37,14 +43,33 @@ def determine_c_type(volpe_type):
     # Aggregate types:
     if isinstance(volpe_type, VolpeObject):
         class CObject(Structure):
-            _fields_ = [(key, determine_c_type(value)) for key, value in volpe_type.type_dict.items()]
+            _fields_ = []
+            pos = 0
+            for key, value in volpe_type.type_dict.items():
+                c_type = determine_c_type(value)
+                size = sizeof(c_type)
+                pow2_size = next_pow2(size)
+                
+                if size != 0 and pos % pow2_size != 0:
+                    pad_needed = calc_space(pos, pow2_size)
+                    _fields_.append((f"*pad_at_{pos}_size_{pad_needed}", get_padding(pad_needed)))
+                    pos += pad_needed
+                
+                _fields_.append((f"*{key}", c_type))
+                pos += size
+
+                if size != 0 and pos % pow2_size != 0:
+                    pad_needed = calc_space(pos, pow2_size)
+                    _fields_.append((f"*pad_at_{pos}_size_{pad_needed}", get_padding(pad_needed)))
+                    pos += pad_needed
+
 
             def __repr__(self):
                 # Field names are being shown only if they don't begin with an underscore.
                 res = "{" + ", ".join(
                     [
-                        ("" if key[0] == "_" else f"{key}: ") + str(getattr(self, key)) 
-                        for (key, _) in self._fields_
+                        ("" if key[1] == "_" else f"{key[1:]}: ") + str(getattr(self, key)) 
+                        for (key, _) in self._fields_ if key[:4] != "*pad"
                     ]
                 )
                 res += ",}" if len(self._fields_) == 1 else "}"
@@ -73,3 +98,36 @@ def determine_c_type(volpe_type):
         
     # Unknown type
     return None
+
+
+def get_padding(size):
+    class Buffer(Structure):
+        _fields_ = [("data", c_uint8 * size)]
+
+        # repr for testing (hexdump)
+        def __repr__(self):
+            nibbles = []
+            for byte in self.data:
+                nibbles.append((byte & 0b11110000) >> 4)
+                nibbles.append(byte & 0b00001111)
+            res = "hexdump:\n"
+            for i, nibble in enumerate(nibbles):
+                res += hex(nibble)[2:]
+                if i % 2 == 1:
+                    res += " "
+                if i % 16 == 15:
+                    res += "\n"
+            return res
+
+    return Buffer
+
+def next_pow2(x):
+    if x == 0:
+        return 0
+    power = 1
+    while power < x:
+        power *= 2
+    return power
+
+def calc_space(pos, size):
+    return size - (pos % size)
