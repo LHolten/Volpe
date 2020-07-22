@@ -42,34 +42,40 @@ def determine_c_type(volpe_type):
     
     # Aggregate types:
     if isinstance(volpe_type, VolpeObject):
+        # Create fields with padding in between to counteract abi incompatibility.
+        # Fields begin with '*' to avoid name collision with Structure attributes.
+        fields = []
+        pos = 0
+        def padding(size):
+            nonlocal fields
+            nonlocal pos
+            if size != 0 and pos % size != 0:
+                pad_needed = calc_space(pos, size)
+                fields.append((f"*pad_at_{pos}_size_{pad_needed}", get_padding(pad_needed)))
+                pos += pad_needed
+
+        for key, value in volpe_type.type_dict.items():
+            c_type = determine_c_type(value)
+            size = sizeof(c_type)
+            pow2_size = next_pow2(size)
+            
+            padding(pow2_size)
+            fields.append((f"*{key}", c_type))
+            pos += size
+            padding(pow2_size)
+
+
         class CObject(Structure):
-            _fields_ = []
-            pos = 0
-            for key, value in volpe_type.type_dict.items():
-                c_type = determine_c_type(value)
-                size = sizeof(c_type)
-                pow2_size = next_pow2(size)
-                
-                if size != 0 and pos % pow2_size != 0:
-                    pad_needed = calc_space(pos, pow2_size)
-                    _fields_.append((f"*pad_at_{pos}_size_{pad_needed}", get_padding(pad_needed)))
-                    pos += pad_needed
-                
-                _fields_.append((f"*{key}", c_type))
-                pos += size
-
-                if size != 0 and pos % pow2_size != 0:
-                    pad_needed = calc_space(pos, pow2_size)
-                    _fields_.append((f"*pad_at_{pos}_size_{pad_needed}", get_padding(pad_needed)))
-                    pos += pad_needed
-
+            _fields_ = fields
 
             def __repr__(self):
+                # Filter out padding fields.
+                keys = [key for (key, _) in self._fields_ if key[:4] != "*pad"]
                 # Field names are being shown only if they don't begin with an underscore.
                 res = "{" + ", ".join(
                     [
-                        ("" if key[1] == "_" else f"{key[1:]}: ") + str(getattr(self, key)) 
-                        for (key, _) in self._fields_ if key[:4] != "*pad"
+                        ("" if key[1] == "_" else f"{key[1:]}: ") + repr(getattr(self, key))
+                        for key in keys
                     ]
                 )
                 res += ",}" if len(self._fields_) == 1 else "}"
