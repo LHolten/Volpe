@@ -50,7 +50,7 @@ def determine_c_type(volpe_type):
             nonlocal fields
             nonlocal pos
             if size != 0 and pos % size != 0:
-                pad_needed = calc_space(pos, size)
+                pad_needed = size - (pos % size)
                 fields.append((f"*pad_at_{pos}_size_{pad_needed}", get_padding(pad_needed)))
                 pos += pad_needed
 
@@ -135,5 +135,3 @@ def next_pow2(x):
         power *= 2
     return power
 
-def calc_space(pos, size):
-    return size - (pos % size)
