@@ -27,7 +27,8 @@ class AnnotateScope(Interpreter):
         self.rules = rules
 
         if args is not None:
-            self.unify(shape(self, self.local_scope, args[0]), args[1])
+            volpe_assert(self.unify(shape(self, self.local_scope, args[0]), args[1]),
+                         "wrong arguments for function", tree)
 
         tree.children[-1] = TypeTree("return_n", [tree.children[-1]], tree.meta)
         tree.return_type = var()
