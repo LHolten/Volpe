@@ -44,10 +44,7 @@ def compile_and_run(llvm_ir, result_type, show_time=False, console=False):
     func(byref(res))
     end_time = time.perf_counter_ns()
 
-    if hasattr(res, "contents"):
-        print("main() =", res.contents)
-    else:
-        print("main() =", res)
+    print("main() =", res)
     
     if show_time:
         time_taken = end_time - start_time
