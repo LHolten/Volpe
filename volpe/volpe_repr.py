@@ -99,7 +99,7 @@ def determine_c_type(volpe_type):
             _fields_ = [(key, determine_c_type(value)) for key, value in volpe_type.env.items()]
 
             def __repr__(self):
-                return "closure (line: {volpe_type.tree.meta.line})"
+                return f"closure (line {volpe_type.tree.meta.line})"
 
         return CFunc
         
