@@ -34,11 +34,7 @@ def determine_c_type(volpe_type):
     if volpe_type == flt64:
         return c_double
     if volpe_type == char:
-        class c_char_wrapper(c_char):
-            # Use Python byte repr but cut off the `b` preffix.
-            def __repr__(self):
-                return repr(bytes(self))[1:]
-        return c_char_wrapper
+        return c_char
     
     # Aggregate types:
     if isinstance(volpe_type, VolpeObject):

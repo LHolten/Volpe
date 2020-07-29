@@ -4,7 +4,7 @@ from ctypes import CFUNCTYPE, POINTER, byref
 
 import llvmlite.binding as llvm
 
-from volpe_repr import determine_c_type
+from volpe_repr import determine_c_type, ENCODING
 
 # All these initializations are required for code generation!
 llvm.initialize()
@@ -44,7 +44,11 @@ def compile_and_run(llvm_ir, result_type, show_time=False, console=False):
     func(byref(res))
     end_time = time.perf_counter_ns()
 
-    print("main() =", res)
+    if hasattr(res, "value"):
+        res = res.value
+    if hasattr(res, "decode"):
+        res = res.decode(ENCODING)
+    print("main() =", repr(res))
     
     if show_time:
         time_taken = end_time - start_time
