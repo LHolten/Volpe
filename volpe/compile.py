@@ -11,8 +11,14 @@ llvm.initialize()
 llvm.initialize_native_target()
 llvm.initialize_native_asmprinter()  # yes, even this one
 
+# Could be useful if you want to compile for other targets.
+# llvmlite.binding.initialize_all_targets() 
 
-def compile_and_run(llvm_ir, result_type, show_time=False, console=False):
+# Ensure JIT execution is allowed
+llvm.check_jit_execution()
+
+
+def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, console=False):
     """
     Create an ExecutionEngine suitable for JIT code generation on
     the host CPU. The engine is reusable for an arbitrary number of
@@ -25,6 +31,34 @@ def compile_and_run(llvm_ir, result_type, show_time=False, console=False):
     mod = llvm.parse_assembly(llvm_ir)
     mod.triple = llvm.get_process_triple()
     mod.verify()
+
+    # Optimizations
+    pass_manager = llvm.ModulePassManager()
+    pass_manager_builder = llvm.PassManagerBuilder()
+    pass_manager_builder.populate(pass_manager)
+    
+    if more_verbose:
+        print("\nBefore optimization.\n")
+        print(mod)
+
+    pass_count = 1
+    previous = str(mod)
+    while pass_manager.run(mod):
+        pass_count += 1
+
+        # HACK
+        # The docs claim that .run() returns False if no changes are made
+        # but from testing it seems it can still return True if no changes are made
+        # https://llvmlite.readthedocs.io/en/latest/user-guide/binding/optimization-passes.html#llvmlite.binding.ModulePassManager.run
+        str_mod = str(mod)
+        if str_mod == previous:
+            break
+        else:
+            previous = str_mod
+
+    if more_verbose:
+        print(f"\nCompleted {pass_count} optimization passes.\n")
+        print(mod)
 
     if console:
         with io.open("output.obj", "wb") as file:
