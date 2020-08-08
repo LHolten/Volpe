@@ -33,31 +33,30 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     mod.verify()
 
     # Optimizations
-    pass_manager = llvm.ModulePassManager()
-    pass_manager_builder = llvm.PassManagerBuilder()
-    pass_manager_builder.populate(pass_manager)
+
+    # https://llvmlite.readthedocs.io/en/latest/user-guide/binding/optimization-passes.html#llvmlite.binding.PassManagerBuilder
+    pm_builder = llvm.PassManagerBuilder()
+    pm_builder.disable_unroll_loops = False
+    pm_builder.inlining_threshold = 1000
+    pm_builder.loop_vectorize = True
+    pm_builder.slp_vectorize = True
+    pm_builder.opt_level = 3
+    pm_builder.size_level = 0
+
+    pm = llvm.ModulePassManager()
+    pm_builder.populate(pm)
+
+    # target specific optimizations
+    target_machine.add_analysis_passes(pm)
     
     if more_verbose:
-        print("\nBefore optimization.\n")
+        print("\nBefore optimization\n")
         print(mod)
 
-    pass_count = 1
-    previous = str(mod)
-    while pass_manager.run(mod):
-        pass_count += 1
-
-        # HACK
-        # The docs claim that .run() returns False if no changes are made
-        # but from testing it seems it can still return True if no changes are made
-        # https://llvmlite.readthedocs.io/en/latest/user-guide/binding/optimization-passes.html#llvmlite.binding.ModulePassManager.run
-        str_mod = str(mod)
-        if str_mod == previous:
-            break
-        else:
-            previous = str_mod
+    pm.run(mod)
 
     if more_verbose:
-        print(f"\nCompleted {pass_count} optimization passes.\n")
+        print("\nAfter optimization\n")
         print(mod)
 
     if console:
