@@ -32,8 +32,7 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     mod.triple = llvm.get_process_triple()
     mod.verify()
 
-    # Optimizations
-
+    # Configure optimization pass manager builder
     # https://llvmlite.readthedocs.io/en/latest/user-guide/binding/optimization-passes.html#llvmlite.binding.PassManagerBuilder
     pm_builder = llvm.PassManagerBuilder()
     pm_builder.disable_unroll_loops = False
@@ -46,13 +45,14 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     pm = llvm.ModulePassManager()
     pm_builder.populate(pm)
 
-    # target specific optimizations
+    # Target specific optimizations
     target_machine.add_analysis_passes(pm)
     
     if more_verbose:
         print("\nBefore optimization\n")
         print(mod)
 
+    # Run the optimization passes
     pm.run(mod)
 
     if more_verbose:
