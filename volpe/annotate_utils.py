@@ -1,4 +1,5 @@
 from tree import TypeTree, volpe_assert
+from lark import Token
 from unification_copy import var
 from volpe_types import int1, VolpeObject, VolpeArray, int64
 
@@ -57,8 +58,13 @@ def shape(self, scope: dict, tree: TypeTree):
     if tree.data == "object":
         obj_scope = dict()
         for i, child in enumerate(tree.children):
-            obj_scope[f"_{i}"] = shape(self, scope, child)
+            if len(child.children) < 2:
+                child.children.insert(0, Token("CNAME", f"_{i}"))
+            obj_scope[child.children[0]] = shape(self, scope, child.children[1])
         tree.return_type = VolpeObject(obj_scope)
+
+    elif tree.data == "attribute":
+        self.visit(tree)
 
     elif tree.data == "list":
         element_type = var()
@@ -70,6 +76,6 @@ def shape(self, scope: dict, tree: TypeTree):
         self.visit(tree)
 
     else:
-        assert tree.data == "symbol"  # no message?
+        volpe_assert(tree.data == "symbol", f"cannot assign to {tree.data}", tree)
         tree.return_type = scope[tree.children[0].value] = var()
     return tree.return_type
