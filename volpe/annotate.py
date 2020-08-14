@@ -70,7 +70,9 @@ class AnnotateScope(Interpreter):
         for i, child in enumerate(tree.children):
             if len(child.children) < 2:
                 child.children.insert(0, Token("CNAME", f"_{i}"))
-            scope[child.children[0]] = self.visit(child.children[1])
+            key = child.children[0]
+            volpe_assert(key not in scope, f"attribute names have to be unique, `{key}` is not", tree)
+            scope[key] = self.visit(child.children[1])
         return VolpeObject(scope)
 
     def attribute(self, tree: TypeTree):
