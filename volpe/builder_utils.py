@@ -72,7 +72,14 @@ def mutate_array(self, tree):
 def assign(self, tree: TypeTree, value):
     if tree.data == "object":
         for i, child in enumerate(tree.children):
-            assign(self, child, self.builder.extract_value(value, i))
+            assign(self, child.children[1], self.builder.extract_value(value, i))
+
+    elif tree.data == "attribute":
+        obj = tree.children[0].return_type
+        index = list(obj.type_dict.keys()).index(tree.children[1])
+        value = self.builder.insert_value(self.visit(tree.children[0]), value, index)
+        # update scope
+        assign(self, tree.children[0], value)
 
     elif tree.data == "list":
         for i, child in enumerate(tree.children):
@@ -83,7 +90,7 @@ def assign(self, tree: TypeTree, value):
         fun(self.builder.insert_element(array_value, value, self.visit(tree.children[1])))
 
     else:
-        assert tree.data == "symbol"  # no message?
+        volpe_assert(tree.data == "symbol", f"cannot assign to {tree.data}", tree)
         name = tree.children[0].value
         self.local_scope[name] = value
 

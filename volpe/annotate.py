@@ -68,8 +68,19 @@ class AnnotateScope(Interpreter):
     def object(self, tree: TypeTree):
         scope = dict()
         for i, child in enumerate(tree.children):
-            scope[f"_{i}"] = self.visit(child)
+            if len(child.children) < 2:
+                child.children.insert(0, Token("CNAME", f"_{i}"))
+            key = child.children[0]
+            volpe_assert(key not in scope, f"attribute names have to be unique, `{key}` is not", tree)
+            scope[key] = self.visit(child.children[1])
         return VolpeObject(scope)
+
+    def attribute(self, tree: TypeTree):
+        obj = reify(self.visit(tree.children[0]), self.rules)
+        key = tree.children[1]
+        volpe_assert(isinstance(obj, VolpeObject), "only objects have attributes", tree)
+        volpe_assert(key in obj.type_dict, f"this object does not have an attribute named {key}", tree)
+        return obj.type_dict[tree.children[1]]
 
     def func(self, tree: TypeTree):
         tree.children = [TypeTree("inst", tree.children, tree.meta)]
@@ -102,7 +113,7 @@ class AnnotateScope(Interpreter):
 
     def assign(self, tree: TypeTree):
         value = self.visit(tree.children[1])
-        volpe_assert(self.unify(shape(self, self.local_scope, tree.children[0]), value), "assign error", tree)
+        volpe_assert(self.unify(shape(self, self.local_scope, tree.children[0]), value), "assignment error, probably mismatched shape or invalid type for attribute", tree)
 
     @staticmethod
     def integer(_: TypeTree):
