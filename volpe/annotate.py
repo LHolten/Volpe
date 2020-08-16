@@ -88,10 +88,11 @@ class AnnotateScope(Interpreter):
         return VolpeClosure(tree=tree, scope=self.get_scope())
 
     def func_call(self, tree: TypeTree):
-        closure, args = reify(self.visit_children(tree), self.rules)
+        closure, args = self.visit_children(tree)
+        r_args, closure = reify((args, closure), self.rules)
 
-        if args not in closure.tree.instances:
-            new_tree = closure.tree.instances[args] = deepcopy(closure.tree.children[0])
+        if r_args not in closure.tree.instances:
+            new_tree = closure.tree.instances[r_args] = deepcopy(closure.tree.children[0])
             closure.tree.children.append(new_tree)
 
             outside_used = set()
@@ -106,7 +107,7 @@ class AnnotateScope(Interpreter):
 
             closure.env = {k: closure.scope(k, tree) for k in outside_used}
 
-        return closure.tree.instances[args].children[1].return_type
+        return closure.tree.instances[r_args].children[1].return_type
 
     def return_n(self, tree: TypeTree):
         self.ret(self.visit(tree.children[0]))
