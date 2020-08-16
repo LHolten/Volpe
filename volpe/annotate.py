@@ -95,17 +95,15 @@ class AnnotateScope(Interpreter):
             new_tree = closure.tree.instances[r_args] = deepcopy(closure.tree.children[0])
             closure.tree.children.append(new_tree)
 
-            outside_used = set()
+            closure.env = dict()
 
             def scope(name, t_tree: TypeTree):
                 if name == "@":
                     return closure
-                outside_used.add(name)
-                return closure.scope(name, t_tree)
+                closure.env[name] = closure.scope(name, t_tree)
+                return closure.env[name]
 
             self.rules = AnnotateScope(new_tree.children[1], scope, self.rules, (new_tree.children[0], args)).rules
-
-            closure.env = {k: closure.scope(k, tree) for k in outside_used}
 
         return closure.tree.instances[r_args].children[1].return_type
 
