@@ -17,9 +17,9 @@ def math(self, tree: TypeTree):
 
 def comp(self, tree: TypeTree):
     values = self.visit_children(tree)
-    if is_int(tree.return_type) or isinstance(tree.return_type, char):
+    if is_int(tree.children[0].return_type) or tree.children[0].return_type == char:
         return getattr(self, tree.data + "_int")(values)
-    if is_flt(tree.return_type):
+    if is_flt(tree.children[0].return_type):
         return getattr(self, tree.data + "_flt")(values)
     assert False, "can't happen"
 
