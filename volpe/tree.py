@@ -12,10 +12,10 @@ class TypeTree(Tree):
         return self.data
 
 
-def get_obj_key(tree: TypeTree, i):
+def get_obj_key_value(tree: TypeTree, i):
     if len(tree.children) == 2:
-        return tree.children[0]
-    return f"_{i}"
+        return tree.children[0], tree.children[1]
+    return f"_{i}", tree.children[0]
 
 
 class VolpeError(Exception):

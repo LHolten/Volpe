@@ -5,7 +5,7 @@ from lark import Token
 from copy import deepcopy
 
 from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, assign
-from tree import TypeTree, volpe_assert, get_obj_key
+from tree import TypeTree, volpe_assert, get_obj_key_value
 from volpe_types import (
     int64,
     flt64,
@@ -61,9 +61,9 @@ class AnnotateScope(Interpreter):
     def object(self, tree: TypeTree):
         scope = dict()
         for i, child in enumerate(tree.children):
-            key = get_obj_key(child, i)
+            key, attribute = get_obj_key_value(child, i)
             volpe_assert(key not in scope, f"attribute names have to be unique, `{key}` is not", tree)
-            scope[key] = self.visit(child.children[1])
+            scope[key] = self.visit(attribute)
         return VolpeObject(scope)
 
     def attribute(self, tree: TypeTree):

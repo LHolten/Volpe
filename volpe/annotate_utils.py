@@ -1,4 +1,4 @@
-from tree import TypeTree, volpe_assert, get_obj_key
+from tree import TypeTree, volpe_assert, get_obj_key_value
 from volpe_types import int1, VolpeObject, VolpeArray, char, is_flt, is_int
 
 
@@ -50,9 +50,9 @@ def assign(self, scope: dict, tree: TypeTree, value):
     if tree.data == "object":
         volpe_assert(isinstance(value, VolpeObject), "can only destructure object")
         for i, child in enumerate(tree.children):
-            key = get_obj_key(child, i)
+            key, attribute = get_obj_key_value(child, i)
             volpe_assert(key in value.type_dict, f"object doesn't have attribute {key}", child)
-            assign(self, scope, child.children[1], value.type_dict[key])
+            assign(self, scope, attribute, value.type_dict[key])
 
     elif tree.data == "attribute":
         volpe_assert(self.visit(tree) == value, "wrong type in attribute assignment", tree)

@@ -2,7 +2,7 @@ from contextlib import contextmanager
 
 from llvmlite import ir
 
-from tree import TypeTree, volpe_assert, get_obj_key
+from tree import TypeTree, volpe_assert, get_obj_key_value
 from volpe_types import unwrap, is_int, is_flt, char
 
 
@@ -70,9 +70,9 @@ def mutate_array(self, tree):
 def assign(self, tree: TypeTree, value):
     if tree.data == "object":
         for i, child in enumerate(tree.children):
-            key = get_obj_key(child, i)
+            key, attribute = get_obj_key_value(child, i)
             index = list(value.type.type_dict.keys()).index(key)
-            assign(self, child.children[1], self.builder.extract_value(value, index))
+            assign(self, attribute, self.builder.extract_value(value, index))
 
     elif tree.data == "attribute":
         obj = tree.children[0].return_type

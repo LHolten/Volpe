@@ -4,7 +4,7 @@ from lark.visitors import Interpreter
 from llvmlite import ir
 
 from builder_utils import options, assign, math, comp, build_or_get_function
-from tree import TypeTree, volpe_assert
+from tree import TypeTree, volpe_assert, get_obj_key_value
 from volpe_types import int1, int64, flt64, unwrap, VolpeObject
 
 
@@ -79,11 +79,9 @@ class LLVMScope(Interpreter):
     def object(self, tree: TypeTree):
         value = unwrap(tree.return_type)(ir.Undefined)
         for i, child in enumerate(tree.children):
-            value = self.builder.insert_value(value, self.visit(child), i)
+            key, attribute = get_obj_key_value(child, i)
+            value = self.builder.insert_value(value, self.visit(attribute), i)
         return value
-
-    def item(self, tree: TypeTree):
-        return self.visit(tree.children[1])
 
     def attribute(self, tree: TypeTree):
         value = self.visit(tree.children[0])
