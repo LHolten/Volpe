@@ -24,7 +24,6 @@ class AnnotateScope(Interpreter):
         self.used = set()
 
         if args is not None:
-            print(args)
             assign(self, self.local_scope, args[0], args[1])
 
         tree.children[-1] = TypeTree("return_n", [tree.children[-1]], tree.meta)
