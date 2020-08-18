@@ -48,10 +48,14 @@ def comp(self, tree: TypeTree):
 
 def assign(self, scope: dict, tree: TypeTree, value):
     if tree.data == "object":
-        volpe_assert(isinstance(value, VolpeObject), "can only destructure object")
+        volpe_assert(isinstance(value, VolpeObject), "can only destructure object", tree)
+        volpe_assert(len(tree.children) == len(value.type_dict), "only full deconstruction is allowed", tree)
+        used = set()
         for i, child in enumerate(tree.children):
             key, attribute = get_obj_key_value(child, i)
             volpe_assert(key in value.type_dict, f"object doesn't have attribute {key}", child)
+            volpe_assert(key not in used, f"{key} has already been used", child)
+            used.add(key)
             assign(self, scope, attribute, value.type_dict[key])
 
     elif tree.data == "attribute":
