@@ -115,4 +115,4 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
                 print(f"average time: {nanoseconds:.3f} ns")
         else:
             print("ran the code once")
-            print(f"time: {(end_time - start_time) / ticks_in_sec:3f} s")
+            print(f"time: {(end_time - start_time) / ticks_in_sec:.3f} s")
