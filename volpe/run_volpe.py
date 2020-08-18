@@ -5,7 +5,6 @@ import traceback
 from lark import Lark
 from lark.exceptions import UnexpectedEOF, UnexpectedCharacters
 from llvmlite import ir
-from unification import reify
 
 from annotate import AnnotateScope
 from builder import LLVMScope
@@ -26,10 +25,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
             return arg_scope[name]
         raise VolpeError(f"variable `{name}` not found", local_tree)
 
-    rules = AnnotateScope(tree, scope, dict()).rules
-
-    for t in tree.iter_subtrees():
-        t.return_type = reify(t.return_type, rules)
+    AnnotateScope(tree, scope)
 
     if verbose:
         print(tree.pretty())

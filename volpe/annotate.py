@@ -2,12 +2,10 @@ from typing import Callable
 
 from lark.visitors import Interpreter
 from lark import Token
-from unification import unify, reify
 from copy import deepcopy
 
-from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, shape
-from tree import TypeTree, volpe_assert
-from unification_copy import var
+from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, assign
+from tree import TypeTree, volpe_assert, get_obj_key
 from volpe_types import (
     int64,
     flt64,
@@ -20,28 +18,24 @@ from volpe_types import (
 
 
 class AnnotateScope(Interpreter):
-    def __init__(self, tree: TypeTree, scope: Callable, rules: dict, args=None):
+    def __init__(self, tree: TypeTree, scope: Callable, args=None):
         self.scope = scope
         self.local_scope = dict()
         self.used = set()
-        self.rules = rules
 
         if args is not None:
-            volpe_assert(self.unify(shape(self, self.local_scope, args[0]), args[1]),
-                         "wrong arguments for function", tree)
+            print(args)
+            assign(self, self.local_scope, args[0], args[1])
 
         tree.children[-1] = TypeTree("return_n", [tree.children[-1]], tree.meta)
-        tree.return_type = var()
 
         def ret(value_type):
-            volpe_assert(self.unify(tree.return_type, value_type), "block has different return types", tree)
+            if tree.return_type is None:
+                tree.return_type = value_type
+            volpe_assert(tree.return_type == value_type, "block has different return types", tree)
         self.ret = ret
 
         self.visit_children(tree)  # sets tree.return_type
-
-    def unify(self, a, b):
-        self.rules = unify(a, b, self.rules)
-        return self.rules is not False
 
     def visit(self, tree: TypeTree):
         tree.return_type = getattr(self, tree.data)(tree)
@@ -62,22 +56,19 @@ class AnnotateScope(Interpreter):
         return self.get_scope()(tree.children[0].value, tree)
 
     def block(self, tree: TypeTree):
-        self.rules = AnnotateScope(tree, self.get_scope(), self.rules).rules
+        AnnotateScope(tree, self.get_scope())
         return tree.return_type
 
     def object(self, tree: TypeTree):
         scope = dict()
         for i, child in enumerate(tree.children):
-            if len(child.children) < 2:
-                child.children.insert(0, Token("CNAME", f"_{i}"))
-            key = child.children[0]
+            key = get_obj_key(child, i)
             volpe_assert(key not in scope, f"attribute names have to be unique, `{key}` is not", tree)
             scope[key] = self.visit(child.children[1])
         return VolpeObject(scope)
 
     def attribute(self, tree: TypeTree):
-        obj = reify(self.visit(tree.children[0]), self.rules)
-        key = tree.children[1]
+        obj, key = self.visit(tree.children[0]), tree.children[1]
         volpe_assert(isinstance(obj, VolpeObject), "only objects have attributes", tree)
         volpe_assert(key in obj.type_dict, f"this object does not have an attribute named {key}", tree)
         return obj.type_dict[tree.children[1]]
@@ -89,10 +80,9 @@ class AnnotateScope(Interpreter):
 
     def func_call(self, tree: TypeTree):
         closure, args = self.visit_children(tree)
-        r_args, closure = reify((args, closure), self.rules)
 
-        if r_args not in closure.tree.instances:
-            new_tree = closure.tree.instances[r_args] = deepcopy(closure.tree.children[0])
+        if args not in closure.tree.instances:
+            new_tree = closure.tree.instances[args] = deepcopy(closure.tree.children[0])
             closure.tree.children.append(new_tree)
 
             closure.env = dict()
@@ -103,16 +93,16 @@ class AnnotateScope(Interpreter):
                 closure.env[name] = closure.scope(name, t_tree)
                 return closure.env[name]
 
-            self.rules = AnnotateScope(new_tree.children[1], scope, self.rules, (new_tree.children[0], args)).rules
+            AnnotateScope(new_tree.children[1], scope, (new_tree.children[0], args))
 
-        return closure.tree.instances[r_args].children[1].return_type
+        return closure.tree.instances[args].children[1].return_type
 
     def return_n(self, tree: TypeTree):
         self.ret(self.visit(tree.children[0]))
 
     def assign(self, tree: TypeTree):
         value = self.visit(tree.children[1])
-        volpe_assert(self.unify(shape(self, self.local_scope, tree.children[0]), value), "assignment error, probably mismatched shape or invalid type for attribute", tree)
+        assign(self, self.local_scope, tree.children[0], value)
 
     @staticmethod
     def integer(_: TypeTree):
@@ -137,28 +127,28 @@ class AnnotateScope(Interpreter):
 
     def list_index(self, tree: TypeTree):
         volpe_array, index = self.visit_children(tree)
-        volpe_type = var()
-        volpe_assert(self.unify(volpe_array, VolpeArray(volpe_type)), "can only index arrays", tree)
-        volpe_assert(self.unify(index, int64), "can only index with an integer", tree)
-        return volpe_type
+        volpe_assert(isinstance(volpe_array, VolpeArray), "can only index arrays", tree)
+        volpe_assert(index == int64, "can only index with an integer", tree)
+        return volpe_array.element
 
     def list_size(self, tree: TypeTree):
         volpe_array = self.visit_children(tree)[0]
-        volpe_assert(self.unify(volpe_array, VolpeArray()), "can only get size of arrays", tree)
+        volpe_assert(isinstance(volpe_array, VolpeArray), "can only get size of arrays", tree)
         return int64
 
     def list(self, tree: TypeTree):
-        element_type = var()
-        for child in tree.children:
-            volpe_assert(self.unify(element_type, self.visit(child)), "different types in list", tree)
+        volpe_assert(len(tree.children) > 0, "array needs at least one value", tree)
+        element_type = self.visit(tree.children[0])
+        for child in tree.children[1:]:
+            volpe_assert(element_type == self.visit(child), "different types in list", tree)
         return VolpeArray(element_type, len(tree.children))
 
     def convert_int(self, tree: TypeTree):
-        volpe_assert(self.unify(self.visit(tree.children[0]), int64), "can only convert int", tree)
+        volpe_assert(self.visit(tree.children[0]) == int64, "can only convert int", tree)
         return flt64
 
     def convert_flt(self, tree: TypeTree):
-        volpe_assert(self.unify(self.visit(tree.children[0]), flt64), "can only convert float", tree)
+        volpe_assert(self.visit(tree.children[0]) == flt64, "can only convert float", tree)
         return int64
 
     def if_then(self, tree: TypeTree):

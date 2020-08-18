@@ -1,31 +1,24 @@
-from tree import TypeTree, volpe_assert
-from lark import Token
-from unification_copy import var
-from volpe_types import int1, VolpeObject, VolpeArray, int64
+from tree import TypeTree, volpe_assert, get_obj_key
+from volpe_types import int1, VolpeObject, VolpeArray, char, is_flt, is_int
 
 
 def logic(self, tree: TypeTree):
     ret = self.visit_children(tree)
-    volpe_assert(
-        self.unify(ret[0], int1) and self.unify(ret[1], int1),
-        "logic operations only work for booleans",
-        tree
-    )
+    volpe_assert(ret[0] == ret[1] == int1, "logic operations only work for booleans", tree)
     return int1
 
 
 def unary_logic(self, tree: TypeTree):
     ret = self.visit_children(tree)[0]
-    volpe_assert(self.unify(ret, int1), "unary logic operations only work for booleans", tree)
+    volpe_assert(ret == int1, "unary logic operations only work for booleans", tree)
     return int1
 
 
 def math(self, tree: TypeTree):
-    children = self.visit_children(tree)
-    ret0 = children[0]
-    ret1 = children[1]
-    volpe_assert(self.unify(ret0, ret1), "types need to match for math operations", tree)
-    return ret0
+    ret = self.visit_children(tree)
+    volpe_assert(ret[0] == ret[1], "types need to match for math operations", tree)
+    volpe_assert(is_int(ret[0]) or is_flt(ret[0]), "can only math int and flt")
+    return ret[0]
 
 
 def unary_math(self, tree: TypeTree):
@@ -47,35 +40,34 @@ def math_assign(self, tree: TypeTree):
 
 
 def comp(self, tree: TypeTree):
-    children = self.visit_children(tree)
-    ret0 = children[0]
-    ret1 = children[1]
-    volpe_assert(self.unify(ret0, ret1), "types need to match for comparison operations", tree)
+    ret = self.visit_children(tree)
+    volpe_assert(ret[0] == ret[1], "types need to match for comparison operations", tree)
+    volpe_assert(ret[0] == char or is_int(ret[0]) or is_flt(ret[0]), "can only compare int, flt and char")
     return int1
 
 
-def shape(self, scope: dict, tree: TypeTree):
+def assign(self, scope: dict, tree: TypeTree, value):
     if tree.data == "object":
-        obj_scope = dict()
+        volpe_assert(isinstance(value, VolpeObject), "can only destructure object")
         for i, child in enumerate(tree.children):
-            if len(child.children) < 2:
-                child.children.insert(0, Token("CNAME", f"_{i}"))
-            obj_scope[child.children[0]] = shape(self, scope, child.children[1])
-        tree.return_type = VolpeObject(obj_scope)
+            key = get_obj_key(child, i)
+            volpe_assert(key in value.type_dict, f"object doesn't have attribute {key}", child)
+            assign(self, scope, child.children[1], value.type_dict[key])
 
     elif tree.data == "attribute":
-        self.visit(tree)
+        volpe_assert(self.visit(tree) == value, "wrong type in attribute assignment", tree)
 
     elif tree.data == "list":
-        element_type = var()
+        volpe_assert(isinstance(value, VolpeArray), "can only destructure array")
+        volpe_assert(value.count == len(tree.children), "array has wrong length")
         for child in tree.children:
-            volpe_assert(self.unify(element_type, shape(self, scope, child)), "different types in list", tree)
-        tree.return_type = VolpeArray(element_type, len(tree.children))
+            assign(self, scope, child, value.element)
 
     elif tree.data == "list_index":
-        self.visit(tree)
+        volpe_assert(self.visit(tree) == value, "wrong type in array assignment", tree)
 
     else:
         volpe_assert(tree.data == "symbol", f"cannot assign to {tree.data}", tree)
-        tree.return_type = scope[tree.children[0].value] = var()
-    return tree.return_type
+        scope[tree.children[0].value] = value
+
+    tree.return_type = value

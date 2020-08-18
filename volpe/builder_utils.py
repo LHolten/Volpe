@@ -2,28 +2,26 @@ from contextlib import contextmanager
 
 from llvmlite import ir
 
-from tree import TypeTree, volpe_assert, VolpeError
-from volpe_types import int64, flt64, char, unwrap
+from tree import TypeTree, volpe_assert, get_obj_key
+from volpe_types import unwrap, is_int, is_flt, char
 
 
 def math(self, tree: TypeTree):
     values = self.visit_children(tree)
-    t = unwrap(tree.return_type)
-    if t == int64 or isinstance(t, ir.VectorType) and t.element == int64:
+    if is_int(tree.return_type):
         return getattr(self, tree.data + "_int")(values)
-    if t == flt64 or isinstance(t, ir.VectorType) and t.element == flt64:
+    if is_flt(tree.return_type):
         return getattr(self, tree.data + "_flt")(values)
-    raise VolpeError("math operations only work for integers and floats", tree)
+    assert False, "can't happen"
 
 
 def comp(self, tree: TypeTree):
     values = self.visit_children(tree)
-    t = unwrap(tree.children[0].return_type)
-    if t == int64 or t == char:
+    if is_int(tree.return_type) or isinstance(tree.return_type, char):
         return getattr(self, tree.data + "_int")(values)
-    if t == flt64:
+    if is_flt(tree.return_type):
         return getattr(self, tree.data + "_flt")(values)
-    raise VolpeError("comparisons only work for integers, floats, and chars", tree)
+    assert False, "can't happen"
 
 
 @contextmanager
@@ -72,7 +70,9 @@ def mutate_array(self, tree):
 def assign(self, tree: TypeTree, value):
     if tree.data == "object":
         for i, child in enumerate(tree.children):
-            assign(self, child.children[1], self.builder.extract_value(value, i))
+            key = get_obj_key(child, i)
+            index = list(value.type.type_dict.keys()).index(key)
+            assign(self, child.children[1], self.builder.extract_value(value, index))
 
     elif tree.data == "attribute":
         obj = tree.children[0].return_type

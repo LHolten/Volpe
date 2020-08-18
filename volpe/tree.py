@@ -1,4 +1,3 @@
-from copy import deepcopy
 from typing import Optional
 from lark import Tree
 
@@ -12,8 +11,11 @@ class TypeTree(Tree):
             return f'{self.data}: {self.return_type}'
         return self.data
 
-    def __deepcopy__(self, memo):
-        return type(self)(self.data, deepcopy(self.children, memo), self.meta)
+
+def get_obj_key(tree: TypeTree, i):
+    if len(tree.children) == 2:
+        return tree.children[0]
+    return f"_{i}"
 
 
 class VolpeError(Exception):

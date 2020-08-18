@@ -1,11 +1,9 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, Union
 
 from llvmlite import ir
-from unification import unifiable, isvar
 
 from tree import TypeTree
-from unification_copy import var
 
 int1 = ir.IntType(1)
 int32 = ir.IntType(32)
@@ -16,10 +14,6 @@ pint8 = int8.as_pointer()
 flt64 = ir.DoubleType()
 char = ir.IntType(8)
 unknown = ir.VoidType()
-
-
-def vary():
-    return field(default_factory=var)
 
 
 class VolpeType:
@@ -39,26 +33,38 @@ def unwrap(value: Union[ir.Type, VolpeType]) -> ir.Type:
     return value
 
 
-@unifiable
+def is_int(value: Union[ir.Type, VolpeType]) -> bool:
+    if isinstance(value, VolpeArray):
+        return is_int(value.element)
+    return value == int64
+
+
+def is_flt(value: Union[ir.Type, VolpeType]) -> bool:
+    if isinstance(value, VolpeArray):
+        return is_int(value.element)
+    return value == flt64
+
+
 @dataclass
 class VolpeObject(VolpeType):
-    type_dict: Dict[str, Union[ir.Type, VolpeType]] = vary()
+    type_dict: Dict[str, Union[ir.Type, VolpeType]]
 
     def __repr__(self):
         return "{" + ", ".join(str(v) for v in self.type_dict.values()) + "}"
 
     def unwrap(self) -> ir.Type:
-        return ir.LiteralStructType(unwrap(value) for value in self.type_dict.values())
+        obj = ir.LiteralStructType(unwrap(value) for value in self.type_dict.values())
+        obj.type_dict = self.type_dict
+        return obj
 
     def __hash__(self):
         return hash(tuple(self.type_dict.values()))
 
 
-@unifiable
 @dataclass
 class VolpeArray(VolpeType):
-    element: Union[ir.Type, VolpeType] = vary()
-    count: int = vary()
+    element: Union[ir.Type, VolpeType]
+    count: int
 
     def __repr__(self):
         return f"[{self.count} x {self.element}]"
@@ -70,20 +76,19 @@ class VolpeArray(VolpeType):
         return hash((self.element, self.count))
 
 
-@unifiable
 @dataclass
 class VolpeClosure(VolpeType):
-    tree: TypeTree = vary()
-    scope: callable = vary()
-    env: Dict[str, Union[ir.Type, VolpeType]] = vary()
+    tree: TypeTree
+    scope: callable
+    env: Dict[str, Union[ir.Type, VolpeType]] = None
 
     def __repr__(self):
-        if isvar(self.env):
+        if self.env is None:
             return "{?}"
         return "{" + ", ".join(f"{k}: {v}" for k, v in self.env.items()) + "}"
 
     def unwrap(self) -> ir.Type:
-        if isvar(self.env):
+        if self.env is None:
             self.env = dict()  # fix for passing around functions that are never called
         return ir.LiteralStructType(unwrap(value) for value in self.env.values())
 

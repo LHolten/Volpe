@@ -86,9 +86,9 @@ class LLVMScope(Interpreter):
         return self.visit(tree.children[1])
 
     def attribute(self, tree: TypeTree):
-        obj = tree.children[0].return_type
-        index = list(obj.type_dict.keys()).index(tree.children[1])
-        return self.builder.extract_value(self.visit(tree.children[0]), index)
+        value = self.visit(tree.children[0])
+        index = list(value.type.type_dict.keys()).index(tree.children[1])
+        return self.builder.extract_value(value, index)
 
     def list_index(self, tree: TypeTree):
         array_value, i = self.visit_children(tree)

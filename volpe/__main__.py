@@ -35,7 +35,7 @@ def install():
     if path_to_volpe_root in path:
         print("Volpe is already on PATH.")
         
-        if not path_to_volpe_root in os.environ["PATH"]:
+        if path_to_volpe_root not in os.environ["PATH"]:
             print("=====")
             print("Please restart this console for changes to take effect.")
 

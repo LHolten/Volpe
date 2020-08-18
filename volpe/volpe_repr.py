@@ -21,6 +21,7 @@ from volpe_types import (
 ENCODING = "ascii"
 DEBUG_BUFFER = False
 
+
 def determine_c_type(volpe_type):
     """Interpret the volpe type and return a corresponding C type."""
     if DEBUG_BUFFER:
@@ -42,6 +43,7 @@ def determine_c_type(volpe_type):
         # Fields begin with '*' to avoid name collision with Structure attributes.
         fields = []
         pos = 0
+
         def padding(size):
             nonlocal fields
             nonlocal pos
@@ -59,7 +61,6 @@ def determine_c_type(volpe_type):
             fields.append((f"*{key}", c_type))
             pos += size
             padding(pow2_size)
-
 
         class CObject(Structure):
             _fields_ = fields
@@ -82,6 +83,7 @@ def determine_c_type(volpe_type):
     if isinstance(volpe_type, VolpeArray):
         class CArray(Structure):
             _fields_ = [("elements", determine_c_type(volpe_type.element) * volpe_type.count)]
+
             def __repr__(self):
                 if volpe_type.element == char:
                     return f"\"{bytes(self).decode(ENCODING)}\""
@@ -123,6 +125,7 @@ def get_padding(size):
             return res
 
     return Buffer
+
 
 def next_pow2(x):
     if x == 0:
