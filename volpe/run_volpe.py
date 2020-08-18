@@ -50,10 +50,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
 
         LLVMScope(b, tree, scope, ret, None)
 
-    if more_verbose:
-        print(module)
-
-    compile_and_run(str(module), tree.return_type, show_time, console)
+    compile_and_run(str(module), tree.return_type, more_verbose=more_verbose, show_time=show_time, console=console)
 
 
 def get_parser(path_to_lark):
