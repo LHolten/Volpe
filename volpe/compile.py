@@ -104,7 +104,7 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     if show_time:
         if count > 1:
             print(f"ran the code {count} times")
-            nanoseconds = MEASUREMENT_TIME / count * (1E9 / ticks_in_sec) 
+            nanoseconds = (end_time - start_time) / count * (1E9 / ticks_in_sec) 
             if nanoseconds > 1E9:
                 print(f"average time: {nanoseconds / 1E9:.3f} s")
             elif nanoseconds > 1E6:
