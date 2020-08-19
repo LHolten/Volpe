@@ -1,10 +1,22 @@
 import io
-import time
 from ctypes import CFUNCTYPE, POINTER, byref
 
 import llvmlite.binding as llvm
 
 from volpe_repr import determine_c_type, ENCODING
+
+import time
+from sys import version_info
+
+# use nanosecond perf_counter if available
+if version_info >= (3, 7, 0):
+    perf_counter = time.perf_counter_ns
+    ticks_in_sec = 1E9
+else:
+    perf_counter = time.perf_counter
+    ticks_in_sec = 1
+
+MEASUREMENT_TIME = 5.0 * ticks_in_sec
 
 # All these initializations are required for code generation!
 llvm.initialize()
@@ -72,10 +84,16 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     c_type = determine_c_type(result_type)
     func = CFUNCTYPE(None, POINTER(c_type))(func_ptr)
     res = c_type()
-
-    start_time = time.perf_counter_ns()
-    func(byref(res))
-    end_time = time.perf_counter_ns()
+    
+    if show_time:
+        count = 0
+        start_time = perf_counter()
+        while perf_counter() - start_time < MEASUREMENT_TIME:
+            func(byref(res))
+            count += 1
+        end_time = perf_counter()
+    else:
+        func(byref(res))
 
     if hasattr(res, "value"):
         res = res.value
@@ -84,8 +102,17 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     print("main() =", repr(res))
     
     if show_time:
-        time_taken = end_time - start_time
-        if time_taken > 100000:
-            print(f"time = {time_taken/1E9}s")
+        if count > 1:
+            print(f"ran the code {count} times")
+            nanoseconds = (end_time - start_time) / count * (1E9 / ticks_in_sec) 
+            if nanoseconds > 1E9:
+                print(f"average time: {nanoseconds / 1E9:.3f} s")
+            elif nanoseconds > 1E6:
+                print(f"average time: {nanoseconds / 1E6:.3f} ms")
+            elif nanoseconds > 1E3:
+                print(f"average time: {nanoseconds / 1E3:.3f} µs")
+            else:
+                print(f"average time: {nanoseconds:.3f} ns")
         else:
-            print(f"time = {time_taken}ns")
+            print("ran the code once")
+            print(f"time: {(end_time - start_time) / ticks_in_sec:.3f} s")

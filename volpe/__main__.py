@@ -60,7 +60,7 @@ def compile_and_run(file_path, verbose=False, show_time=False, console=False):
 
 
 if __name__ == '__main__':
-    assert version_info >= (3, 7, 0), "You need Python 3.7 or higher."
+    assert version_info >= (3, 6, 0), "You need Python 3.6 or higher."
 
     args = docopt(__doc__)
 

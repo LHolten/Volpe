@@ -2,7 +2,7 @@
 
 ## Installation
 
-1. You need Python 3.7.0 or higher. [Install here.](https://www.python.org/downloads/)
+1. You need Python 3.6.0 or higher, although we recommend at least 3.7.0. [Install here.](https://www.python.org/downloads/)
 2. You need pip, the Python package manager. It should come pre-installed with Python.
 3. Install the needed packages by running `pip install -r requirements.txt` from the root directory.
 4. Optionally add Volpe to path with `python volpe add-path`. This means you can use `volpe file_name.vlp` anywhere (notice the missing `python`).
