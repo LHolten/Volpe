@@ -41,7 +41,7 @@ def is_int(value: Union[ir.Type, VolpeType]) -> bool:
 
 def is_flt(value: Union[ir.Type, VolpeType]) -> bool:
     if isinstance(value, VolpeArray):
-        return is_int(value.element)
+        return is_flt(value.element)
     return value == flt64
 
 
