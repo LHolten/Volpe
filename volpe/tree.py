@@ -1,11 +1,12 @@
 from copy import deepcopy
-from typing import Optional
-from lark import Tree
+from typing import Optional, List, Union
+from lark import Tree, Token
 
 
 class TypeTree(Tree):
     return_type = None
     instances = None
+    children: List[Union['TypeTree', Token]]
 
     def _pretty_label(self):
         if self.return_type is not None:
