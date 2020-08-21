@@ -9,8 +9,15 @@ from volpe_types import int1, int64, flt64, unwrap, VolpeObject
 
 
 class LLVMScope(Interpreter):
-    def __init__(self, builder: ir.IRBuilder, tree: TypeTree, scope: callable, ret: Callable, rec: Optional[Callable],
-                 args: Optional[Tuple[TypeTree, VolpeObject]] = None):
+    def __init__(
+        self,
+        builder: ir.IRBuilder,
+        tree: TypeTree,
+        scope: callable,
+        ret: Callable,
+        rec: Optional[Callable],
+        args: Optional[Tuple[TypeTree, VolpeObject]] = None,
+    ):
         self.builder = builder
         self.scope = scope
         self.local_scope = dict()
@@ -63,10 +70,12 @@ class LLVMScope(Interpreter):
         return self.builder.call(func, [closure, args])
 
     def return_n(self, tree: TypeTree):
-        if tree.children[0].data == "func_call" \
-                and tree.children[0].children[0].data == "symbol" \
-                and tree.children[0].children[0].children[0].value == "@" \
-                and self.rec is not None:  # prevent tail call optimization in blocks
+        if (
+            tree.children[0].data == "func_call"
+            and tree.children[0].children[0].data == "symbol"
+            and tree.children[0].children[0].children[0].value == "@"
+            and self.rec is not None
+        ):  # prevent tail call optimization in blocks
             self.rec(self.visit(tree.children[0].children[1]))
         else:
             self.ret(self.visit(tree.children[0]))
@@ -132,7 +141,7 @@ class LLVMScope(Interpreter):
     def logic_not(self, tree: TypeTree):
         value = self.visit_children(tree)[0]
         return self.builder.not_(value)
-        
+
     # Integers
     @staticmethod
     def integer(tree: TypeTree):

@@ -51,8 +51,14 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
 
 def get_parser(path_to_lark):
     with open(path_to_lark) as lark_file:
-        return Lark(lark_file, start='block', parser='earley', ambiguity='explicit', tree_class=TypeTree,
-                    propagate_positions=True)
+        return Lark(
+            lark_file,
+            start="block",
+            parser="earley",
+            ambiguity="explicit",
+            tree_class=TypeTree,
+            propagate_positions=True,
+        )
 
 
 def run(file_path, verbose=False, show_time=False, console=False):

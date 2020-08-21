@@ -8,15 +8,7 @@ from ctypes import (
     Structure,
 )
 
-from volpe_types import (
-    int1,
-    int64,
-    flt64,
-    char,
-    VolpeObject,
-    VolpeClosure,
-    VolpeArray
-)
+from volpe_types import int1, int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray
 
 ENCODING = "ascii"
 DEBUG_BUFFER = False
@@ -36,7 +28,7 @@ def determine_c_type(volpe_type):
         return c_double
     if volpe_type == char:
         return c_char
-    
+
     # Aggregate types:
     if isinstance(volpe_type, VolpeObject):
         # Create fields with padding in between to counteract abi incompatibility.
@@ -56,7 +48,7 @@ def determine_c_type(volpe_type):
             c_type = determine_c_type(value)
             size = sizeof(c_type)
             pow2_size = next_pow2(size)
-            
+
             padding(pow2_size)
             fields.append((f"*{key}", c_type))
             pos += size
@@ -70,10 +62,7 @@ def determine_c_type(volpe_type):
                 keys = [key for (key, _) in self._fields_ if key[:4] != "*pad"]
                 # Field names are being shown only if they don't begin with an underscore.
                 res = "{" + ", ".join(
-                    [
-                        ("" if key[1] == "_" else f"{key[1:]}: ") + repr(getattr(self, key))
-                        for key in keys
-                    ]
+                    [("" if key[1] == "_" else f"{key[1:]}: ") + repr(getattr(self, key)) for key in keys]
                 )
                 res += ",}" if len(self._fields_) == 1 else "}"
                 return res
@@ -81,18 +70,20 @@ def determine_c_type(volpe_type):
         return CObject
 
     if isinstance(volpe_type, VolpeArray):
+
         class CArray(Structure):
             _fields_ = [("elements", determine_c_type(volpe_type.element) * volpe_type.count)]
 
             def __repr__(self):
                 if volpe_type.element == char:
-                    return f"\"{bytes(self).decode(ENCODING)}\""
+                    return f'"{bytes(self).decode(ENCODING)}"'
                 else:
                     return repr(self.elements[:])
 
         return CArray
 
     if isinstance(volpe_type, VolpeClosure):
+
         class CFunc(Structure):
             _fields_ = [(key, determine_c_type(value)) for key, value in volpe_type.env.items()]
 
@@ -100,7 +91,7 @@ def determine_c_type(volpe_type):
                 return f"closure (line {volpe_type.tree.meta.line})"
 
         return CFunc
-        
+
     # Unknown type
     return None
 
@@ -134,4 +125,3 @@ def next_pow2(x):
     while power < x:
         power *= 2
     return power
-

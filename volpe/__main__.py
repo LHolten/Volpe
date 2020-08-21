@@ -20,7 +20,8 @@ from docopt import docopt
 def install():
     # Look up user path in registry.
     import winreg
-    reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Environment')
+
+    reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment")
     path = winreg.QueryValueEx(reg_key, "Path")[0]
 
     path_to_volpe = os.path.abspath(os.path.dirname(__file__))
@@ -34,7 +35,7 @@ def install():
 
     if path_to_volpe_root in path:
         print("Volpe is already on PATH.")
-        
+
         if path_to_volpe_root not in os.environ["PATH"]:
             print("=====")
             print("Please restart this console for changes to take effect.")
@@ -45,7 +46,7 @@ def install():
         path_including_volpe = path + os.pathsep + path_to_volpe_root
         print("Setting local user PATH.")
         os.system(f'SETX Path "{path_including_volpe}"')
-        
+
         print("=====")
         print("Please restart this console for changes to take effect.")
 
@@ -59,7 +60,7 @@ def compile_and_run(file_path, verbose=False, show_time=False, console=False):
     run(file_path, verbose=verbose, show_time=show_time, console=console)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     assert version_info >= (3, 6, 0), "You need Python 3.6 or higher."
 
     args = docopt(__doc__)

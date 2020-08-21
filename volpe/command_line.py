@@ -5,7 +5,7 @@ from volpe_types import int64, char, VolpeArray, VolpeObject, size, int32, pint8
 
 string_type = VolpeArray(char)
 string_list = VolpeArray(string_type)
-string_obj = VolpeObject({'_0': string_list})
+string_obj = VolpeObject({"_0": string_list})
 
 
 def build_main(module, run_func, printf_func):
@@ -51,7 +51,7 @@ def string_to_volpe(b: ir.IRBuilder, string: ir.Value):
         ret(int64(0))
 
     character = b.load(b.gep(string, [phi]))
-    with b.if_then(b.icmp_unsigned('!=', character, char(0))):
+    with b.if_then(b.icmp_unsigned("!=", character, char(0))):
         ret(b.add(phi, int64(1)))
 
     new_string = string_type.unwrap()(ir.Undefined)

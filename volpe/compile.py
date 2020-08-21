@@ -11,7 +11,7 @@ from sys import version_info
 # use nanosecond perf_counter if available
 if version_info >= (3, 7, 0):
     perf_counter = time.perf_counter_ns
-    ticks_in_sec = 1E9
+    ticks_in_sec = 1e9
 else:
     perf_counter = time.perf_counter
     ticks_in_sec = 1
@@ -24,7 +24,7 @@ llvm.initialize_native_target()
 llvm.initialize_native_asmprinter()  # yes, even this one
 
 # Could be useful if you want to compile for other targets.
-# llvmlite.binding.initialize_all_targets() 
+# llvmlite.binding.initialize_all_targets()
 
 # Ensure JIT execution is allowed
 llvm.check_jit_execution()
@@ -59,7 +59,7 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
 
     # Target specific optimizations
     target_machine.add_analysis_passes(pm)
-    
+
     if more_verbose:
         print("\nBefore optimization\n")
         print(mod)
@@ -84,7 +84,7 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     c_type = determine_c_type(result_type)
     func = CFUNCTYPE(None, POINTER(c_type))(func_ptr)
     res = c_type()
-    
+
     if show_time:
         count = 0
         start_time = perf_counter()
@@ -100,16 +100,16 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     if hasattr(res, "decode"):
         res = res.decode(ENCODING)
     print("main() =", repr(res))
-    
+
     if show_time:
         if count > 1:
             print(f"ran the code {count} times")
-            nanoseconds = (end_time - start_time) / count * (1E9 / ticks_in_sec) 
-            if nanoseconds > 1E9:
+            nanoseconds = (end_time - start_time) / count * (1e9 / ticks_in_sec)
+            if nanoseconds > 1e9:
                 print(f"average time: {nanoseconds / 1E9:.3f} s")
-            elif nanoseconds > 1E6:
+            elif nanoseconds > 1e6:
                 print(f"average time: {nanoseconds / 1E6:.3f} ms")
-            elif nanoseconds > 1E3:
+            elif nanoseconds > 1e3:
                 print(f"average time: {nanoseconds / 1E3:.3f} µs")
             else:
                 print(f"average time: {nanoseconds:.3f} ns")

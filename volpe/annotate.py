@@ -6,15 +6,7 @@ from copy import deepcopy
 
 from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, assign
 from tree import TypeTree, volpe_assert, get_obj_key_value
-from volpe_types import (
-    int64,
-    flt64,
-    char,
-    VolpeObject,
-    VolpeClosure,
-    VolpeArray,
-    int1,
-)
+from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1
 
 
 class AnnotateScope(Interpreter):
@@ -32,6 +24,7 @@ class AnnotateScope(Interpreter):
             if tree.return_type is None:
                 tree.return_type = value_type
             volpe_assert(tree.return_type == value_type, "block has different return types", tree)
+
         self.ret = ret
 
         self.visit_children(tree)  # sets tree.return_type
@@ -49,6 +42,7 @@ class AnnotateScope(Interpreter):
             if name in local_scope:
                 return local_scope[name]
             return self.scope(name, tree)
+
         return scope
 
     def symbol(self, tree: TypeTree):

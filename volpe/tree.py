@@ -6,11 +6,11 @@ from lark import Tree, Token
 class TypeTree(Tree):
     return_type = None
     instances = None
-    children: List[Union['TypeTree', Token]]
+    children: List[Union["TypeTree", Token]]
 
     def _pretty_label(self):
         if self.return_type is not None:
-            return f'{self.data}: {self.return_type}'
+            return f"{self.data}: {self.return_type}"
         return self.data
 
     def __deepcopy__(self, memo):
@@ -40,8 +40,8 @@ class VolpeError(Exception):
         spacing = len(str(last_line))
 
         with open(tree.meta.file_path, "r") as f:
-            text = f.readlines()    
-            for i, line in enumerate(text[first_line-1: last_line], first_line):
+            text = f.readlines()
+            for i, line in enumerate(text[first_line - 1 : last_line], first_line):
                 padding = " " * (spacing - len(str(i)))
                 message += f"\n{padding}{i}| {line.rstrip()}"
 
