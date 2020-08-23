@@ -3,12 +3,12 @@ from contextlib import contextmanager
 from llvmlite import ir
 
 from tree import TypeTree, volpe_assert, get_obj_key_value
-from volpe_types import unwrap, is_int, is_flt, char
+from volpe_types import unwrap, is_int, is_flt, is_char
 
 
 def math(self, tree: TypeTree):
     values = self.visit_children(tree)
-    if is_int(tree.return_type):
+    if is_int(tree.return_type) or is_char:
         return getattr(self, tree.data + "_int")(values)
     if is_flt(tree.return_type):
         return getattr(self, tree.data + "_flt")(values)
@@ -17,7 +17,7 @@ def math(self, tree: TypeTree):
 
 def comp(self, tree: TypeTree):
     values = self.visit_children(tree)
-    if is_int(tree.children[0].return_type) or tree.children[0].return_type == char:
+    if is_int(tree.children[0].return_type) or is_char(tree.children[0].return_type):
         return getattr(self, tree.data + "_int")(values)
     if is_flt(tree.children[0].return_type):
         return getattr(self, tree.data + "_flt")(values)
