@@ -14,6 +14,14 @@ ENCODING = "ascii"
 DEBUG_BUFFER = False
 
 
+def get_repr(val):
+    if hasattr(val, "value"):
+        val = val.value
+    if hasattr(val, "decode"):
+        val = val.decode(ENCODING)
+    return repr(val)
+
+
 def determine_c_type(volpe_type):
     """Interpret the volpe type and return a corresponding C type."""
     if DEBUG_BUFFER:
@@ -49,10 +57,12 @@ def determine_c_type(volpe_type):
             size = sizeof(c_type)
             pow2_size = next_pow2(size)
 
-            padding(pow2_size)
+            if not isinstance(value, VolpeObject):
+                padding(pow2_size)
             fields.append((f"*{key}", c_type))
             pos += size
-            padding(pow2_size)
+            if not isinstance(value, VolpeObject):
+                padding(pow2_size)
 
         class CObject(Structure):
             _fields_ = fields
@@ -62,9 +72,8 @@ def determine_c_type(volpe_type):
                 keys = [key for (key, _) in self._fields_ if key[:4] != "*pad"]
                 # Field names are being shown only if they don't begin with an underscore.
                 res = "{" + ", ".join(
-                    [("" if key[1] == "_" else f"{key[1:]}: ") + repr(getattr(self, key)) for key in keys]
-                )
-                res += ",}" if len(self._fields_) == 1 else "}"
+                    [("" if key[1] == "_" else f"{key[1:]}: ") + get_repr(getattr(self, key)) for key in keys]
+                ) + "}"
                 return res
 
         return CObject
