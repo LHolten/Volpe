@@ -3,7 +3,7 @@ from ctypes import CFUNCTYPE, POINTER, byref
 
 import llvmlite.binding as llvm
 
-from volpe_repr import determine_c_type, ENCODING
+from volpe_repr import determine_c_type, get_repr
 
 import time
 from sys import version_info
@@ -95,11 +95,7 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     else:
         func(byref(res))
 
-    if hasattr(res, "value"):
-        res = res.value
-    if hasattr(res, "decode"):
-        res = res.decode(ENCODING)
-    print("main() =", repr(res))
+    print("main() =", get_repr(res))
 
     if show_time:
         if count > 1:
