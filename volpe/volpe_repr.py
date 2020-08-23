@@ -49,10 +49,12 @@ def determine_c_type(volpe_type):
             size = sizeof(c_type)
             pow2_size = next_pow2(size)
 
-            padding(pow2_size)
+            if not isinstance(value, VolpeObject):
+                padding(pow2_size)
             fields.append((f"*{key}", c_type))
             pos += size
-            padding(pow2_size)
+            if not isinstance(value, VolpeObject):
+                padding(pow2_size)
 
         class CObject(Structure):
             _fields_ = fields
