@@ -8,7 +8,7 @@ from volpe_types import unwrap, is_int, is_flt, is_char
 
 def math(self, tree: TypeTree):
     values = self.visit_children(tree)
-    if is_int(tree.return_type) or is_char:
+    if is_int(tree.return_type) or is_char(tree.return_type):
         return getattr(self, tree.data + "_int")(values)
     if is_flt(tree.return_type):
         return getattr(self, tree.data + "_flt")(values)
