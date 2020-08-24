@@ -1,12 +1,14 @@
 from typing import Callable
+from sys import version_info
 
 from lark.visitors import Interpreter
 from lark import Token
 from copy import deepcopy
 
 from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, assign
-from tree import TypeTree, volpe_assert, get_obj_key_value
+from tree import TypeTree, volpe_assert, VolpeError, get_obj_key_value
 from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1
+from version_dependent import is_ascii
 
 
 class AnnotateScope(Interpreter):
@@ -111,7 +113,13 @@ class AnnotateScope(Interpreter):
 
     def string(self, tree: TypeTree):
         tree.data = "list"
-        text = eval(tree.children[0])
+        # Evaluate string using Python
+        try:
+            text = eval(tree.children[0])
+        except SyntaxError as err:
+            raise VolpeError(err.msg, tree)
+        volpe_assert(is_ascii(text), "strings can only have ascii characters", tree)
+
         tree.children = []
         for eval_character in text:
             tree.children.append(TypeTree("character", [Token("CHARACTER", "'" + eval_character + "'")], tree.meta))

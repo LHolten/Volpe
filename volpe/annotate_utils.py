@@ -1,5 +1,5 @@
 from tree import TypeTree, volpe_assert, get_obj_key_value
-from volpe_types import int1, VolpeObject, VolpeArray, char, is_flt, is_int
+from volpe_types import int1, VolpeObject, VolpeArray, char, is_flt, is_int, is_char
 
 
 def logic(self, tree: TypeTree):
@@ -17,7 +17,7 @@ def unary_logic(self, tree: TypeTree):
 def math(self, tree: TypeTree):
     ret = self.visit_children(tree)
     volpe_assert(ret[0] == ret[1], "types need to match for math operations", tree)
-    volpe_assert(is_int(ret[0]) or is_flt(ret[0]), "can only math int and flt")
+    volpe_assert(is_int(ret[0]) or is_flt(ret[0]) or is_char(ret[0]), "can only do math operations with int, flt, or char")
     return ret[0]
 
 
@@ -42,7 +42,7 @@ def math_assign(self, tree: TypeTree):
 def comp(self, tree: TypeTree):
     ret = self.visit_children(tree)
     volpe_assert(ret[0] == ret[1], "types need to match for comparison operations", tree)
-    volpe_assert(ret[0] == char or is_int(ret[0]) or is_flt(ret[0]), "can only compare int, flt and char")
+    volpe_assert(is_char(ret[0]) or is_int(ret[0]) or is_flt(ret[0]), "can only compare int, flt and char")
     return int1
 
 

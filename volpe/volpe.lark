@@ -51,6 +51,7 @@ block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
     | INTEGER -> integer
     | CHARACTER -> character
     | ESCAPED_CHARACTER -> escaped_character
+    | HEX_CHARACTER -> escaped_character
     | ESCAPED_STRING -> string
     | "(" value1 ")" "{" block "}" -> func
     | "{" block "}"
@@ -78,6 +79,7 @@ WS: /[ \t\f]/+
 INTEGER: INT
 FLOATING: INT "." INT
 ESCAPED_CHARACTER: /'\\[abfnrtv'\\]'/
+HEX_CHARACTER: /'\\x[0-7][0-9a-fA-F]'/
 CHARACTER: /'[^'\\]'/
 
 MULTILINE_COMMENT: "#!" /((?!!#).|\n)*/ "!#" " "*

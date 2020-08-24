@@ -18,7 +18,11 @@ def get_repr(val):
     if hasattr(val, "value"):
         val = val.value
     if hasattr(val, "decode"):
-        val = val.decode(ENCODING)
+        try:
+            val = val.decode(ENCODING)
+        except UnicodeDecodeError:
+            # not valid ascii, just use default repr (but remove the b)
+            return repr(val)[1:]
     return repr(val)
 
 
@@ -85,7 +89,11 @@ def determine_c_type(volpe_type):
 
             def __repr__(self):
                 if volpe_type.element == char:
-                    return f'"{bytes(self).decode(ENCODING)}"'
+                    try:
+                        return f'"{bytes(self).decode(ENCODING)}"'
+                    except UnicodeDecodeError:
+                        # if not valid ascii, use default repr, but replace b' ' with b" "
+                        return f'"{repr(self.elements[:])[2:-1]}"'
                 else:
                     return repr(self.elements[:])
 
