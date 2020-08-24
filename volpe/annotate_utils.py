@@ -42,7 +42,7 @@ def math_assign(self, tree: TypeTree):
 def comp(self, tree: TypeTree):
     ret = self.visit_children(tree)
     volpe_assert(ret[0] == ret[1], "types need to match for comparison operations", tree)
-    volpe_assert(ret[0] == char or is_int(ret[0]) or is_flt(ret[0]), "can only compare int, flt and char")
+    volpe_assert(is_char(ret[0]) or is_int(ret[0]) or is_flt(ret[0]), "can only compare int, flt and char")
     return int1
 
 
