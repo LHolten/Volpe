@@ -8,6 +8,7 @@ from copy import deepcopy
 from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, assign
 from tree import TypeTree, volpe_assert, VolpeError, get_obj_key_value
 from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1
+from version_dependent import is_ascii
 
 
 class AnnotateScope(Interpreter):
@@ -117,12 +118,7 @@ class AnnotateScope(Interpreter):
             text = eval(tree.children[0])
         except SyntaxError as err:
             raise VolpeError(err.msg, tree)
-        # Check that all characters are valid ascii
-        if version_info >= (3, 7, 0):
-            is_ascii = text.isascii()
-        else:
-            is_ascii = all(ord(char) < 128 for char in text)
-        volpe_assert(is_ascii, "strings can only have ascii characters", tree)
+        volpe_assert(is_ascii(text), "strings can only have ascii characters", tree)
 
         tree.children = []
         for eval_character in text:
