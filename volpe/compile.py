@@ -48,7 +48,7 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     # https://llvmlite.readthedocs.io/en/latest/user-guide/binding/optimization-passes.html#llvmlite.binding.PassManagerBuilder
     pm_builder = llvm.PassManagerBuilder()
     pm_builder.disable_unroll_loops = False
-    pm_builder.inlining_threshold = 1000
+    pm_builder.inlining_threshold = 100
     pm_builder.loop_vectorize = True
     pm_builder.slp_vectorize = True
     pm_builder.opt_level = 3
@@ -61,15 +61,19 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     target_machine.add_analysis_passes(pm)
 
     if more_verbose:
-        print("\nBefore optimization\n")
-        print(mod)
+        # print("\nBefore optimization\n")
+        # print(mod)
+        with open("before.ll", "w") as file:
+            file.write(str(mod))
 
     # Run the optimization passes
     pm.run(mod)
 
     if more_verbose:
-        print("\nAfter optimization\n")
-        print(mod)
+        # print("\nAfter optimization\n")
+        # print(mod)
+        with open("after.ll", "w") as file:
+            file.write(str(mod))
 
     if console:
         with io.open("output.obj", "wb") as file:
