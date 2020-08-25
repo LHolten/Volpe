@@ -48,25 +48,6 @@ def build_func(func: ir.Function):
     yield builder, func.args
 
 
-def mutate_array(self, tree):
-    if tree.data == "symbol":
-        name = tree.children[0].value
-
-        def fun(value):
-            self.local_scope[name] = value
-
-        return self.get_scope(name), fun
-
-    volpe_assert(tree.data == "list_index", "can only index arrays", tree)
-    array_value, inner_fun = mutate_array(self, tree.children[0])
-    i = self.visit(tree.children[1])
-
-    def fun(value):
-        inner_fun(self.builder.insert_element(array_value, value, i))
-
-    return self.builder.extract_element(array_value, i), fun
-
-
 def assign(self, tree: TypeTree, value):
     if tree.data == "object":
         for i, child in enumerate(tree.children):
@@ -86,8 +67,9 @@ def assign(self, tree: TypeTree, value):
             assign(self, child, self.builder.extract_element(value, i))
 
     elif tree.data == "list_index":
-        array_value, fun = mutate_array(self, tree.children[0])
-        fun(self.builder.insert_element(array_value, value, self.visit(tree.children[1])))
+        array, index = self.visit_children(tree)
+        new_array = self.builder.insert_element(self.visit(tree.children[0]), value, index)
+        assign(self, tree.children[0], new_array)
 
     else:
         volpe_assert(tree.data == "symbol", f"cannot assign to {tree.data}", tree)
