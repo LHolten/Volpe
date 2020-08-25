@@ -51,6 +51,12 @@ def is_char(value: Union[ir.Type, VolpeType]) -> bool:
     return value == char
 
 
+def int1_like(value: Union[ir.Type, VolpeType]) -> Union[ir.Type, VolpeType]:
+    if isinstance(value, VolpeArray):
+        return VolpeArray(int1_like(value.element), value.count)
+    return int1
+
+
 @dataclass
 class VolpeObject(VolpeType):
     type_dict: Dict[str, Union[ir.Type, VolpeType]]

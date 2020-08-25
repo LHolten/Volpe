@@ -1,5 +1,5 @@
 from tree import TypeTree, volpe_assert, get_obj_key_value
-from volpe_types import int1, VolpeObject, VolpeArray, char, is_flt, is_int, is_char
+from volpe_types import int1, VolpeObject, VolpeArray, is_flt, is_int, is_char, int1_like
 
 
 def logic(self, tree: TypeTree):
@@ -43,7 +43,7 @@ def comp(self, tree: TypeTree):
     ret = self.visit_children(tree)
     volpe_assert(ret[0] == ret[1], "types need to match for comparison operations", tree)
     volpe_assert(is_char(ret[0]) or is_int(ret[0]) or is_flt(ret[0]), "can only compare int, flt and char")
-    return int1
+    return int1_like(ret[0])
 
 
 def assign(self, scope: dict, tree: TypeTree, value):
