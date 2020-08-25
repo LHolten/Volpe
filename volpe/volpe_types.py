@@ -45,6 +45,12 @@ def is_flt(value: Union[ir.Type, VolpeType]) -> bool:
     return value == flt64
 
 
+def is_char(value: Union[ir.Type, VolpeType]) -> bool:
+    if isinstance(value, VolpeArray):
+        return is_char(value.element)
+    return value == char
+
+
 @dataclass
 class VolpeObject(VolpeType):
     type_dict: Dict[str, Union[ir.Type, VolpeType]]

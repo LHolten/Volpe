@@ -3,20 +3,12 @@ from ctypes import CFUNCTYPE, POINTER, byref
 
 import llvmlite.binding as llvm
 
-from volpe_repr import determine_c_type, ENCODING
+from volpe_repr import determine_c_type, get_repr
+from version_dependent import perf_counter, TICKS_IN_SEC
 
 import time
-from sys import version_info
 
-# use nanosecond perf_counter if available
-if version_info >= (3, 7, 0):
-    perf_counter = time.perf_counter_ns
-    ticks_in_sec = 1e9
-else:
-    perf_counter = time.perf_counter
-    ticks_in_sec = 1
-
-MEASUREMENT_TIME = 5.0 * ticks_in_sec
+MEASUREMENT_TIME = 5.0 * TICKS_IN_SEC
 
 # All these initializations are required for code generation!
 llvm.initialize()
@@ -48,7 +40,7 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     # https://llvmlite.readthedocs.io/en/latest/user-guide/binding/optimization-passes.html#llvmlite.binding.PassManagerBuilder
     pm_builder = llvm.PassManagerBuilder()
     pm_builder.disable_unroll_loops = False
-    pm_builder.inlining_threshold = 1000
+    pm_builder.inlining_threshold = 100
     pm_builder.loop_vectorize = True
     pm_builder.slp_vectorize = True
     pm_builder.opt_level = 3
@@ -61,15 +53,19 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     target_machine.add_analysis_passes(pm)
 
     if more_verbose:
-        print("\nBefore optimization\n")
-        print(mod)
+        # print("\nBefore optimization\n")
+        # print(mod)
+        with open("before.ll", "w") as file:
+            file.write(str(mod))
 
     # Run the optimization passes
     pm.run(mod)
 
     if more_verbose:
-        print("\nAfter optimization\n")
-        print(mod)
+        # print("\nAfter optimization\n")
+        # print(mod)
+        with open("after.ll", "w") as file:
+            file.write(str(mod))
 
     if console:
         with io.open("output.obj", "wb") as file:
@@ -95,16 +91,12 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     else:
         func(byref(res))
 
-    if hasattr(res, "value"):
-        res = res.value
-    if hasattr(res, "decode"):
-        res = res.decode(ENCODING)
-    print("main() =", repr(res))
+    print("main() =", get_repr(res))
 
     if show_time:
         if count > 1:
             print(f"ran the code {count} times")
-            nanoseconds = (end_time - start_time) / count * (1e9 / ticks_in_sec)
+            nanoseconds = (end_time - start_time) / count * (1e9 / TICKS_IN_SEC)
             if nanoseconds > 1e9:
                 print(f"average time: {nanoseconds / 1E9:.3f} s")
             elif nanoseconds > 1e6:
@@ -115,4 +107,4 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
                 print(f"average time: {nanoseconds:.3f} ns")
         else:
             print("ran the code once")
-            print(f"time: {(end_time - start_time) / ticks_in_sec:.3f} s")
+            print(f"time: {(end_time - start_time) / TICKS_IN_SEC:.3f} s")

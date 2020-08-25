@@ -241,7 +241,7 @@ class LLVMScope(Interpreter):
 
     @staticmethod
     def escaped_character(tree: TypeTree):
-        # let Python parse the escaped character
+        # let Python parse the escaped character (guaranteed ascii by lark)
         evaluated = eval(f"{tree.children[0]}")
         return tree.return_type(ord(evaluated))
 
