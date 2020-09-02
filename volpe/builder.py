@@ -5,7 +5,7 @@ from llvmlite import ir
 
 from builder_utils import options, assign, math, comp, build_or_get_function
 from tree import TypeTree, volpe_assert, get_obj_key_value
-from volpe_types import int1, int64, flt64, unwrap, VolpeObject
+from volpe_types import int1, int64, flt64, unwrap, VolpeObject, int32
 
 
 class LLVMScope(Interpreter):
@@ -110,6 +110,13 @@ class LLVMScope(Interpreter):
         for i, ret in enumerate(self.visit_children(tree)):
             array_value = self.builder.insert_element(array_value, ret, int64(i))
         return array_value
+
+    def constant_list(self, tree: TypeTree):
+        value = self.visit(tree.children[0])
+        array_value = unwrap(tree.return_type)(ir.Undefined)
+        array_value = self.builder.insert_element(array_value, value, int64(0))
+        mask = ir.VectorType(int32, tree.return_type.count)([0] * tree.return_type.count)
+        return self.builder.shuffle_vector(array_value, unwrap(tree.return_type)(ir.Undefined), mask)
 
     def implication(self, tree: TypeTree):
         with options(self.builder, tree.return_type) as (ret, phi):

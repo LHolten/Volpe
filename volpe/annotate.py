@@ -119,6 +119,7 @@ class AnnotateScope(Interpreter):
         except SyntaxError as err:
             raise VolpeError(err.msg, tree)
         volpe_assert(is_ascii(text), "strings can only have ascii characters", tree)
+        volpe_assert(len(text) > 0, "empty strings are not allowed", tree)
 
         tree.children = []
         for eval_character in text:
@@ -143,6 +144,10 @@ class AnnotateScope(Interpreter):
         for child in tree.children[1:]:
             volpe_assert(element_type == self.visit(child), "different types in list", tree)
         return VolpeArray(element_type, len(tree.children))
+
+    def constant_list(self, tree: TypeTree):
+        element_type = self.visit(tree.children[0])
+        return VolpeArray(element_type, int(tree.children[1].value))
 
     def convert_int(self, tree: TypeTree):
         volpe_assert(self.visit(tree.children[0]) == int64, "can only convert int", tree)
