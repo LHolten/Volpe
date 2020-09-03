@@ -40,47 +40,33 @@ def math_assign(self, tree: TypeTree):
 
 
 def chain_comp(self, tree: TypeTree):
-    # Single comparison
-    if len(tree.children) == 3:
-        a, symbol, b = tree.children[0], tree.children[1], tree.children[2]
-        tree.data = symbol_to_data(symbol)
-        tree.children = [a, b]
-        self.visit_children(tree)
+    symbol_to_data = {
+        "<=": "less_equals",
+        ">=": "greater_equals",
+        "<": "less",
+        ">": "greater",
+    }
 
-    # Chained comparison
-    else:
-        # Separate expressions and comparison operators.
-        expressions = tree.children[::2]
-        comparisons = tree.children[1::2]
+    # Separate expressions and comparison operators.
+    expressions = tree.children[::2]
+    comparisons = tree.children[1::2]
 
-        # Generate comparison trees.
-        comp_trees = [
-            TypeTree(symbol_to_data(symbol), [a, b], tree.meta)
-            for symbol, a, b in zip(comparisons, expressions[:-1], expressions[1:])
-        ]
+    # Generate comparison trees.
+    comp_trees = [
+        TypeTree(symbol_to_data[symbol], [a, b], tree.meta)
+        for symbol, a, b in zip(comparisons, expressions[:-1], expressions[1:])
+    ]
 
-        # Build up nested tree.
-        prev_tree = TypeTree("logic_and", [comp_trees[0], comp_trees[1]], tree.meta)
-        for comp_tree in comp_trees[2:]:
-            prev_tree = TypeTree("logic_and", [prev_tree, comp_tree], tree.meta)
+    # Build up nested tree.
+    prev_tree = comp_trees[0]
+    for comp_tree in comp_trees[1:]:
+        prev_tree = TypeTree("logic_and", [prev_tree, comp_tree], tree.meta)
 
-        # Override this node with last.
-        tree.data = prev_tree.data
-        tree.children = prev_tree.children
+    # Override this node with last.
+    tree.data = prev_tree.data
+    tree.children = prev_tree.children
 
-        self.visit_children(tree)
-
-
-def symbol_to_data(symbol):
-    if symbol == "<=":
-        return "less_equals"
-    if symbol == ">=":
-        return "greater_equals"
-    if symbol == "<":
-        return "less"
-    if symbol == ">":
-        return "greater"
-    raise VolpeError(f"unknown comparison operator `{symbol}` in symbol_to_data")
+    self.visit_children(tree)
 
 
 def comp(self, tree: TypeTree):
