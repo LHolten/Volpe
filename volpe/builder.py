@@ -167,8 +167,14 @@ class LLVMScope(Interpreter):
     def mod_int(self, values):
         return self.builder.srem(values[0], values[1])
 
+    def mod_uint(self, values):
+        return self.builder.urem(values[0], values[1])
+
     def div_int(self, values):
         return self.builder.sdiv(values[0], values[1])
+
+    def div_uint(self, values):
+        return self.builder.udiv(values[0], values[1])
 
     def mul_int(self, values):
         # TODO Use overflow bit to raise runtime error
