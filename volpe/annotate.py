@@ -5,7 +5,7 @@ from lark.visitors import Interpreter
 from lark import Token
 from copy import deepcopy
 
-from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, assign
+from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, chain_comp, assign
 from tree import TypeTree, volpe_assert, VolpeError, get_obj_key_value
 from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1
 from version_dependent import is_ascii
@@ -183,6 +183,7 @@ class AnnotateScope(Interpreter):
     mod_assign = math_assign
 
     # Comparison
+    chain_comp = chain_comp
     equals = comp
     not_equals = comp
     greater = comp

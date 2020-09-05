@@ -25,10 +25,7 @@ block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
     | value5 "!=" value6 -> not_equals
 
 ?value6: value7
-    | value6 "<=" value7 -> less_equals
-    | value6 ">=" value7 -> greater_equals
-    | value6 "<" value7 -> less
-    | value6 ">" value7 -> greater
+    | value7 (COMP_TYPE value7)+ -> chain_comp
 
 ?value7: value8
     | value7 "+" value8 -> add
@@ -89,6 +86,7 @@ NEWLINE: (CR? LF)
 
 THIS_FUNC: "@"
 IMPORT: "$" CNAME
+COMP_TYPE: "<=" | ">=" | "<" | ">"
 
 _COM: COMMENT
     | MULTILINE_COMMENT

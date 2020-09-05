@@ -1,4 +1,4 @@
-from tree import TypeTree, volpe_assert, get_obj_key_value
+from tree import TypeTree, volpe_assert, VolpeError, get_obj_key_value
 from volpe_types import int1, VolpeObject, VolpeArray, is_flt, is_int, is_char, int1_like
 
 
@@ -37,6 +37,36 @@ def math_assign(self, tree: TypeTree):
     tree.children[1] = TypeTree(operation, [symbol, expression], tree.meta)
 
     return self.visit(tree)
+
+
+def chain_comp(self, tree: TypeTree):
+    symbol_to_data = {
+        "<=": "less_equals",
+        ">=": "greater_equals",
+        "<": "less",
+        ">": "greater",
+    }
+
+    # Separate expressions and comparison operators.
+    expressions = tree.children[::2]
+    comparisons = tree.children[1::2]
+
+    # Generate comparison trees.
+    comp_trees = [
+        TypeTree(symbol_to_data[symbol], [a, b], tree.meta)
+        for symbol, a, b in zip(comparisons, expressions[:-1], expressions[1:])
+    ]
+
+    # Build up nested tree.
+    prev_tree = comp_trees[0]
+    for comp_tree in comp_trees[1:]:
+        prev_tree = TypeTree("logic_and", [prev_tree, comp_tree], tree.meta)
+
+    # Override this node with last.
+    tree.data = prev_tree.data
+    tree.children = prev_tree.children
+
+    self.visit_children(tree)
 
 
 def comp(self, tree: TypeTree):
