@@ -1,25 +1,11 @@
 import io
 from ctypes import CFUNCTYPE, POINTER, byref
 
-import llvmlite.binding as llvm
-
+from target import target_machine, pass_manager, llvm
 from volpe_repr import determine_c_type, get_repr
 from version_dependent import perf_counter, TICKS_IN_SEC
 
-import time
-
 MEASUREMENT_TIME = 5.0 * TICKS_IN_SEC
-
-# All these initializations are required for code generation!
-llvm.initialize()
-llvm.initialize_native_target()
-llvm.initialize_native_asmprinter()  # yes, even this one
-
-# Could be useful if you want to compile for other targets.
-# llvmlite.binding.initialize_all_targets()
-
-# Ensure JIT execution is allowed
-llvm.check_jit_execution()
 
 
 def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, console=False):
@@ -28,29 +14,10 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     the host CPU. The engine is reusable for an arbitrary number of
     modules.
     """
-    # Create a target machine representing the host
-    target = llvm.Target.from_triple(llvm.get_process_triple())
-    target_machine = target.create_target_machine(codemodel="default")
     # And an execution engine with an empty backing module
     mod = llvm.parse_assembly(llvm_ir)
     mod.triple = llvm.get_process_triple()
     mod.verify()
-
-    # Configure optimization pass manager builder
-    # https://llvmlite.readthedocs.io/en/latest/user-guide/binding/optimization-passes.html#llvmlite.binding.PassManagerBuilder
-    pm_builder = llvm.PassManagerBuilder()
-    pm_builder.disable_unroll_loops = False
-    pm_builder.inlining_threshold = 100
-    pm_builder.loop_vectorize = True
-    pm_builder.slp_vectorize = True
-    pm_builder.opt_level = 3
-    pm_builder.size_level = 0
-
-    pm = llvm.ModulePassManager()
-    pm_builder.populate(pm)
-
-    # Target specific optimizations
-    target_machine.add_analysis_passes(pm)
 
     if more_verbose:
         # print("\nBefore optimization\n")
@@ -59,7 +26,7 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
             file.write(str(mod))
 
     # Run the optimization passes
-    pm.run(mod)
+    pass_manager.run(mod)
 
     if more_verbose:
         # print("\nAfter optimization\n")

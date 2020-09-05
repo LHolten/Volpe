@@ -8,7 +8,8 @@ from ctypes import (
     Structure,
 )
 
-from volpe_types import int1, int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray
+from volpe_types import int1, int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, unwrap
+from target import target_data
 
 ENCODING = "ascii"
 DEBUG_BUFFER = False
@@ -48,25 +49,16 @@ def determine_c_type(volpe_type):
         fields = []
         pos = 0
 
-        def padding(size):
-            nonlocal fields
-            nonlocal pos
-            if size != 0 and pos % size != 0:
-                pad_needed = size - (pos % size)
+        for i, (key, value) in enumerate(volpe_type.type_dict.items()):
+            ll_type = unwrap(volpe_type)._get_ll_pointer_type(target_data).element_type
+            pad_needed = target_data.get_element_offset(ll_type, i) - pos
+            if pad_needed != 0:
                 fields.append((f"*pad_at_{pos}_size_{pad_needed}", get_padding(pad_needed)))
                 pos += pad_needed
 
-        for key, value in volpe_type.type_dict.items():
             c_type = determine_c_type(value)
-            size = sizeof(c_type)
-            pow2_size = next_pow2(size)
-
-            if not isinstance(value, VolpeObject):
-                padding(pow2_size)
             fields.append((f"*{key}", c_type))
-            pos += size
-            if not isinstance(value, VolpeObject):
-                padding(pow2_size)
+            pos += sizeof(c_type)
 
         class CObject(Structure):
             _fields_ = fields
@@ -133,12 +125,3 @@ def get_padding(size):
             return res
 
     return Buffer
-
-
-def next_pow2(x):
-    if x == 0:
-        return 0
-    power = 1
-    while power < x:
-        power *= 2
-    return power
