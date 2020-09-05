@@ -167,8 +167,14 @@ class LLVMScope(Interpreter):
     def mod_int(self, values):
         return self.builder.srem(values[0], values[1])
 
+    def mod_uint(self, values):
+        return self.builder.urem(values[0], values[1])
+
     def div_int(self, values):
         return self.builder.sdiv(values[0], values[1])
+
+    def div_uint(self, values):
+        return self.builder.udiv(values[0], values[1])
 
     def mul_int(self, values):
         # TODO Use overflow bit to raise runtime error
@@ -181,8 +187,14 @@ class LLVMScope(Interpreter):
     def convert_int(self, tree: TypeTree):
         value = self.visit(tree.children[0])
         float_value = self.builder.sitofp(value, flt64)
-        decimals = tree.return_type(float("0." + tree.children[1].value))
-        return self.builder.fadd(float_value, decimals)
+        decimals = flt64(float("0." + tree.children[1].value))
+        # Subtract decimal part if float is negative.
+        negative = self.builder.fcmp_ordered("<", float_value, flt64(0.0))
+        with options(self.builder, tree.return_type) as (ret, phi):
+            with self.builder.if_then(negative):
+                ret(self.builder.fsub(float_value, decimals))
+            ret(self.builder.fadd(float_value, decimals))
+        return phi
 
     def equals_int(self, values):
         return self.builder.icmp_signed("==", values[0], values[1])
