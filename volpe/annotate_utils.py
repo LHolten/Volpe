@@ -91,13 +91,13 @@ def assign(self, scope: dict, tree: TypeTree, value):
     elif tree.data == "attribute":
         volpe_assert(self.visit(tree) == value, "wrong type in attribute assignment", tree)
 
-    elif tree.data == "list":
+    elif tree.data == "array":
         volpe_assert(isinstance(value, VolpeArray), "can only destructure array")
         volpe_assert(value.count == len(tree.children), "array has wrong length")
         for child in tree.children:
             assign(self, scope, child, value.element)
 
-    elif tree.data == "list_index":
+    elif tree.data == "array_index":
         volpe_assert(self.visit(tree) == value, "wrong type in array assignment", tree)
 
     else:

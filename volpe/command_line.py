@@ -4,8 +4,8 @@ from builder_utils import build_func, free, options
 from volpe_types import int64, char, VolpeArray, VolpeObject, size, int32, pint8
 
 string_type = VolpeArray(char)
-string_list = VolpeArray(string_type)
-string_obj = VolpeObject({"_0": string_list})
+string_array = VolpeArray(string_type)
+string_obj = VolpeObject({"_0": string_array})
 
 
 def build_main(module, run_func, printf_func):
@@ -29,7 +29,7 @@ def build_main(module, run_func, printf_func):
 
             ret(b.add(phi, int64(1)))
 
-        arguments = string_list.unwrap()(ir.Undefined)
+        arguments = string_array.unwrap()(ir.Undefined)
         arguments = b.insert_value(arguments, pointer, 0)
         arguments = b.insert_value(arguments, num_args, 1)
 

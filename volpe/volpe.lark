@@ -41,8 +41,7 @@ block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
     | "!" value9 -> logic_not
     | "~" value9 -> convert_flt
     | value9 "." INTEGER -> convert_int
-    | "|" value10 "|" -> list_size
-    | value9 "::" value10 -> concatenate
+    | "|" value10 "|" -> array_size
 
 ?value10: symbol
     | INTEGER -> integer
@@ -53,11 +52,12 @@ block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
     | "(" value1 ")" "{" block "}" -> func
     | "{" block "}"
     | "(" value1 ")"
-    | "[" _SEP* value2 ("," _SEP* value2)* _SEP* "]" -> list
-    | "[" _SEP* value1 _SEP* ";" _SEP* INTEGER _SEP* "]" -> constant_list
+    | "[" _SEP* value2 ("," _SEP* value2)* _SEP* "]" -> array
+    | "[" _SEP* value1 _SEP* ";" _SEP* INTEGER _SEP* "]" -> constant_array
+    | "[" _SEP* value1 _SEP* ";" _SEP* "|" value10 "|" _SEP* "]" -> constant_array_like
     | value10 "." CNAME -> attribute
     | value10 "(" value1 ")" -> func_call
-    | value10 "[" _SEP* value2 _SEP* "]" -> list_index
+    | value10 "[" _SEP* value2 _SEP* "]" -> array_index
 
 object: item "," (_SEP* item ("," _SEP* item)*)?
 item: (CNAME ":" _SEP*)? value2

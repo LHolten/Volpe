@@ -112,7 +112,7 @@ class AnnotateScope(Interpreter):
         return char
 
     def string(self, tree: TypeTree):
-        tree.data = "list"
+        tree.data = "array"
         # Evaluate string using Python
         try:
             text = eval(tree.children[0])
@@ -127,27 +127,33 @@ class AnnotateScope(Interpreter):
         self.visit_children(tree)
         return VolpeArray(char, len(tree.children))
 
-    def list_index(self, tree: TypeTree):
+    def array_index(self, tree: TypeTree):
         volpe_array, index = self.visit_children(tree)
         volpe_assert(isinstance(volpe_array, VolpeArray), "can only index arrays", tree)
         volpe_assert(index == int64, "can only index with an integer", tree)
         return volpe_array.element
 
-    def list_size(self, tree: TypeTree):
+    def array_size(self, tree: TypeTree):
         volpe_array = self.visit_children(tree)[0]
         volpe_assert(isinstance(volpe_array, VolpeArray), "can only get size of arrays", tree)
         return int64
 
-    def list(self, tree: TypeTree):
+    def array(self, tree: TypeTree):
         volpe_assert(len(tree.children) > 0, "array needs at least one value", tree)
         element_type = self.visit(tree.children[0])
         for child in tree.children[1:]:
-            volpe_assert(element_type == self.visit(child), "different types in list", tree)
+            volpe_assert(element_type == self.visit(child), "different types in array", tree)
         return VolpeArray(element_type, len(tree.children))
 
-    def constant_list(self, tree: TypeTree):
+    def constant_array(self, tree: TypeTree):
         element_type = self.visit(tree.children[0])
         return VolpeArray(element_type, int(tree.children[1].value))
+
+    def constant_array_like(self, tree: TypeTree):
+        tree.data = "constant_array"
+        element_type, parent_array = self.visit_children(tree)
+        volpe_assert(isinstance(parent_array, VolpeArray), "can only get size of arrays", tree)
+        return VolpeArray(element_type, parent_array.count)
 
     def convert_int(self, tree: TypeTree):
         volpe_assert(self.visit(tree.children[0]) == int64, "can only convert int", tree)
