@@ -149,6 +149,12 @@ class AnnotateScope(Interpreter):
         element_type = self.visit(tree.children[0])
         return VolpeArray(element_type, int(tree.children[1].value))
 
+    def constant_list_like(self, tree: TypeTree):
+        tree.data = "constant_list"
+        element_type, parent_array = self.visit_children(tree)
+        volpe_assert(isinstance(parent_array, VolpeArray), "can only get size of arrays", tree)
+        return VolpeArray(element_type, parent_array.count)
+
     def convert_int(self, tree: TypeTree):
         volpe_assert(self.visit(tree.children[0]) == int64, "can only convert int", tree)
         return flt64
