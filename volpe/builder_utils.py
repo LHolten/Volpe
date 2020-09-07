@@ -67,11 +67,11 @@ def assign(self, tree: TypeTree, value):
         # update scope
         assign(self, tree.children[0], value)
 
-    elif tree.data == "list":
+    elif tree.data == "array":
         for i, child in enumerate(tree.children):
             assign(self, child, self.builder.extract_element(value, i))
 
-    elif tree.data == "list_index":
+    elif tree.data == "array_index":
         array, index = self.visit_children(tree)
         new_array = self.builder.insert_element(self.visit(tree.children[0]), value, index)
         assign(self, tree.children[0], new_array)

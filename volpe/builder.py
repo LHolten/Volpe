@@ -97,21 +97,21 @@ class LLVMScope(Interpreter):
         index = list(value.type.type_dict.keys()).index(tree.children[1])
         return self.builder.extract_value(value, index)
 
-    def list_index(self, tree: TypeTree):
+    def array_index(self, tree: TypeTree):
         array_value, i = self.visit_children(tree)
         return self.builder.extract_element(array_value, i)
 
     @staticmethod
-    def list_size(tree: TypeTree):
+    def array_size(tree: TypeTree):
         return int64(tree.children[0].return_type.count)
 
-    def list(self, tree: TypeTree):
+    def array(self, tree: TypeTree):
         array_value = unwrap(tree.return_type)(ir.Undefined)
         for i, ret in enumerate(self.visit_children(tree)):
             array_value = self.builder.insert_element(array_value, ret, int64(i))
         return array_value
 
-    def constant_list(self, tree: TypeTree):
+    def constant_array(self, tree: TypeTree):
         value = self.visit(tree.children[0])
         array_value = unwrap(tree.return_type)(ir.Undefined)
         array_value = self.builder.insert_element(array_value, value, int64(0))
