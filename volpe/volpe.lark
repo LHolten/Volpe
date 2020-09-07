@@ -42,7 +42,6 @@ block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
     | "~" value9 -> convert_flt
     | value9 "." INTEGER -> convert_int
     | "|" value10 "|" -> array_size
-    | value9 "::" value10 -> concatenate
 
 ?value10: symbol
     | INTEGER -> integer
