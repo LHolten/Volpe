@@ -29,6 +29,11 @@ class VolpeError(Exception):
             super().__init__(message)
             return
 
+        # Add type info to error
+        types = ", ".join(str(child.return_type) for child in tree.children)
+        s = "s" if len(tree.children) > 1 else ""
+        message += f"\n  type{s}: {types}"
+
         if not hasattr(tree.meta, "file_path"):
             # file_path in tree.meta has not been initialized
             super().__init__(message + f", line: {tree.meta.line}")
@@ -45,9 +50,11 @@ class VolpeError(Exception):
                 padding = " " * (spacing - len(str(i)))
                 message += f"\n{padding}{i}| {line.rstrip()}"
 
-        if stack_trace is not None:
+        if stack_trace is not None and len(stack_trace) > 0:
+            trace = ""
             for bush in stack_trace:
-                message = str(VolpeError(f"in {bush.data}:", bush)) + "  # types: " + ", ".join(str(child.return_type) for child in tree.children) + "\n" + message
+                trace = trace + str(VolpeError(f"{bush.data}", bush)) + "\n"
+            message = f"-- stack trace --\n{trace}-- - - - - - - --\n{message}"
 
         super().__init__(message)
 
