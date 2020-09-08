@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, List
 from sys import version_info
 
 from lark.visitors import Interpreter
@@ -12,10 +12,11 @@ from version_dependent import is_ascii
 
 
 class AnnotateScope(Interpreter):
-    def __init__(self, tree: TypeTree, scope: Callable, args=None):
+    def __init__(self, tree: TypeTree, scope: Callable, args=None, stack_trace: List[TypeTree]=[]):
         self.scope = scope
         self.local_scope = dict()
         self.used = set()
+        self.stack_trace = stack_trace
 
         if args is not None:
             assign(self, self.local_scope, args[0], args[1])
@@ -25,11 +26,14 @@ class AnnotateScope(Interpreter):
         def ret(value_type):
             if tree.return_type is None:
                 tree.return_type = value_type
-            volpe_assert(tree.return_type == value_type, "block has different return types", tree)
+            self.assert_(tree.return_type == value_type, "block has different return types", tree)
 
         self.ret = ret
 
         self.visit_children(tree)  # sets tree.return_type
+
+    def assert_(self, condition, message, tree=None):
+        volpe_assert(condition, message, tree, self.stack_trace)
 
     def visit(self, tree: TypeTree):
         tree.return_type = getattr(self, tree.data)(tree)
@@ -51,21 +55,21 @@ class AnnotateScope(Interpreter):
         return self.get_scope()(tree.children[0].value, tree)
 
     def block(self, tree: TypeTree):
-        AnnotateScope(tree, self.get_scope())
+        AnnotateScope(tree, self.get_scope(), self.stack_trace)
         return tree.return_type
 
     def object(self, tree: TypeTree):
         scope = dict()
         for i, child in enumerate(tree.children):
             key, attribute = get_obj_key_value(child, i)
-            volpe_assert(key not in scope, f"attribute names have to be unique, `{key}` is not", tree)
+            self.assert_(key not in scope, f"attribute names have to be unique, `{key}` is not", tree)
             scope[key] = self.visit(attribute)
         return VolpeObject(scope)
 
     def attribute(self, tree: TypeTree):
         obj, key = self.visit(tree.children[0]), tree.children[1]
-        volpe_assert(isinstance(obj, VolpeObject), "only objects have attributes", tree)
-        volpe_assert(key in obj.type_dict, f"this object does not have an attribute named {key}", tree)
+        self.assert_(isinstance(obj, VolpeObject), "only objects have attributes", tree)
+        self.assert_(key in obj.type_dict, f"this object does not have an attribute named {key}", tree)
         return obj.type_dict[tree.children[1]]
 
     def func(self, tree: TypeTree):
@@ -74,6 +78,7 @@ class AnnotateScope(Interpreter):
         return VolpeClosure(tree=tree, scope=self.get_scope())
 
     def func_call(self, tree: TypeTree):
+        self.stack_trace.append(tree)
         closure, args = self.visit_children(tree)
 
         if args not in closure.tree.instances:
@@ -89,7 +94,7 @@ class AnnotateScope(Interpreter):
                 return closure.env[name]
 
             AnnotateScope(new_tree.children[1], scope, (new_tree.children[0], args))
-
+        self.stack_trace.pop()
         return closure.tree.instances[args].children[1].return_type
 
     def return_n(self, tree: TypeTree):
@@ -117,9 +122,9 @@ class AnnotateScope(Interpreter):
         try:
             text = eval(tree.children[0])
         except SyntaxError as err:
-            raise VolpeError(err.msg, tree)
-        volpe_assert(is_ascii(text), "strings can only have ascii characters", tree)
-        volpe_assert(len(text) > 0, "empty strings are not allowed", tree)
+            raise VolpeError(err.msg, tree, self.stack_trace)
+        self.assert_(is_ascii(text), "strings can only have ascii characters", tree)
+        self.assert_(len(text) > 0, "empty strings are not allowed", tree)
 
         tree.children = []
         for eval_character in text:
@@ -129,20 +134,20 @@ class AnnotateScope(Interpreter):
 
     def array_index(self, tree: TypeTree):
         volpe_array, index = self.visit_children(tree)
-        volpe_assert(isinstance(volpe_array, VolpeArray), "can only index arrays", tree)
-        volpe_assert(index == int64, "can only index with an integer", tree)
+        self.assert_(isinstance(volpe_array, VolpeArray), "can only index arrays", tree)
+        self.assert_(index == int64, "can only index with an integer", tree)
         return volpe_array.element
 
     def array_size(self, tree: TypeTree):
         volpe_array = self.visit_children(tree)[0]
-        volpe_assert(isinstance(volpe_array, VolpeArray), "can only get size of arrays", tree)
+        self.assert_(isinstance(volpe_array, VolpeArray), "can only get size of arrays", tree)
         return int64
 
     def array(self, tree: TypeTree):
-        volpe_assert(len(tree.children) > 0, "array needs at least one value", tree)
+        self.assert_(len(tree.children) > 0, "array needs at least one value", tree)
         element_type = self.visit(tree.children[0])
         for child in tree.children[1:]:
-            volpe_assert(element_type == self.visit(child), "different types in array", tree)
+            self.assert_(element_type == self.visit(child), "different types in array", tree)
         return VolpeArray(element_type, len(tree.children))
 
     def constant_array(self, tree: TypeTree):
@@ -152,15 +157,15 @@ class AnnotateScope(Interpreter):
     def constant_array_like(self, tree: TypeTree):
         tree.data = "constant_array"
         element_type, parent_array = self.visit_children(tree)
-        volpe_assert(isinstance(parent_array, VolpeArray), "can only get size of arrays", tree)
+        self.assert_(isinstance(parent_array, VolpeArray), "can only get size of arrays", tree)
         return VolpeArray(element_type, parent_array.count)
 
     def convert_int(self, tree: TypeTree):
-        volpe_assert(self.visit(tree.children[0]) == int64, "can only convert int", tree)
+        self.assert_(self.visit(tree.children[0]) == int64, "can only convert int", tree)
         return flt64
 
     def convert_flt(self, tree: TypeTree):
-        volpe_assert(self.visit(tree.children[0]) == flt64, "can only convert float", tree)
+        self.assert_(self.visit(tree.children[0]) == flt64, "can only convert float", tree)
         return int64
 
     def if_then(self, tree: TypeTree):

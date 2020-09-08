@@ -24,7 +24,7 @@ def get_obj_key_value(tree: TypeTree, i):
 
 
 class VolpeError(Exception):
-    def __init__(self, message: str, tree: Optional[TypeTree] = None):
+    def __init__(self, message: str, tree: Optional[TypeTree]=None, stack_trace: Optional[List[TypeTree]]=None):
         if tree is None:
             super().__init__(message)
             return
@@ -45,9 +45,13 @@ class VolpeError(Exception):
                 padding = " " * (spacing - len(str(i)))
                 message += f"\n{padding}{i}| {line.rstrip()}"
 
+        if stack_trace is not None:
+            for bush in stack_trace:
+                print(str(VolpeError(f"in {bush.data}:", bush)))
+
         super().__init__(message)
 
 
-def volpe_assert(condition: bool, message: str, tree: Optional[TypeTree] = None):
+def volpe_assert(condition: bool, message: str, tree: Optional[TypeTree]=None, stack_trace: Optional[List[TypeTree]]=None):
     if not condition:
-        raise VolpeError(message, tree)
+        raise VolpeError(message, tree, stack_trace)
