@@ -47,7 +47,7 @@ class VolpeError(Exception):
 
         if stack_trace is not None:
             for bush in stack_trace:
-                print(str(VolpeError(f"in {bush.data}:", bush)))
+                message = str(VolpeError(f"in {bush.data}:", bush)) + "  # types: " + ", ".join(str(child.return_type) for child in tree.children) + "\n" + message
 
         super().__init__(message)
 
