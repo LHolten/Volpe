@@ -17,7 +17,7 @@ def unary_logic(self, tree: TypeTree):
 def math(self, tree: TypeTree):
     ret = self.visit_children(tree)
     self.assert_(ret[0] == ret[1], "types need to match for math operations", tree)
-    self.assert_(is_int(ret[0]) or is_flt(ret[0]) or is_char(ret[0]), "can only do math operations with int, flt, or char")
+    self.assert_(is_int(ret[0]) or is_flt(ret[0]) or is_char(ret[0]), "can only do math operations with int, flt, or char", tree)
     return ret[0]
 
 
@@ -72,7 +72,7 @@ def chain_comp(self, tree: TypeTree):
 def comp(self, tree: TypeTree):
     ret = self.visit_children(tree)
     self.assert_(ret[0] == ret[1], "types need to match for comparison operations", tree)
-    self.assert_(is_char(ret[0]) or is_int(ret[0]) or is_flt(ret[0]), "can only compare int, flt and char")
+    self.assert_(is_char(ret[0]) or is_int(ret[0]) or is_flt(ret[0]), "can only compare int, flt and char", tree)
     return int1_like(ret[0])
 
 
@@ -92,8 +92,8 @@ def assign(self, scope: dict, tree: TypeTree, value):
         self.assert_(self.visit(tree) == value, "wrong type in attribute assignment", tree)
 
     elif tree.data == "array":
-        self.assert_(isinstance(value, VolpeArray), "can only destructure array")
-        self.assert_(value.count == len(tree.children), "array has wrong length")
+        self.assert_(isinstance(value, VolpeArray), "can only destructure array", tree)
+        self.assert_(value.count == len(tree.children), "array has wrong length", tree)
         for child in tree.children:
             assign(self, scope, child, value.element)
 
