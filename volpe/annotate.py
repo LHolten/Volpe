@@ -1,4 +1,4 @@
-from typing import Callable, List
+from typing import Callable, List, Optional
 from sys import version_info
 
 from lark.visitors import Interpreter
@@ -12,11 +12,12 @@ from version_dependent import is_ascii
 
 
 class AnnotateScope(Interpreter):
-    def __init__(self, tree: TypeTree, scope: Callable, args=None, stack_trace: List[TypeTree]=[]):
+    def __init__(self, tree: TypeTree, scope: Callable, args=None, stack_trace: Optional[List[TypeTree]]=None):
         self.scope = scope
         self.local_scope = dict()
         self.used = set()
-        self.stack_trace = stack_trace
+        self.stack_trace: List[TypeTree] = [] if stack_trace is None else stack_trace
+
 
         if args is not None:
             assign(self, self.local_scope, args[0], args[1])
@@ -32,7 +33,7 @@ class AnnotateScope(Interpreter):
 
         self.visit_children(tree)  # sets tree.return_type
 
-    def assert_(self, condition, message, tree=None):
+    def assert_(self, condition: bool, message: str, tree: Optional[TypeTree]=None):
         volpe_assert(condition, message, tree, self.stack_trace)
 
     def visit(self, tree: TypeTree):
@@ -55,7 +56,7 @@ class AnnotateScope(Interpreter):
         return self.get_scope()(tree.children[0].value, tree)
 
     def block(self, tree: TypeTree):
-        AnnotateScope(tree, self.get_scope(), self.stack_trace)
+        AnnotateScope(tree, self.get_scope(), stack_trace=self.stack_trace)
         return tree.return_type
 
     def object(self, tree: TypeTree):
@@ -93,7 +94,7 @@ class AnnotateScope(Interpreter):
                 closure.env[name] = closure.scope(name, t_tree)
                 return closure.env[name]
 
-            AnnotateScope(new_tree.children[1], scope, (new_tree.children[0], args))
+            AnnotateScope(new_tree.children[1], scope, (new_tree.children[0], args), stack_trace=self.stack_trace)
         self.stack_trace.pop()
         return closure.tree.instances[args].children[1].return_type
 
