@@ -66,13 +66,6 @@ class AnnotateScope(Interpreter):
             scope[key] = self.visit(attribute)
         return VolpeObject(scope)
 
-    def item(self, tree: TypeTree):
-        # this item should be in an object, but the object was removed by lark because this is the only item
-        new_tree = TypeTree(data="item", children=tree.children, meta=tree.meta)
-        tree.children = [new_tree]
-        tree.data = "object"
-        return self.visit(tree)
-
     def attribute(self, tree: TypeTree):
         obj, key = self.visit(tree.children[0]), tree.children[1]
         self.assert_(isinstance(obj, VolpeObject), "only objects have attributes", tree)
