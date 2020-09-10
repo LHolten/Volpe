@@ -8,8 +8,7 @@ block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
     | value1 "%=" value1 -> mod_assign
     | value1 "->" value1 -> if_then
 
-?value1: value2
-    | object
+?value1: object
 
 ?value2: value3
     | value2 "->" value3 -> implication
@@ -59,8 +58,8 @@ block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
     | value10 "(" value1 ")" -> func_call
     | value10 "[" _SEP* value2 _SEP* "]" -> array_index
 
-object: item "," (_SEP* item ("," _SEP* item)*)?
-item: (CNAME ":" _SEP*)? value2
+?object: (item ("," _SEP* item)*)?
+?item: (CNAME ":" _SEP*)? value2
 
 symbol: CNAME
     | THIS_FUNC

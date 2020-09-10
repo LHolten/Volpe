@@ -18,7 +18,6 @@ class AnnotateScope(Interpreter):
         self.used = set()
         self.stack_trace: List[TypeTree] = [] if stack_trace is None else stack_trace
 
-
         if args is not None:
             assign(self, self.local_scope, args[0], args[1])
 
@@ -66,6 +65,13 @@ class AnnotateScope(Interpreter):
             self.assert_(key not in scope, f"attribute names have to be unique, `{key}` is not", tree)
             scope[key] = self.visit(attribute)
         return VolpeObject(scope)
+
+    def item(self, tree: TypeTree):
+        # this item should be in an object, but the object was removed by lark because this is the only item
+        new_tree = TypeTree(data="item", children=tree.children, meta=tree.meta)
+        tree.children = [new_tree]
+        tree.data = "object"
+        return self.visit(tree)
 
     def attribute(self, tree: TypeTree):
         obj, key = self.visit(tree.children[0]), tree.children[1]

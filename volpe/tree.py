@@ -18,9 +18,9 @@ class TypeTree(Tree):
 
 
 def get_obj_key_value(tree: TypeTree, i):
-    if len(tree.children) == 2:
+    if tree.data == "item":
         return tree.children[0], tree.children[1]
-    return f"_{i}", tree.children[0]
+    return f"_{i}", tree
 
 
 class VolpeError(Exception):
@@ -30,7 +30,7 @@ class VolpeError(Exception):
             return
 
         # Add type info to error
-        types = ", ".join(str(child.return_type) for child in tree.children)
+        types = ", ".join(str(child.return_type) for child in tree.children if isinstance(child, TypeTree))
         s = "s" if len(tree.children) > 1 else ""
         message += f"\n  type{s}: {types}"
 
