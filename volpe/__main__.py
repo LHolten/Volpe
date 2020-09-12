@@ -51,13 +51,26 @@ def install():
         print("Please restart this console for changes to take effect.")
 
 
-def compile_and_run(file_path, verbose=False, show_time=False, console=False):
-    from run_volpe import run
+def run(file_path, verbose=False, show_time=False, console=False):
+    import traceback
+    from parse import parse_trees, volpe_llvm
+    from compile import compile_and_run
+    from tree import VolpeError
 
     assert file_path.split(".")[-1] == "vlp", "Volpe files have the file ending .vlp"
     assert os.path.exists(file_path), f"Could not find file: {file_path}"
 
-    run(file_path, verbose=verbose, show_time=show_time, console=console)
+    try:
+        tree = parse_trees(file_path, dict())
+        llvm = volpe_llvm(tree, verbose, verbose, console)
+    except VolpeError as err:
+        if verbose:
+            traceback.print_exc()
+        else:
+            print(err)
+        return
+
+    compile_and_run(llvm, tree.return_type, verbose, show_time, console)
 
 
 if __name__ == "__main__":
@@ -68,4 +81,4 @@ if __name__ == "__main__":
     if args["add-path"]:
         install()
     else:
-        compile_and_run(args["<file_path>"], args["--verbose"], args["--time"], args["--console"])
+        run(args["<file_path>"], args["--verbose"], args["--time"], args["--console"])

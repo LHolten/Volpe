@@ -1,6 +1,5 @@
 import itertools
 from os import path
-import traceback
 from typing import Dict
 
 from lark import Lark
@@ -10,7 +9,6 @@ from llvmlite import ir
 from annotate import AnnotateScope
 from builder import LLVMScope
 from builder_utils import build_func
-from compile import compile_and_run
 from tree import TypeTree, VolpeError
 from volpe_types import unwrap, unknown
 
@@ -28,7 +26,7 @@ with open(path_to_lark) as lark_file:
     )
 
 
-def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=False, console=False):
+def volpe_llvm(tree: TypeTree, verbose=False, more_verbose=False, console=False) -> str:
     if more_verbose:
         print(tree.pretty())
 
@@ -60,7 +58,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
 
         LLVMScope(b, tree, scope, ret, None)
 
-    compile_and_run(str(module), tree.return_type, more_verbose=more_verbose, show_time=show_time, console=console)
+    return str(module)
 
 
 def parse_trees(file_path: str, imports: Dict):
@@ -72,6 +70,8 @@ def parse_trees(file_path: str, imports: Dict):
             tree = volpe_parser.parse(vlp_file.read())
             obj_tree = TypeTree("object", [], tree.meta)
             imports[file_path] = TypeTree("func", [obj_tree, tree], tree.meta)
+        except UnexpectedEOF:
+            raise VolpeError("unexpected end of input (did you return from main?)")
         except UnexpectedCharacters as err:
             # Return cursor to start of file.
             vlp_file.seek(0)
@@ -96,17 +96,3 @@ def parse_trees(file_path: str, imports: Dict):
             subtree.children = [imports[import_path], obj_tree]
 
     return tree
-
-
-def run(file_path, verbose=False, show_time=False, console=False):
-    try:
-        imports = dict()
-        tree = parse_trees(file_path, imports)
-        volpe_llvm(tree, verbose, show_time, verbose, console)
-    except UnexpectedEOF:
-        print("unexpected end-of-input")
-    except VolpeError as err:
-        if verbose:
-            traceback.print_exc()
-        else:
-            print(err)
