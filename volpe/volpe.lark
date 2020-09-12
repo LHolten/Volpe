@@ -66,7 +66,7 @@ item: CNAME ":" _SEP* value2 -> item
 
 symbol: CNAME
     | THIS_FUNC
-    | IMPORT
+    | "$" CNAME ("\\" CNAME)* -> import_
 
 %import common.ESCAPED_STRING
 %import common.INT
@@ -87,7 +87,6 @@ COMMENT: "#" /.*/
 NEWLINE: (CR? LF)
 
 THIS_FUNC: "@"
-IMPORT: "$" CNAME
 COMP_TYPE: "<=" | ">=" | "<" | ">"
 
 _COM: COMMENT

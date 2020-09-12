@@ -1,6 +1,7 @@
 import itertools
 from os import path
 import traceback
+from typing import Dict
 
 from lark import Lark
 from lark.exceptions import UnexpectedEOF, UnexpectedCharacters
@@ -12,6 +13,19 @@ from builder_utils import build_func
 from compile import compile_and_run
 from tree import TypeTree, VolpeError
 from volpe_types import unwrap, unknown
+
+
+base_path = path.dirname(__file__)
+path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
+with open(path_to_lark) as lark_file:
+    volpe_parser = Lark(
+        lark_file,
+        start="block",
+        parser="earley",
+        ambiguity="explicit",
+        tree_class=TypeTree,
+        propagate_positions=True,
+    )
 
 
 def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=False, console=False):
@@ -49,30 +63,13 @@ def volpe_llvm(tree: TypeTree, verbose=False, show_time=False, more_verbose=Fals
     compile_and_run(str(module), tree.return_type, more_verbose=more_verbose, show_time=show_time, console=console)
 
 
-def get_parser(path_to_lark):
-    with open(path_to_lark) as lark_file:
-        return Lark(
-            lark_file,
-            start="block",
-            parser="earley",
-            ambiguity="explicit",
-            tree_class=TypeTree,
-            propagate_positions=True,
-        )
+def parse_trees(file_path: str, imports: Dict):
+    if file_path in imports:
+        return
 
-
-def run(file_path, verbose=False, show_time=False, console=False):
-    base_path = path.dirname(__file__)
-    path_to_lark = path.abspath(path.join(base_path, "volpe.lark"))
-    volpe_parser = get_parser(path_to_lark)
     with open(file_path) as vlp_file:
         try:
-            parsed_tree = volpe_parser.parse(vlp_file.read())
-
-        except UnexpectedEOF:
-            print("unexpected end-of-input")
-            return
-
+            imports[file_path] = volpe_parser.parse(vlp_file.read())
         except UnexpectedCharacters as err:
             # Return cursor to start of file.
             vlp_file.seek(0)
@@ -84,22 +81,29 @@ def run(file_path, verbose=False, show_time=False, console=False):
             # Add the cursor.
             padding = " " * (len(str(err.line)) + err.column)
             error_message += f"\n{padding} ^"
-            print(error_message)
-            return
+            raise VolpeError(error_message)
 
-        except Exception as err:
-            if verbose:
-                traceback.print_exc()
-            else:
-                print(err)
-            return
+    for subtree in imports[file_path].iter_subtrees():
+        subtree.meta.file_path = file_path
 
-    # put file_path inside tree.meta so that VolpeError can print code blocks
-    for tree in parsed_tree.iter_subtrees():
-        tree.meta.file_path = file_path
+        if subtree.data == "import_":
+            directory = path.dirname(file_path)
+            import_path = path.join(directory, *[child.value for child in subtree.children]) + ".vlp"
+            parse_trees(import_path, imports)
 
+            obj_tree = TypeTree("object", [], subtree.meta)
+            func_tree = TypeTree("func", [obj_tree, imports[import_path]])
+            subtree.data = "func_call"
+            subtree.children = [func_tree, obj_tree]
+
+
+def run(file_path, verbose=False, show_time=False, console=False):
     try:
-        volpe_llvm(parsed_tree, verbose, show_time, verbose, console)
+        imports = dict()
+        parse_trees(file_path, imports)
+        volpe_llvm(imports[file_path], verbose, show_time, verbose, console)
+    except UnexpectedEOF:
+        print("unexpected end-of-input")
     except VolpeError as err:
         if verbose:
             traceback.print_exc()

@@ -1,0 +1,2 @@
+T, F, xor := $bools
+xor(T, F)
