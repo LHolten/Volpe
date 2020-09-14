@@ -58,7 +58,7 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     else:
         func(byref(res))
 
-    print("main() =", get_repr(res))
+    print(get_repr(res))
 
     if show_time:
         if count > 1:
