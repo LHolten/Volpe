@@ -1,4 +1,5 @@
 block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
+?opt_block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
 
 ?value_ass: value1 ":=" value1 -> assign
     | value1 "+=" value1 -> add_assign
@@ -52,8 +53,8 @@ item: CNAME ":" _SEP* value2 -> item
     | HEX_CHARACTER -> escaped_character
     | ESCAPED_STRING -> string
     | "(" value1 ")" "{" block "}" -> func
-    | "{" block "}"
-    | "(" value1 ")"
+    | "{" opt_block "}"
+    | "(" _SEP* value1 _SEP* ")"
     | "|" value10 "|" -> array_size
     | "[" _SEP* value2 ("," _SEP* value2)* _SEP* "]" -> array
     | "[" _SEP* value2 _SEP* ";" _SEP* INTEGER _SEP* "]" -> constant_array
