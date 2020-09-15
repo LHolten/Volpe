@@ -1,6 +1,7 @@
 from llvmlite import ir
 
-from builder_utils import build_func, free, options
+from builder_utils import free
+from llvm_utils import options, build_func
 from volpe_types import int64, char, VolpeArray, VolpeObject, size, int32, pint8
 
 string_type = VolpeArray(char)

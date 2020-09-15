@@ -2,11 +2,12 @@ from typing import Callable, List, Optional
 
 from lark.visitors import Interpreter
 from lark import Token
-from copy import deepcopy
 
 from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, chain_comp, assign
+from c_interop import VolpeCFunc
+from target import FFI
 from tree import TypeTree, volpe_assert, get_obj_key_value
-from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1
+from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1, VolpePointer
 from version_dependent import is_ascii
 from tree import VolpeError
 
@@ -80,22 +81,9 @@ class AnnotateScope(Interpreter):
     def func_call(self, tree: TypeTree):
         self.stack_trace.append(tree)
         closure, args = self.visit_children(tree)
-
-        if args not in closure.tree.instances:
-            new_tree = closure.tree.instances[args] = deepcopy(closure.tree.children[0])
-            closure.tree.children.append(new_tree)
-
-            closure.env = dict()
-
-            def scope(name, t_tree: TypeTree):
-                if name == "@":
-                    return closure
-                closure.env[name] = closure.scope(name, t_tree)
-                return closure.env[name]
-
-            AnnotateScope(new_tree.children[1], scope, (new_tree.children[0], args), stack_trace=self.stack_trace)
+        ret = closure.ret_type(self, args)
         self.stack_trace.pop()
-        return closure.tree.instances[args].children[1].return_type
+        return ret
 
     def return_n(self, tree: TypeTree):
         self.ret(self.visit(tree.children[0]))
@@ -172,6 +160,20 @@ class AnnotateScope(Interpreter):
         tree.data = "implication"
         tree.children[1] = TypeTree("return_n", [tree.children[1]], tree.meta)
         return self.visit(tree)
+
+    def c_import(self, tree: TypeTree):
+        from os import path
+        import pydffi
+        directory = path.dirname(tree.meta.file_path)
+        import_path = path.join(directory, *[child.value for child in tree.children[:-1]]) + ".h"
+        CU = FFI.cdef(f"#include <{import_path}>")
+        name = tree.children[-1].value
+        return VolpeCFunc(pydffi.typeof(getattr(CU.funcs, name)), name)
+
+    def make_pointer(self, tree: TypeTree):
+        array = self.visit(tree.children[0])
+        self.assert_(isinstance(array, VolpeArray), "can only make pointer from array", tree)
+        return VolpePointer(array.element)
 
     # Boolean logic
     implication = logic

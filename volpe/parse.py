@@ -8,7 +8,7 @@ from llvmlite import ir
 
 from annotate import AnnotateScope
 from builder import LLVMScope
-from builder_utils import build_func
+from llvm_utils import build_func
 from tree import TypeTree, VolpeError
 from volpe_types import unwrap, unknown
 
@@ -26,7 +26,7 @@ with open(path_to_lark) as lark_file:
     )
 
 
-def volpe_llvm(tree: TypeTree, verbose=False, more_verbose=False, console=False) -> str:
+def volpe_llvm(tree: TypeTree, verbose=False, more_verbose=False, console=False):
     if more_verbose:
         print(tree.pretty())
 
@@ -44,6 +44,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, more_verbose=False, console=False)
 
     module = ir.Module("program")
     module.func_count = itertools.count()
+    module.wrappers = dict()
 
     run_func = ir.Function(module, ir.FunctionType(unknown, [unwrap(tree.return_type).as_pointer()]), "run")
     with build_func(run_func) as (b, args):
@@ -58,7 +59,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, more_verbose=False, console=False)
 
         LLVMScope(b, tree, scope, ret, None)
 
-    return str(module)
+    return str(module), module.wrappers
 
 
 def parse_trees(file_path: str, imports: Dict):

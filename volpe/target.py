@@ -1,4 +1,5 @@
 import llvmlite.binding as llvm
+import pydffi
 
 # All these initializations are required for code generation!
 llvm.initialize()
@@ -30,3 +31,5 @@ pm_builder.populate(pass_manager)
 
 # Target specific optimizations
 target_machine.add_analysis_passes(pass_manager)
+
+FFI = pydffi.FFI()

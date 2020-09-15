@@ -14,16 +14,22 @@ def compile_and_run(llvm_ir, result_type, more_verbose=False, show_time=False, c
     the host CPU. The engine is reusable for an arbitrary number of
     modules.
     """
-    # And an execution engine with an empty backing module
-    mod = llvm.parse_assembly(llvm_ir)
-    mod.triple = llvm.get_process_triple()
-    mod.verify()
+    llvm_ir, wrappers = llvm_ir
 
     if more_verbose:
         # print("\nBefore optimization\n")
         # print(mod)
         with open("before.ll", "w") as file:
-            file.write(str(mod))
+            file.write(llvm_ir)
+
+    # And an execution engine with an empty backing module
+    mod = llvm.parse_assembly(llvm_ir)
+    for wrapper in wrappers.values():
+        wrapper_mod = llvm.parse_assembly(wrapper)
+        mod.link_in(wrapper_mod)
+        mod.data_layout = ""
+    mod.triple = llvm.get_process_triple()
+    mod.verify()
 
     # Run the optimization passes
     pass_manager.run(mod)

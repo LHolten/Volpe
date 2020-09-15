@@ -1,8 +1,10 @@
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, Union
 
 from llvmlite import ir
 
+from llvm_utils import options, build_func
 from tree import TypeTree
 
 int1 = ir.IntType(1)
@@ -89,6 +91,20 @@ class VolpeArray(VolpeType):
 
 
 @dataclass
+class VolpePointer(VolpeType):
+    pointee: Union[ir.Type, VolpeType]
+
+    def __repr__(self):
+        return f"&{self.pointee}"
+
+    def unwrap(self) -> ir.Type:
+        return ir.PointerType(unwrap(self.pointee))
+
+    def __hash__(self):
+        return hash(self.pointee)
+
+
+@dataclass
 class VolpeClosure(VolpeType):
     tree: TypeTree
     scope: callable
@@ -109,3 +125,46 @@ class VolpeClosure(VolpeType):
 
     def __eq__(self, other):
         return isinstance(other, VolpeClosure) and self.scope is other.scope
+
+    def ret_type(self, parent, args: VolpeType):
+        if args not in self.tree.instances:
+            new_tree = self.tree.instances[args] = deepcopy(self.tree.children[0])
+            self.tree.children.append(new_tree)
+
+            self.env = dict()
+
+            def scope(name, t_tree: TypeTree):
+                if name == "@":
+                    return self
+                self.env[name] = self.scope(name, t_tree)
+                return self.env[name]
+
+            parent.__class__(new_tree.children[1], scope, (new_tree.children[0], args), stack_trace=parent.stack_trace)
+        return self.tree.instances[args].children[1].return_type
+
+    def build_or_get_function(self, parent, args):
+        inst = self.tree.instances[args]
+        if not hasattr(inst, "func"):
+            arg_type = inst.children[0].return_type
+            ret_type = inst.children[1].return_type
+
+            module = parent.builder.module
+            func_name = str(next(module.func_count))
+            func_type = ir.FunctionType(unwrap(ret_type), [unwrap(self), unwrap(arg_type)])
+            inst.func = ir.Function(module, func_type, func_name)
+
+            with build_func(inst.func) as (b, args):
+                b: ir.IRBuilder
+                with options(b, args[1].type) as (rec, phi):
+                    rec(args[1])
+
+                new_values = [b.extract_value(args[0], i) for i in range(len(self.env))]
+                env_scope = dict(zip(self.env.keys(), new_values))
+                env_scope["@"] = args[0]
+
+                def scope(name):
+                    return env_scope[name]
+
+                parent.__class__(b, inst.children[1], scope, b.ret, rec, (inst.children[0], phi))
+
+        return inst.func

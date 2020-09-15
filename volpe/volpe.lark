@@ -45,6 +45,7 @@ item: CNAME ":" _SEP* value2 -> item
     | "-" value9 -> negate
     | "!" value9 -> logic_not
     | "~" value9 -> convert_flt
+    | "&" value9 -> make_pointer
 
 ?value10: symbol
     | INTEGER -> integer
@@ -68,6 +69,7 @@ item: CNAME ":" _SEP* value2 -> item
 symbol: CNAME
     | THIS_FUNC
     | "$" CNAME ("\\" CNAME)* -> import_
+    | "$$" CNAME ("\\" CNAME)* -> c_import
 
 %import common.ESCAPED_STRING
 %import common.INT

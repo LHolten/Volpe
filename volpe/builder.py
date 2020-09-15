@@ -3,7 +3,8 @@ from typing import Callable, Optional, Tuple
 from lark.visitors import Interpreter
 from llvmlite import ir
 
-from builder_utils import options, assign, math, comp, build_or_get_function
+from builder_utils import assign, math, comp
+from llvm_utils import options
 from tree import TypeTree, volpe_assert, get_obj_key_value
 from volpe_types import int1, int64, flt64, unwrap, VolpeObject, int32
 
@@ -66,7 +67,7 @@ class LLVMScope(Interpreter):
 
     def func_call(self, tree: TypeTree):
         closure, args = self.visit_children(tree)
-        func = build_or_get_function(self, tree)
+        func = tree.children[0].return_type.build_or_get_function(self, tree.children[1].return_type)
         return self.builder.call(func, [closure, args])
 
     def return_n(self, tree: TypeTree):
@@ -257,6 +258,15 @@ class LLVMScope(Interpreter):
         # let Python parse the escaped character (guaranteed ascii by lark)
         evaluated = eval(f"{tree.children[0]}")
         return tree.return_type(ord(evaluated))
+
+    def c_import(self, tree: TypeTree):
+        return ir.LiteralStructType([])(ir.Undefined)
+
+    def make_pointer(self, tree: TypeTree):
+        value = self.visit(tree.children[0])
+        ptr = self.builder.alloca(value.type)
+        self.builder.store(value, ptr)
+        return self.builder.bitcast(ptr, value.type.element.as_pointer())
 
     # Mathematics
     add = math
