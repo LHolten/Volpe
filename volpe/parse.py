@@ -54,7 +54,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, more_verbose=False, console=False)
             return arg_scope[name]
 
         def ret(value):
-            b.store(value, args[0])
+            b.store(value, args[0], 8)
             b.ret_void()
 
         LLVMScope(b, tree, scope, ret, None)
