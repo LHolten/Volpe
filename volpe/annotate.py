@@ -168,7 +168,9 @@ class AnnotateScope(Interpreter):
         directory = path.dirname(path.abspath(tree.meta.file_path))
         import_path = path.join(directory, *[child.value for child in tree.children[:-1]]) + ".h"
 
-        res: clang.cindex.Cursor = index.parse(import_path).cursor
+        options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE + \
+            clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
+        res: clang.cindex.Cursor = index.parse(import_path, options=options).cursor
         name = tree.children[-1].value
 
         for child in res.get_children():
