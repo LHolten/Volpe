@@ -2,23 +2,23 @@
 
 ## Installation
 
-1. You need Python 3.6.0 or higher, although we recommend at least 3.7.0. [Install here.](https://www.python.org/downloads/)
-2. You need pip, the Python package manager. It should come pre-installed with Python.
-3. Install the needed packages by running `pip install -r requirements.txt` from the root directory.
-4. Optionally add Volpe to path with `python volpe add-path`. This means you can use `volpe file_name.vlp` anywhere (notice the missing `python`).
-    - It will update `volpe.bat` with the correct volpe directory and add it to your PATH.
-    - You can customise the batch file further if you want to use a specific python installation or environment.
+1. Clone the master branch of this repository with `git clone https://github.com/LHolten/Volpe.git`.
+2. You need Python 3.6.0 or higher, although we recommend at least 3.7.0. [Install here.](https://www.python.org/downloads/)
+3. You need pip, the Python package manager. It should come pre-installed with Python.
+4. Install the required Python packages by running `pip install -r requirements.txt`.
+5. Optionally add Volpe to path with `python volpe add-path`. This means you can use `volpe file_name.vlp` anywhere.
+    - It will create a `bin` folder and put either `volpe.bat` (windows) or `volpe` (linux) inside.
+    - The new `bin` folder will be added to PATH and the batch/bash script will have the correct volpe directory.
+    - You can customise the batch/bash file further if you want to use a specific python installation or environment.
 
 ## How to use
 
-Run `volpe --help` to get show the help message. (`-h` for short.)
+Run `volpe --help` to show a help message. (`-h` for short.)
 
 Write your code in a file ending with `.vlp`. Once you are ready to run it, run `volpe <file_path>`.
 `<file_path>` is either a relative path from your working directory or an absolute path.
 
-Use `volpe --verbose` to also see the parsed code. (`-v` for short.)
-
-*If you did not add Volpe to path (step 4 in Installation), prefix all commands with `python`.*
+*If you did not add Volpe to path (step 5 in Installation), prefix all commands with `python`.*
 
 ## Documentation
 
