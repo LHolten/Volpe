@@ -31,8 +31,7 @@ class VolpeError(Exception):
 
         # Add type info to error
         types = ", ".join(str(child.return_type) for child in tree.children if isinstance(child, TypeTree))
-        s = "s" if len(tree.children) > 1 else ""
-        message += f"\n  type{s}: {types}"
+        message += f"\n  typing: {types}"
 
         if not hasattr(tree.meta, "file_path"):
             # file_path in tree.meta has not been initialized
