@@ -1,92 +1,70 @@
 from dataclasses import dataclass
+from typing import Union
 
 from llvmlite import ir
-import pydffi as dffi
+import clang.cindex
 
 from llvm_utils import build_func
 from volpe_types import int64, VolpeType, VolpeObject, VolpePointer, char, pint8, unknown, unwrap, int32
 
+index = clang.cindex.Index.create()
 
-def volpe_from_c(c_type: dffi.Type):
-    if isinstance(c_type, dffi.QualType):
-        return volpe_from_c(c_type.type)
-    if isinstance(c_type, dffi.BasicType):
-        if c_type.kind == dffi.BasicKind.Int:
-            return int64
-        if c_type.size == 1:
-            return char
-        assert False, f"unknown basic-type: {c_type.kind}"
-    if isinstance(c_type, dffi.PointerType):
-        return VolpePointer(volpe_from_c(c_type.pointee()))
-    assert False, f"unknown c-type: {c_type}"
+
+def volpe_from_c(c_type: clang.cindex.Type) -> Union[ir.Type, VolpeType]:
+    if c_type.kind == clang.cindex.TypeKind.POINTER:
+        return VolpePointer(volpe_from_c(c_type.get_pointee()))
+    if c_type.kind == clang.cindex.TypeKind.CHAR_S:
+        return char
+    if c_type.kind == clang.cindex.TypeKind.INT:
+        return int64
+
+    assert False, f"unknown c-type: {c_type.kind}"
 
 
 @dataclass
 class VolpeCFunc(VolpeType):
-    c_func: dffi.FunctionType
+    c_func: clang.cindex.Type
     name: str
 
     def __repr__(self):
         return "c-func"
 
-    def unwrap_args(self):
-        return [unwrap(volpe_from_c(p)) for p in self.c_func.params]
+    def args(self):
+        args = [volpe_from_c(a) for a in self.c_func.argument_types()]
+        if len(args) == 1:
+            return args[0]
+        return VolpeObject({f"_{i}": a for i, a in enumerate(args)})
 
-    def unwrap_ret(self):
-        return unwrap(volpe_from_c(self.c_func.returnType))
+    def ret(self):
+        return volpe_from_c(self.c_func.get_result())
 
     def unwrap(self) -> ir.Type:
-        args = ir.LiteralStructType(self.unwrap_args())
-        if len(args) == 1:
-            args = args.elements[0]
-        return ir.FunctionType(self.unwrap_ret(), [ir.LiteralStructType([]), args])
+        return ir.LiteralStructType([])
 
     def __hash__(self):
         raise hash(self.c_func)
 
     def ret_type(self, parent, args: VolpeType):
-        if not isinstance(args, VolpeObject):
-            args = VolpeObject({"_0": args})
-        target_args = VolpeObject({f"_{i}": volpe_from_c(p) for i, p in enumerate(self.c_func.params)})
-        assert args == target_args
-        return volpe_from_c(self.c_func.returnType)
+        assert args == self.args()
+        return self.ret()
 
-    def build_or_get_function(self, parent, args):
+    def build_or_get_function(self, parent, volpe_args):
         module: ir.Module = parent.builder.module
-        func_type = ir.FunctionType(self.unwrap_ret(), self.unwrap_args())
+
+        func_args = unwrap(self.args())
+        if not isinstance(volpe_args, VolpeObject):
+            func_args = ir.LiteralStructType([func_args])
+        func_type = ir.FunctionType(unwrap(self.ret()), func_args)
         func = ir.Function(module, func_type, self.name)
 
-        wrapper_type = ir.FunctionType(unknown,
-                                       [func_type.as_pointer(), func_type.return_type.as_pointer(), pint8.as_pointer()])
-        wrapper_name = f"{self.name}_wrapper"
-        wrapper = ir.Function(module, wrapper_type, wrapper_name)
-
-        volpe_func_type = self.unwrap()
+        volpe_func_type = ir.FunctionType(unwrap(self.ret()), [ir.LiteralStructType([]), unwrap(self.args())])
         volpe_func = ir.Function(module, volpe_func_type, str(next(module.func_count)))
         with build_func(volpe_func) as (b, args):
             b: ir.IRBuilder
-            args = args[1]
-            if not isinstance(args.type, ir.LiteralStructType):
-                new_args = ir.LiteralStructType([args.type])(ir.Undefined)
-                args = b.insert_value(new_args, args, 0)
+            args = [args[1]]
+            if isinstance(volpe_args, VolpeObject):
+                args = [b.extract_value(args[0], i) for i in range(len(volpe_args.type_dict))]
 
-            ptr = b.alloca(args.type)
-            b.store(args, ptr)
-            params = ir.LiteralStructType([ir.PointerType(t) for t in args.type.elements])(ir.Undefined)
-
-            for i in range(len(args.type.elements)):
-                params = b.insert_value(params, b.gep(ptr, [int32(0), int32(i)]), i)
-
-            param_ptr = b.alloca(params.type)
-            b.store(params, param_ptr)
-            param_ptr = b.bitcast(param_ptr, pint8.as_pointer())
-
-            result_ptr = b.alloca(self.unwrap_ret())
-
-            b.call(wrapper, [func, result_ptr, param_ptr])
-
-            b.ret(b.load(result_ptr))
-
-        module.wrappers[wrapper_name] = self.c_func.getWrapperLLVMStr(wrapper_name)
+            b.ret(b.call(func, args))
 
         return volpe_func

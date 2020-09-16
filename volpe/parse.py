@@ -44,7 +44,6 @@ def volpe_llvm(tree: TypeTree, verbose=False, more_verbose=False, console=False)
 
     module = ir.Module("program")
     module.func_count = itertools.count()
-    module.wrappers = dict()
 
     run_func = ir.Function(module, ir.FunctionType(unknown, [unwrap(tree.return_type).as_pointer()]), "run")
     with build_func(run_func) as (b, args):
@@ -59,7 +58,7 @@ def volpe_llvm(tree: TypeTree, verbose=False, more_verbose=False, console=False)
 
         LLVMScope(b, tree, scope, ret, None)
 
-    return str(module), module.wrappers
+    return str(module)
 
 
 def parse_trees(file_path: str, imports: Dict):

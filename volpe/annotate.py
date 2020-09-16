@@ -5,7 +5,6 @@ from lark import Token
 
 from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, chain_comp, assign
 from c_interop import VolpeCFunc
-from target import FFI
 from tree import TypeTree, volpe_assert, get_obj_key_value
 from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1, VolpePointer
 from version_dependent import is_ascii
@@ -163,12 +162,24 @@ class AnnotateScope(Interpreter):
 
     def c_import(self, tree: TypeTree):
         from os import path
-        import pydffi
-        directory = path.dirname(tree.meta.file_path)
+        import clang.cindex
+        index = clang.cindex.Index.create()
+
+        directory = path.dirname(path.abspath(tree.meta.file_path))
         import_path = path.join(directory, *[child.value for child in tree.children[:-1]]) + ".h"
-        CU = FFI.cdef(f"#include <{import_path}>")
+
+        res: clang.cindex.Cursor = index.parse(import_path).cursor
         name = tree.children[-1].value
-        return VolpeCFunc(pydffi.typeof(getattr(CU.funcs, name)), name)
+
+        for child in res.get_children():
+            child: clang.cindex.Cursor
+            child_type: clang.cindex.Type = child.type.get_canonical()
+            if child_type.kind != clang.cindex.TypeKind.FUNCTIONPROTO:
+                continue
+            if child.mangled_name != name:
+                continue
+            return VolpeCFunc(child_type, name)
+        self.assert_(False, f"could not find {name} in {import_path}")
 
     def make_pointer(self, tree: TypeTree):
         array = self.visit(tree.children[0])
