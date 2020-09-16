@@ -54,8 +54,13 @@ class VolpeCFunc(VolpeType):
         func_args = unwrap(self.args())
         if not isinstance(volpe_args, VolpeObject):
             func_args = ir.LiteralStructType([func_args])
-        func_type = ir.FunctionType(unwrap(self.ret()), func_args)
-        func = ir.Function(module, func_type, self.name)
+
+        for func in module.functions:
+            if func.name == self.name:
+                break
+        else:
+            func_type = ir.FunctionType(unwrap(self.ret()), func_args)
+            func = ir.Function(module, func_type, self.name)
 
         volpe_func_type = ir.FunctionType(unwrap(self.ret()), [ir.LiteralStructType([]), unwrap(self.args())])
         volpe_func = ir.Function(module, volpe_func_type, str(next(module.func_count)))
