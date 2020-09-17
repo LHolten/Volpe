@@ -45,7 +45,7 @@ class VolpeCFunc(VolpeType):
         raise hash(self.c_func)
 
     def ret_type(self, parent, args: VolpeType):
-        assert args == self.args()
+        parent.assert_(args == self.args(), f"can not call `{self.name}` with args {args}")
         return self.ret()
 
     def build_or_get_function(self, parent, volpe_args):

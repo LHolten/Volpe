@@ -25,38 +25,45 @@ def get_obj_key_value(tree: TypeTree, i):
 
 class VolpeError(Exception):
     def __init__(self, message: str, tree: Optional[TypeTree]=None, stack_trace: Optional[List[TypeTree]]=None):
+        if stack_trace is not None and len(stack_trace) > 0:
+            trace = ""
+            for bush in stack_trace:
+                trace = trace + str(VolpeError("", bush))
+            message = f"\n-- stack trace --{trace}\n-- - - - - - - --\n{message}"
+
         if tree is None:
             super().__init__(message)
             return
+
+        code = get_code(tree)
+        if code is not None:
+            message += f"\n{code}"
 
         # Add type info to error
         types = ", ".join(str(child.return_type) for child in tree.children if isinstance(child, TypeTree))
         s = "s" if len(tree.children) > 1 else ""
         message += f"\n  type{s}: {types}"
-
-        if not hasattr(tree.meta, "file_path"):
-            # file_path in tree.meta has not been initialized
-            super().__init__(message + f", line: {tree.meta.line}")
-            return
-
-        # Pretty error printing that shows the code block
-        first_line = tree.meta.line
-        last_line = tree.meta.end_line
-        spacing = len(str(last_line))
-
-        with open(tree.meta.file_path, "r") as f:
-            text = f.readlines()
-            for i, line in enumerate(text[first_line - 1 : last_line], first_line):
-                padding = " " * (spacing - len(str(i)))
-                message += f"\n{padding}{i}| {line.rstrip()}"
-
-        if stack_trace is not None and len(stack_trace) > 0:
-            trace = ""
-            for bush in stack_trace:
-                trace = trace + str(VolpeError(f"{bush.data}", bush)) + "\n"
-            message = f"-- stack trace --\n{trace}-- - - - - - - --\n{message}"
-
         super().__init__(message)
+
+
+def get_code(tree):
+    if not hasattr(tree.meta, "file_path"):
+        # file_path in tree.meta has not been initialized
+        return None
+
+    # Pretty error printing that shows the code block
+    first_line = tree.meta.line
+    last_line = tree.meta.end_line
+    spacing = len(str(last_line))
+
+    code = []
+    with open(tree.meta.file_path, "r") as f:
+        text = f.readlines()
+        for i, line in enumerate(text[first_line - 1: last_line], first_line):
+            padding = " " * (spacing - len(str(i)))
+            code.append(f"{padding}{i}| {line.rstrip()}")
+
+    return "\n".join(code)
 
 
 def volpe_assert(condition: bool, message: str, tree: Optional[TypeTree]=None, stack_trace: Optional[List[TypeTree]]=None):
