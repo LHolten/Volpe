@@ -115,6 +115,8 @@ class LLVMScope(Interpreter):
     def constant_array(self, tree: TypeTree):
         value = self.visit(tree.children[0])
         array_value = unwrap(tree.return_type)(ir.Undefined)
+        if tree.return_type.count == 0:
+            return array_value
         array_value = self.builder.insert_element(array_value, value, int64(0))
         mask = ir.VectorType(int32, tree.return_type.count)([0] * tree.return_type.count)
         return self.builder.shuffle_vector(array_value, unwrap(tree.return_type)(ir.Undefined), mask)

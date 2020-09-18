@@ -130,9 +130,8 @@ class AnnotateScope(Interpreter):
         return int64
 
     def array(self, tree: TypeTree):
-        element_type = int64
-        if len(tree.children) > 0:
-            element_type = self.visit(tree.children[0])
+        self.assert_(len(tree.children) > 0, "array needs at least one value", tree)
+        element_type = self.visit(tree.children[0])
         for child in tree.children[1:]:
             self.assert_(element_type == self.visit(child), "different types in array", tree)
         return VolpeArray(element_type, len(tree.children))
