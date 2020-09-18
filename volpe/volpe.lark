@@ -62,7 +62,7 @@ item: CNAME ":" _SEP* value2 -> item
     | "{" opt_block "}"
     | "(" _SEP* value1 _SEP* ")"
     | "|" value10 "|" -> array_size
-    | "[" _SEP* value2 ("," _SEP* value2)* _SEP* "]" -> array
+    | "[" (_SEP* value2 ("," _SEP* value2)*)? _SEP* "]" -> array
     | "[" _SEP* value2 _SEP* ";" _SEP* INTEGER _SEP* "]" -> constant_array
     | "[" _SEP* value2 _SEP* ";" _SEP* "|" value10 "|" _SEP* "]" -> constant_array_like
     | value10 "." CNAME -> attribute

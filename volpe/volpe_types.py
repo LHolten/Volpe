@@ -84,6 +84,8 @@ class VolpeArray(VolpeType):
         return f"[{self.count} x {self.element}]"
 
     def unwrap(self) -> ir.Type:
+        if self.count == 0:
+            return ir.LiteralStructType([])
         return ir.VectorType(unwrap(self.element), self.count)
 
     def __hash__(self):
