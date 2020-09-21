@@ -268,7 +268,7 @@ class LLVMScope(Interpreter):
         value = self.visit(tree.children[0])
         ptr = self.builder.alloca(value.type)
         self.builder.store(value, ptr)
-        return self.builder.bitcast(ptr, value.type.element.as_pointer())
+        return self.builder.bitcast(ptr, unwrap(tree.return_type))
 
     # Mathematics
     add = math
