@@ -59,6 +59,14 @@ def int1_like(value: Union[ir.Type, VolpeType]) -> Union[ir.Type, VolpeType]:
     return int1
 
 
+def is_pointer(value: Union[ir.Type, VolpeType]) -> bool:
+    return (
+        isinstance(value, VolpePointer) or
+        isinstance(value, VolpeObject) and any(is_pointer(val) for val in value.type_dict.values()) or
+        isinstance(value, VolpeArray) and is_pointer(value.element)
+    )
+
+
 @dataclass
 class VolpeObject(VolpeType):
     type_dict: Dict[str, Union[ir.Type, VolpeType]]

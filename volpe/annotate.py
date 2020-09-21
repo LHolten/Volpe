@@ -6,7 +6,7 @@ from lark import Token
 from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, chain_comp, assign
 from c_interop import VolpeCFunc
 from tree import TypeTree, volpe_assert, get_obj_key_value
-from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1, VolpePointer, unknown
+from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1, VolpePointer, unknown, is_pointer
 from version_dependent import is_ascii
 from tree import VolpeError
 
@@ -85,7 +85,9 @@ class AnnotateScope(Interpreter):
         return ret
 
     def return_n(self, tree: TypeTree):
-        self.ret(self.visit(tree.children[0]))
+        return_type = self.visit(tree.children[0])
+        self.assert_(not is_pointer(return_type), "cannot return pointers", tree)
+        self.ret(return_type)
 
     def assign(self, tree: TypeTree):
         value = self.visit(tree.children[1])
