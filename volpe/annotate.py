@@ -21,6 +21,10 @@ class AnnotateScope(Interpreter):
         if args is not None:
             assign(self, self.local_scope, args[0], args[1])
 
+        if tree.data != "block":
+            tree.children = [TypeTree(tree.data, tree.children, tree.meta)]
+            tree.data = "block"
+
         tree.children[-1] = TypeTree("return_n", [tree.children[-1]], tree.meta)
 
         def ret(value_type):
