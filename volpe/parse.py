@@ -19,8 +19,7 @@ with open(path_to_lark) as lark_file:
     volpe_parser = Lark(
         lark_file,
         start="block",
-        parser="earley",
-        ambiguity="explicit",
+        parser="lalr",
         tree_class=TypeTree,
         propagate_positions=True,
     )
