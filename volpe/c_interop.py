@@ -13,10 +13,14 @@ index = clang.cindex.Index.create()
 def volpe_from_c(c_type: clang.cindex.Type) -> Union[ir.Type, VolpeType]:
     if c_type.kind == clang.cindex.TypeKind.POINTER:
         return VolpePointer(volpe_from_c(c_type.get_pointee()))
-    if c_type.kind == clang.cindex.TypeKind.CHAR_S:
+    if c_type.kind == clang.cindex.TypeKind.CHAR_S or c_type.kind == clang.cindex.TypeKind.CHAR_U:
         return char
-    if c_type.kind == clang.cindex.TypeKind.INT:
+    if c_type.kind == clang.cindex.TypeKind.INT or c_type.kind == clang.cindex.TypeKind.UINT:
         return int64
+    if c_type.kind == clang.cindex.TypeKind.VOID:
+        return VolpeObject({})
+    if c_type.kind == clang.cindex.TypeKind.RECORD:
+        return VolpeObject({field.spelling: volpe_from_c(field.type) for field in c_type.get_fields()})
 
     assert False, f"unknown c-type: {c_type.kind}"
 
@@ -45,7 +49,7 @@ class VolpeCFunc(VolpeType):
         raise hash(self.c_func)
 
     def ret_type(self, parent, args: VolpeType):
-        assert args == self.args()
+        parent.assert_(args == self.args(), f"can not call `{self.name}` with args {args}")
         return self.ret()
 
     def build_or_get_function(self, parent, volpe_args):

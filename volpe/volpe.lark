@@ -1,5 +1,4 @@
-block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
-?opt_block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
+?block: (value_ass? _COM? _SEP)* result _COM?
 
 ?value_ass: value1 ":=" value1 -> assign
     | value1 "+=" value1 -> add_assign
@@ -9,10 +8,15 @@ block: (value_ass? _COM? _SEP)* value1 (_COM? _SEP)* _COM?
     | value1 "%=" value1 -> mod_assign
     | value1 "->" value1 -> if_then
 
-?value1: value2
+?result: object (_COM? _SEP)*
+    | () -> object
+
+?value1: object
+    | () -> object
+
+?object: value2
     | (item | value2) ("," _SEP* (item | value2))+ -> object
     | item -> object
-    | () -> object
 
 item: CNAME ":" _SEP* value2 -> item
 
@@ -54,10 +58,10 @@ item: CNAME ":" _SEP* value2 -> item
     | HEX_CHARACTER -> escaped_character
     | ESCAPED_STRING -> string
     | "(" value1 ")" "{" block "}" -> func
-    | "{" opt_block "}"
+    | "{" block "}"
     | "(" _SEP* value1 _SEP* ")"
     | "|" value10 "|" -> array_size
-    | "[" _SEP* value2 ("," _SEP* value2)* _SEP* "]" -> array
+    | "[" (_SEP* value2 ("," _SEP* value2)*)? _SEP* "]" -> array
     | "[" _SEP* value2 _SEP* ";" _SEP* INTEGER _SEP* "]" -> constant_array
     | "[" _SEP* value2 _SEP* ";" _SEP* "|" value10 "|" _SEP* "]" -> constant_array_like
     | value10 "." CNAME -> attribute

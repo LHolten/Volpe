@@ -6,7 +6,7 @@ from lark import Token
 from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, chain_comp, assign
 from c_interop import VolpeCFunc
 from tree import TypeTree, volpe_assert, get_obj_key_value
-from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1, VolpePointer
+from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1, VolpePointer, unknown, is_pointer
 from version_dependent import is_ascii
 from tree import VolpeError
 
@@ -20,6 +20,10 @@ class AnnotateScope(Interpreter):
 
         if args is not None:
             assign(self, self.local_scope, args[0], args[1])
+
+        if tree.data != "block":
+            tree.children = [TypeTree(tree.data, tree.children, tree.meta)]
+            tree.data = "block"
 
         tree.children[-1] = TypeTree("return_n", [tree.children[-1]], tree.meta)
 
@@ -85,7 +89,9 @@ class AnnotateScope(Interpreter):
         return ret
 
     def return_n(self, tree: TypeTree):
-        self.ret(self.visit(tree.children[0]))
+        return_type = self.visit(tree.children[0])
+        self.assert_(not is_pointer(return_type), "cannot return pointers", tree)
+        self.ret(return_type)
 
     def assign(self, tree: TypeTree):
         value = self.visit(tree.children[1])
@@ -111,7 +117,6 @@ class AnnotateScope(Interpreter):
         except SyntaxError as err:
             raise VolpeError(err.msg, tree, self.stack_trace)
         self.assert_(is_ascii(text), "strings can only have ascii characters", tree)
-        self.assert_(len(text) > 0, "empty strings are not allowed", tree)
 
         tree.children = []
         for eval_character in text:
