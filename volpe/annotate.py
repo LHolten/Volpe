@@ -3,10 +3,11 @@ from typing import Callable, List, Optional
 from lark.visitors import Interpreter
 from lark import Token
 
-from annotate_utils import logic, unary_logic, math, unary_math, math_assign, comp, chain_comp, assign
+from annotate_utils import logic, unary_logic, unary_math, math_assign, comp, chain_comp, assign
 from c_interop import VolpeCFunc
 from tree import TypeTree, volpe_assert, get_obj_key_value
-from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1, VolpePointer, unknown, is_pointer
+from volpe_types import int64, flt64, char, VolpeObject, VolpeClosure, VolpeArray, int1, VolpePointer, unknown, \
+    is_pointer, is_flt, is_char, is_int
 from version_dependent import is_ascii
 from tree import VolpeError
 
@@ -21,20 +22,12 @@ class AnnotateScope(Interpreter):
         if args is not None:
             assign(self, self.local_scope, args[0], args[1])
 
-        if tree.data != "block":
-            tree.children = [TypeTree(tree.data, tree.children, tree.meta)]
-            tree.data = "block"
-
-        tree.children[-1] = TypeTree("return_n", [tree.children[-1]], tree.meta)
-
-        def ret(value_type):
-            if tree.return_type is None:
-                tree.return_type = value_type
-            self.assert_(tree.return_type == value_type, "block has different return types", tree)
-
-        self.ret = ret
-
-        self.visit_children(tree)  # sets tree.return_type
+        value = self.visit(tree.children[1])
+        assign(self, self.local_scope, tree.children[0], value)
+        if len(tree.children) == 3:
+            tree.return_type = self.visit(tree.children[2])
+        else:
+            tree.return_type = VolpeObject(dict())
 
     def assert_(self, condition: bool, message: str, tree: Optional[TypeTree]=None):
         volpe_assert(condition, message, tree, self.stack_trace)
@@ -57,10 +50,6 @@ class AnnotateScope(Interpreter):
 
     def symbol(self, tree: TypeTree):
         return self.get_scope()(tree.children[0].value, tree)
-
-    def block(self, tree: TypeTree):
-        AnnotateScope(tree, self.get_scope(), stack_trace=self.stack_trace)
-        return tree.return_type
 
     def object(self, tree: TypeTree):
         scope = dict()
@@ -88,14 +77,9 @@ class AnnotateScope(Interpreter):
         self.stack_trace.pop()
         return ret
 
-    def return_n(self, tree: TypeTree):
-        return_type = self.visit(tree.children[0])
-        self.assert_(not is_pointer(return_type), "cannot return pointers", tree)
-        self.ret(return_type)
-
     def assign(self, tree: TypeTree):
-        value = self.visit(tree.children[1])
-        assign(self, self.local_scope, tree.children[0], value)
+        AnnotateScope(tree, self.get_scope(), stack_trace=self.stack_trace)
+        return tree.return_type
 
     @staticmethod
     def integer(_: TypeTree):
@@ -193,18 +177,19 @@ class AnnotateScope(Interpreter):
         self.assert_(isinstance(array, VolpeArray), "can only make pointer from array", tree)
         return VolpePointer(array.element)
 
+    def math(self, tree: TypeTree):
+        ret = self.visit_children(tree)
+        self.assert_(ret[0] == ret[1], "types need to match for math operations", tree)
+        self.assert_(is_int(ret[0]) or is_flt(ret[0]) or is_char(ret[0]),
+                     "can only do math operations with int, flt, or char", tree)
+        return ret[0]
+
     # Boolean logic
     implication = logic
     logic_and = logic
     logic_or = logic
     logic_not = unary_logic
 
-    # Mathematics
-    add = math
-    mod = math
-    mul = math
-    sub = math
-    div = math
     # power = math
     negate = unary_math
     add_assign = math_assign

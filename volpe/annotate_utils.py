@@ -14,11 +14,7 @@ def unary_logic(self, tree: TypeTree):
     return int1
 
 
-def math(self, tree: TypeTree):
-    ret = self.visit_children(tree)
-    self.assert_(ret[0] == ret[1], "types need to match for math operations", tree)
-    self.assert_(is_int(ret[0]) or is_flt(ret[0]) or is_char(ret[0]), "can only do math operations with int, flt, or char", tree)
-    return ret[0]
+
 
 
 def unary_math(self, tree: TypeTree):
