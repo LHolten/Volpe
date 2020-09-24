@@ -1,74 +1,28 @@
-?block: (value_ass? _COM? _SEP)* result _COM?
+?block: _LINE* super
 
-?value_ass: value1 ":=" value1 -> assign
-    | value1 "+=" value1 -> add_assign
-    | value1 "-=" value1 -> sub_assign
-    | value1 "/=" value1 -> div_assign
-    | value1 "*=" value1 -> mul_assign
-    | value1 "%=" value1 -> mod_assign
-    | value1 "->" value1 -> if_then
+?super: "." (expr | operator) _LINE*
+    | arg_s MATH_TYPE? "="? (expr | operator) (_LINE+ super | _LINE*) -> assign
 
-?result: object (_COM? _SEP)*
-    | () -> object
+?expr: symbol | literal | "{" block "}"
+    | expr symbol -> attribute
+    | expr arg -> func_call
+    | operator arg_s -> func_call
+    | brackets arg_s -> func
 
-?value1: object
-    | () -> object
+?operator: expr BOOL_TYPE -> bool
+    | expr COMP_TYPE -> comp
+    | expr MATH_TYPE -> math
 
-?object: value2
-    | (item | value2) ("," _SEP* (item | value2))+ -> object
-    | item -> object
+?arg_s: arg | symbol
+?arg: literal | brackets | "{" block "}"
 
-item: CNAME ":" _SEP* value2 -> item
+?brackets: "(" (expr | operator) ")"
 
-?value2: value3
-    | value2 "->" value3 -> implication
-
-?value3: value4
-    | value3 "||" value4 -> logic_or
-
-?value4: value5
-    | value4 "&&" value5 -> logic_and
-
-?value5: value6
-    | value5 "=" value6 -> equals
-    | value5 "!=" value6 -> not_equals
-
-?value6: value7
-    | value7 (COMP_TYPE value7)+ -> chain_comp
-
-?value7: value8
-    | value7 "+" value8 -> add
-    | value7 "-" value8 -> sub
-
-?value8: value9
-    | value8 "/" value9 -> div
-    | value8 "%" value9 -> mod
-    | value8 "*" value9 -> mul
-
-?value9: value10
-    | "-" value9 -> negate
-    | "!" value9 -> logic_not
-    | "~" value9 -> convert_flt
-    | "&" value9 -> make_pointer
-
-?value10: symbol
-    | INTEGER -> integer
+?literal: INTEGER -> integer
     | CHARACTER -> character
     | ESCAPED_CHARACTER -> escaped_character
     | HEX_CHARACTER -> escaped_character
     | ESCAPED_STRING -> string
-    | "(" value1 ")" "{" block "}" -> func
-    | "{" block "}"
-    | "(" _SEP* value1 _SEP* ")"
-    | "|" value10 "|" -> array_size
-    | "[" (_SEP* value2 ("," _SEP* value2)*)? _SEP* "]" -> array
-    | "[" _SEP* value2 _SEP* ";" _SEP* INTEGER _SEP* "]" -> constant_array
-    | "[" _SEP* value2 _SEP* ";" _SEP* "|" value10 "|" _SEP* "]" -> constant_array_like
-    | value10 "." CNAME -> attribute
-    | value10 "." INTEGER -> convert_int
-    | value10 "(" value1 ")" -> func_call
-    | value10 "[" _SEP* value2 _SEP* "]" -> array_index
-
 
 symbol: CNAME
     | THIS_FUNC
@@ -94,10 +48,14 @@ COMMENT: "#" /.*/
 NEWLINE: (CR? LF)
 
 THIS_FUNC: "@"
-COMP_TYPE: "<=" | ">=" | "<" | ">"
+COMP_TYPE: "<=" | ">=" | "<" | ">" | "==" | "!="
+MATH_TYPE: "+" | "-" | "*" | "/" | "%"
+BOOL_TYPE: "->" | "||" | "&&"
 
 _COM: COMMENT
     | MULTILINE_COMMENT
 
 _SEP: NEWLINE
     | ";"
+
+_LINE: _COM? _SEP

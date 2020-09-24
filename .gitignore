@@ -131,3 +131,7 @@ dmypy.json
 # VSCode
 .vscode/
 *.code-workspace
+
+.idea/
+MingW/
+*.ll

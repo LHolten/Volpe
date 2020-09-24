@@ -20,6 +20,7 @@ with open(path_to_lark) as lark_file:
         lark_file,
         start="block",
         parser="lalr",
+        debug=True,
         tree_class=TypeTree,
         propagate_positions=True,
     )
