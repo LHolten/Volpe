@@ -66,7 +66,7 @@ def chain_comp(self, tree: TypeTree):
     tree.data = prev_tree.data
     tree.children = prev_tree.children
 
-    self.visit_children(tree)
+    self.visit(tree)
 
 
 def comp(self, tree: TypeTree):
