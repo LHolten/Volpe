@@ -40,7 +40,7 @@ class VolpeError(Exception):
             message += f"\n{code}"
 
         # Add type info to error
-        types = ", ".join(str(child.return_type) for child in tree.children if isinstance(child, TypeTree))
+        types = ", ".join((str(child.return_type) if not hasattr(child.return_type, "env") else "closure") for child in tree.children if isinstance(child, TypeTree))
         s = "s" if len(tree.children) > 1 else ""
         message += f"\n  type{s}: {types}"
         super().__init__(message)
@@ -56,7 +56,7 @@ def get_code(tree):
     last_line = tree.meta.end_line
     spacing = len(str(last_line))
 
-    code = []
+    code = [f"-> in {tree.meta.file_path}"]
     with open(tree.meta.file_path, "r") as f:
         text = f.readlines()
         for i, line in enumerate(text[first_line - 1: last_line], first_line):
