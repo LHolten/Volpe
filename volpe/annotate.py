@@ -84,6 +84,7 @@ class AnnotateScope(Interpreter):
     def func_call(self, tree: TypeTree):
         self.stack_trace.append(tree)
         closure, args = self.visit_children(tree)
+        self.assert_(isinstance(closure, (VolpeClosure, VolpeCFunc)), "you can only call closures or c-funcs", tree)
         ret = closure.ret_type(self, args)
         self.stack_trace.pop()
         return ret
@@ -166,12 +167,23 @@ class AnnotateScope(Interpreter):
         return self.visit(tree)
 
     def c_import(self, tree: TypeTree):
-        from os import path
+        import os
+        path = os.path
         import clang.cindex
         index = clang.cindex.Index.create()
 
+        # Attempt local import first.
         directory = path.dirname(path.abspath(tree.meta.file_path))
-        import_path = path.join(directory, *[child.value for child in tree.children[:-1]]) + ".h"
+        other = path.join(*[child.value for child in tree.children[:-1]]) + ".h"
+        import_path = path.join(directory, other) 
+        # Otherwise search PATH
+        if not path.isfile(import_path):
+            for directory in os.environ.get("PATH", "").split(os.pathsep):
+                import_path = path.join(directory, other)
+                if path.isfile(import_path):
+                    break
+            else:
+                self.assert_(False, f"could not find {other}", tree)
 
         options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE + \
             clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
