@@ -1,22 +1,24 @@
 ?block: _LINE* super
 
-?super: "." (expr | operator) _LINE*
-    | arg_s MATH_TYPE? "="? (expr | operator) (_LINE+ super | _LINE*) -> assign
+?super: ".." partial _LINE*
+    | term partial (_LINE+ super | _LINE*) -> assign
 
-?expr: symbol | literal | "{" block "}"
+?expr: term
     | expr symbol -> attribute
     | expr arg -> func_call
-    | operator arg_s -> func_call
-    | brackets arg_s -> func
+    | operator term -> func_call
 
 ?operator: expr BOOL_TYPE -> bool
     | expr COMP_TYPE -> comp
     | expr MATH_TYPE -> math
 
-?arg_s: arg | symbol
-?arg: literal | brackets | "{" block "}"
+?func: symbol "." term
 
-?brackets: "(" (expr | operator) ")"
+?term: arg | symbol
+
+?arg: literal | "(" partial ")" | "{" block "}" | func
+
+?partial: expr | operator
 
 ?literal: INTEGER -> integer
     | CHARACTER -> character
