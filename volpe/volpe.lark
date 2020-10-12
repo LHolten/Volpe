@@ -1,24 +1,38 @@
-?block: _LINE* super
+?block: _LINE* super _COM?
 
-?super: ".." partial _LINE*
-    | term partial (_LINE+ super | _LINE*) -> assign
+?super: ".." bool_implies _LINE*
+    | symbol "="? bool_implies (_LINE+ super | _LINE*) -> assign
 
-?expr: term
-    | expr symbol -> attribute
-    | expr arg -> func_call
-    | operator term -> func_call
+?bool_implies: bool_or
+    | bool_implies "->" bool_or
 
-?operator: expr BOOL_TYPE -> bool
-    | expr COMP_TYPE -> comp
-    | expr MATH_TYPE -> math
+?bool_or: bool_and
+    | bool_or "||" bool_and
 
-?func: symbol "." term
+?bool_and: comp
+    | bool_and "&&" comp
 
-?term: arg | symbol
+?comp: math_1
+    | comp COMP_TYPE math_1
 
-?arg: literal | "(" partial ")" | "{" block "}" | func
+?math_1: math_2
+    | math_1 "+" math_2 -> math_add
+    | math_1 "-" math_2 -> math_sub
 
-?partial: expr | operator
+?math_2: expr
+    | math_2 "*" expr -> math_mul
+    | math_2 "/" expr -> math_div
+    | math_2 "%" expr -> math_mod
+
+?expr: func | literal | symbol
+    | expr "."? symbol -> attribute
+    | expr "."? literal -> func_call
+    | expr "."? func -> func_call
+
+?func: term
+    | symbol ":" func
+
+?term: "(" _LINE* bool_implies ("," bool_implies)* _LINE* ")" | "{" _LINE* super "}"
 
 ?literal: INTEGER -> integer
     | CHARACTER -> character
@@ -51,8 +65,6 @@ NEWLINE: (CR? LF)
 
 THIS_FUNC: "@"
 COMP_TYPE: "<=" | ">=" | "<" | ">" | "==" | "!="
-MATH_TYPE: "+" | "-" | "*" | "/" | "%"
-BOOL_TYPE: "->" | "||" | "&&"
 
 _COM: COMMENT
     | MULTILINE_COMMENT
