@@ -1,16 +1,17 @@
-?block: _LINE* super _COM?
+?block: _LINE* expr _LINE* _COM?
 
-?super: ".." bool_implies _LINE*
-    | symbol "="? bool_implies (_LINE+ super | _LINE*) -> assign
+?expr: bool_1
+    | CNAME "=" bool_1 _LINE+ expr -> assign
+    | bool_1 "?" bool_1 _LINE+ expr -> cond
 
-?bool_implies: bool_or
-    | bool_implies "->" bool_or
+?bool_1: bool_2
+    | bool_1 "->" bool_2 -> bool_implies
 
-?bool_or: bool_and
-    | bool_or "||" bool_and
+?bool_2: bool_3
+    | bool_2 "||" bool_3 -> bool_or
 
-?bool_and: comp
-    | bool_and "&&" comp
+?bool_3: comp
+    | bool_3 "&&" comp -> bool_and
 
 ?comp: math_1
     | comp COMP_TYPE math_1
@@ -19,31 +20,34 @@
     | math_1 "+" math_2 -> math_add
     | math_1 "-" math_2 -> math_sub
 
-?math_2: expr
-    | math_2 "*" expr -> math_mul
-    | math_2 "/" expr -> math_div
-    | math_2 "%" expr -> math_mod
+?math_2: func_call
+    | math_2 "*" func_call -> math_mul
+    | math_2 "/" func_call -> math_div
+    | math_2 "%" func_call -> math_mod
 
-?expr: func | literal | symbol
-    | expr "."? symbol -> attribute
-    | expr "."? literal -> func_call
-    | expr "."? func -> func_call
+?func_call: func
+    | func_call func
 
 ?func: term
-    | symbol ":" func
+    | CNAME ":" func
+    | "@" func -> recursion
 
-?term: "(" _LINE* bool_implies ("," bool_implies)* _LINE* ")" | "{" _LINE* super "}"
+?term: "(" _LINE* expr _LINE* ")" | distinct | flowing
+    | "{" _LINE* expr (_LINE+ expr)* _LINE* "}" -> tuple
+    | "[" _LINE* array (_LINE+ array)* _LINE* "]" -> array
 
-?literal: INTEGER -> integer
+?array: expr ("," _LINE* expr)*
+
+?distinct: "." CNAME -> symbol
     | CHARACTER -> character
     | ESCAPED_CHARACTER -> escaped_character
     | HEX_CHARACTER -> escaped_character
     | ESCAPED_STRING -> string
-
-symbol: CNAME
-    | THIS_FUNC
     | "$" CNAME ("\\" CNAME)* -> import_
     | "$$" CNAME ("\\" CNAME)* -> c_import
+
+?flowing: CNAME -> symbol
+    | INTEGER -> integer
 
 %import common.ESCAPED_STRING
 %import common.INT
@@ -59,11 +63,10 @@ ESCAPED_CHARACTER: /'\\[abfnrtv'\\]'/
 HEX_CHARACTER: /'\\x[0-7][0-9a-fA-F]'/
 CHARACTER: /'[^'\\]'/
 
-MULTILINE_COMMENT: "#!" /((?!!#).|\n)*/ "!#" " "*
+MULTILINE_COMMENT: "#!" /((?!!#).|\n)*/ "!#"
 COMMENT: "#" /.*/
 NEWLINE: (CR? LF)
 
-THIS_FUNC: "@"
 COMP_TYPE: "<=" | ">=" | "<" | ">" | "==" | "!="
 
 _COM: COMMENT
