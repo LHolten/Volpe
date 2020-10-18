@@ -1,12 +1,16 @@
 ?block: _LINE* expr _LINE* _COM?
 
-?expr: bool_1
-    | CNAME "=" bool_1 _LINE+ expr -> assign
-    | CNAME ":=" bool_1 _LINE+ expr -> call_assign
-    | bool_1 "?" bool_1 _LINE+ expr -> cond
+?expr: bool_0
+    | CNAME "=" bool_0 _LINE+ expr -> assign
+    | CNAME ":=" bool_0 _LINE+ expr -> call_assign
+    | bool_0 "->" bool_0 _LINE+ expr -> cond
+
+?bool_0: bool_1
+    | bool_0 "><" bool_1 -> bool_unequal
+    | bool_0 "<>" bool_1 -> bool_equal
 
 ?bool_1: bool_2
-    | bool_1 "->" bool_2 -> bool_implies
+    | bool_1 "=>" bool_2 -> bool_implies
 
 ?bool_2: bool_3
     | bool_2 "||" bool_3 -> bool_or
@@ -34,10 +38,10 @@
     | "@" func -> recursion
 
 ?term: "(" _LINE* expr _LINE* ")" | distinct | flowing
-    | "{" _LINE* expr (_LINE+ expr)* _LINE* "}" -> tuple
+    | "{" _LINE* bool_0 (_LINE+ bool_0)* _LINE* "}" -> tuple
     | "[" _LINE* array (_LINE+ array)* _LINE* "]" -> array
 
-?array: expr ("," _LINE* expr)*
+?array: bool_0 ("," _LINE* bool_0)*
 
 ?distinct: "." CNAME -> symbol
     | CHARACTER -> character
