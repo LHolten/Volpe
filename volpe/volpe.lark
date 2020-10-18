@@ -2,6 +2,7 @@
 
 ?expr: bool_1
     | CNAME "=" bool_1 _LINE+ expr -> assign
+    | CNAME ":=" bool_1 _LINE+ expr -> call_assign
     | bool_1 "?" bool_1 _LINE+ expr -> cond
 
 ?bool_1: bool_2
