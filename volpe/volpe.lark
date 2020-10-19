@@ -1,8 +1,8 @@
 ?block: _LINE* expr _LINE* _COM?
 
 ?expr: bool_0
-    | CNAME "=" bool_0 _LINE+ expr -> assign
-    | CNAME ":=" bool_0 _LINE+ expr -> call_assign
+    | CNAME ":=" bool_0 _LINE+ expr -> assign
+    | (CNAME "=")+ bool_0 _LINE+ expr -> assign_
     | bool_0 "->" bool_0 _LINE+ expr -> cond
 
 ?bool_0: bool_1
@@ -38,7 +38,7 @@
     | "@" func -> recursion
 
 ?term: "(" _LINE* expr _LINE* ")" | distinct | flowing
-    | "{" _LINE* bool_0 (_LINE+ bool_0)* _LINE* "}" -> tuple
+    | "{" _LINE* func (_LINE* func)* _LINE* "}" -> tuple
     | "[" _LINE* array (_LINE+ array)* _LINE* "]" -> array
 
 ?array: bool_0 ("," _LINE* bool_0)*
