@@ -67,9 +67,7 @@ def parse_trees(file_path: str, imports: Dict):
 
     with open(file_path) as vlp_file:
         try:
-            tree = volpe_parser.parse(vlp_file.read())
-            obj_tree = TypeTree("object", [], tree.meta)
-            imports[file_path] = TypeTree("func", [obj_tree, tree], tree.meta)
+            tree = imports[file_path] = volpe_parser.parse(vlp_file.read())
         except UnexpectedEOF:
             raise VolpeError("unexpected end of input (did you return from main?)")
         except UnexpectedCharacters as err:
@@ -92,7 +90,9 @@ def parse_trees(file_path: str, imports: Dict):
             directory = path.dirname(file_path)
             import_path = path.join(directory, *[child.value for child in subtree.children]) + ".vlp"
             parse_trees(import_path, imports)
+
+            obj_tree = TypeTree("object", [], subtree.meta)
             subtree.data = "func_call"
-            subtree.children = [imports[import_path], obj_tree]
+            subtree.children = [TypeTree("func", [obj_tree, imports[import_path]], subtree.meta), obj_tree]
 
     return tree

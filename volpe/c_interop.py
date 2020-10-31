@@ -5,7 +5,7 @@ from llvmlite import ir
 import clang.cindex
 
 from llvm_utils import build_func
-from volpe_types import int64, VolpeType, VolpeObject, VolpePointer, char, pint8, unknown, unwrap, int32
+from volpe_types import int64, flt64, VolpeType, VolpeObject, VolpePointer, char, pint8, unknown, unwrap, int32
 
 index = clang.cindex.Index.create()
 
@@ -17,6 +17,8 @@ def volpe_from_c(c_type: clang.cindex.Type) -> Union[ir.Type, VolpeType]:
         return char
     if c_type.kind == clang.cindex.TypeKind.INT or c_type.kind == clang.cindex.TypeKind.UINT:
         return int64
+    if c_type.kind == clang.cindex.TypeKind.DOUBLE:
+        return flt64
     if c_type.kind == clang.cindex.TypeKind.VOID:
         return VolpeObject({})
     if c_type.kind == clang.cindex.TypeKind.RECORD:
@@ -49,7 +51,7 @@ class VolpeCFunc(VolpeType):
         raise hash(self.c_func)
 
     def ret_type(self, parent, args: VolpeType):
-        parent.assert_(args == self.args(), f"can not call `{self.name}` with args {args}")
+        parent.assert_(args == self.args(), f"can not call `{self.name}` with args {args}, expected {self.args()}")
         return self.ret()
 
     def build_or_get_function(self, parent, volpe_args):

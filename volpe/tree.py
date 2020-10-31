@@ -55,7 +55,7 @@ def get_code(tree):
     last_line = tree.meta.end_line
     spacing = len(str(last_line))
 
-    code = []
+    code = [f"-> in {tree.meta.file_path}"]
     with open(tree.meta.file_path, "r") as f:
         text = f.readlines()
         for i, line in enumerate(text[first_line - 1: last_line], first_line):
