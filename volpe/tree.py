@@ -40,9 +40,8 @@ class VolpeError(Exception):
             message += f"\n{code}"
 
         # Add type info to error
-        types = ", ".join((str(child.return_type) if not hasattr(child.return_type, "env") else "closure") for child in tree.children if isinstance(child, TypeTree))
-        s = "s" if len(tree.children) > 1 else ""
-        message += f"\n  type{s}: {types}"
+        types = ", ".join(str(child.return_type) for child in tree.children if isinstance(child, TypeTree))
+        message += f"\n  typing: {types}"
         super().__init__(message)
 
 
