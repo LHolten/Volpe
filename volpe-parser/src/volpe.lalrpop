@@ -2,9 +2,25 @@ use std::str::FromStr;
 
 grammar;
 
-pub Term: i32 = {
-    <Num>,
-    "(" <Term> ")",
+pub Block = (App "=" App ";")* <App>;
+
+List = (List2 ";")* <List2>;
+
+List2 = (App ",")* <App>;
+
+Obj = (Ident ":" App ";")* Ident ":" <App>;
+
+App = Term* <Term>;
+
+Term = {
+    Num,
+    Ident,
+    "(" <Block> ")",
+    "[" <List> "]",
+    "{" <Obj> "}"
 };
 
-Num: i32 = <r"[0-9]+"> => i32::from_str(<>).unwrap();
+
+Ident = r"[_a-zA-Z][_a-zA-Z0-9]*";
+
+Num = r"[0-9]+";
