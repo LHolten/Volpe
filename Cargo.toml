@@ -1,7 +1,10 @@
 [package]
 name = "volpe"
 version = "0.1.0"
-authors = ["Hytak <lhc.holten@gmail.com>"]
+authors = [
+    "Lucas Holten <lhc.holten@gmail.com>",
+    "Viliam Vadocz <viliam.vadocz@gmail.com>",
+]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

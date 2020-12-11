@@ -290,6 +290,9 @@ name = "lalrpop-util"
 version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6771161eff561647fad8bb7e745e002c304864fb8f436b52b30acda51fca4408"
+dependencies = [
+ "regex",
+]
 
 [[package]]
 name = "lazy_static"
@@ -532,6 +535,8 @@ name = "volpe-parser"
 version = "0.1.0"
 dependencies = [
  "lalrpop",
+ "lalrpop-util",
+ "regex",
 ]
 
 [[package]]
