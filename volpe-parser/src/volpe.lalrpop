@@ -2,24 +2,24 @@ use std::str::FromStr;
 
 grammar;
 
-pub Block = (App "=" App ";")* <App>;
+pub Expr = (Stmt ";")* <Stmt>;
+Stmt = (App "=")* <App>;
 
-List = (List2 ";")* <List2>;
+Column = (Row ";")* <Row>;
+Row = (App ",")* <App>;
 
-List2 = (App ",")* <App>;
-
-Obj = (Ident ":" App ";")* Ident ":" <App>;
+Obj = (Entry ";")* <Entry>;
+Entry = App ":" <App>;
 
 App = Term* <Term>;
 
 Term = {
     Num,
     Ident,
-    "(" <Block> ")",
-    "[" <List> "]",
-    "{" <Obj> "}"
+    "(" <Expr> ")",
+    "[" <Column> "]",
+    "{" <Obj> "}",
 };
-
 
 Ident = r"[_a-zA-Z][_a-zA-Z0-9]*";
 
