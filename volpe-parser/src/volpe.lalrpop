@@ -2,16 +2,18 @@ use std::str::FromStr;
 
 grammar;
 
-pub Expr = (Stmt ";")* <Stmt>;
+pub Expr = (Stmt ";")* <Stmt> ";"?;
 Stmt = (App "=")* <App>;
 
-Column = (Row ";")* <Row>;
+Column = (Row ";")* <Row> ";"?;
 Row = (App ",")* <App>;
 
-Obj = (Entry ";")* <Entry>;
+Obj = (Entry ";")* <Entry> ";"?;
 Entry = App ":" <App>;
 
-App = Term* <Term>;
+App = Func* <Func>;
+
+Func = (Term ".")* <Term>;
 
 Term = {
     Num,

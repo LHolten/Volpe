@@ -14,5 +14,20 @@ mod tests {
             .parse("[1, 2, 3; 4, 5, 6] 10 (cool thing)")
             .is_ok());
         assert!(ExprParser::new().parse("(a = 1; b = 2; add a b)").is_ok());
+        assert!(ExprParser::new()
+            .parse(
+                "my_array = [
+                    1, 2, 3;
+                    5, 6, 7;
+                ];
+                
+                print my_array;
+                
+                my_object = {
+                    alpha : something;
+                    beta : 3404;
+                }"
+            )
+            .is_ok());
     }
 }
