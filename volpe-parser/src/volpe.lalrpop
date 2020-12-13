@@ -11,15 +11,20 @@ Row = (App ",")* <App>;
 Obj = (Entry ";")* <Entry> ";"?;
 Entry = App ":" <App>;
 
-App = Or* <Or>;
+App = Or_* <Or_>;
 
-Or = (And "||")* <And>;
+Or_ = (And_ "||")* <And_>;
+And_ = (Applicable "&&")* <Applicable>;
 
-And = (Cmp "&&")* <Cmp>;
+Applicable = {Equal, Cmp, Equable};
 
-Cmp = (Comparable CmpSym)* <Comparable>;
-CmpSym = {"==", "!=", "<", ">", "<=", ">="};
-Comparable = {Add, BinOr, BinXor, Shift, Func};
+Equal = (Equable EqualSym)+ <Equable>;
+EqualSym = {"==", "!="};
+Equable = {BitOr, BitXor, Shift, Comparable}
+
+Cmp = (Comparable CmpSym)+ <Comparable>;
+CmpSym = {"<", ">", "<=", ">="};
+Comparable = {Add, Func};
 
 Add = (Mul_ AddSym)+ <Mul_>;
 AddSym = {"+", "-"};
@@ -28,11 +33,11 @@ Mul = (Func MulSym)+ <Func>;
 Mul_ = (Func MulSym)* <Func>;
 MulSym = {"*", "/", "%"};
 
-BinOr = (BinAnd_ "|")+ <BinAnd_>;
-BinAnd = (Func "&")+ <Func>;
-BinAnd_ = (Func "&")* <Func>;
+BitOr = (BitAnd_ "|")+ <BitAnd_>;
+BitAnd = (Func "&")+ <Func>;
+BitAnd_ = (Func "&")* <Func>;
 
-BinXor = (Func "^")+ <Func>;
+BitXor = (Func "^")+ <Func>;
 
 Shift = (Func ShiftSym)+ <Func>;
 ShiftSym = {"<<", ">>"};
