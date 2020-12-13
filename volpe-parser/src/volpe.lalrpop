@@ -11,7 +11,31 @@ Row = (App ",")* <App>;
 Obj = (Entry ";")* <Entry> ";"?;
 Entry = App ":" <App>;
 
-App = Func* <Func>;
+App = Or* <Or>;
+
+Or = (And "||")* <And>;
+
+And = (Cmp "&&")* <Cmp>;
+
+Cmp = (Comparable CmpSym)* <Comparable>;
+CmpSym = {"==", "!=", "<", ">", "<=", ">="};
+Comparable = {Add, BinOr, BinXor, Shift, Func};
+
+Add = (Mul_ AddSym)+ <Mul_>;
+AddSym = {"+", "-"};
+
+Mul = (Func MulSym)+ <Func>;
+Mul_ = (Func MulSym)* <Func>;
+MulSym = {"*", "/", "%"};
+
+BinOr = (BinAnd_ "|")+ <BinAnd_>;
+BinAnd = (Func "&")+ <Func>;
+BinAnd_ = (Func "&")* <Func>;
+
+BinXor = (Func "^")+ <Func>;
+
+Shift = (Func ShiftSym)+ <Func>;
+ShiftSym = {"<<", ">>"};
 
 Func = (Term ".")* <Term>;
 
