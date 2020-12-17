@@ -1,58 +1,96 @@
 use std::str::FromStr;
+use std::rc::Rc;
 use crate::ast::*;
 
 grammar;
 
+Left<O, N>: Term = LeftOptional<O, N> O N => Term::Op(Op::new(<>));
+
+LeftOptional<O, N>: Term = {
+    LeftOptional<O, N> O N => Term::Op(Op::new(<>)),
+    N,
+};
+
 pub Expr = (Stmt ";")* <Stmt> ";"?;
-Stmt = (App "=")* <App>;
+Stmt = (App_ "=")* <App_>;
 
 Column = (Row ";")* <Row> ";"?;
-Row = (App ",")* <App>;
+Row = (App_ ",")* <App_>;
 
 Obj = (Entry ",")* <Entry> ","?;
-Entry = App ":" <App>;
+Entry = App_ ":" <App_>;
 
-App = Or_* <Or_>;
+App_ = LeftOptional<AppOp, Or_>;
+AppOp: OpCode = () => OpCode::App;
 
-Or_ = (And_ "||")* <And_>;
-And_ = (Applicable "&&")* <Applicable>;
+Or_ = LeftOptional<OrOp, And_>;
+OrOp: OpCode = "||" => OpCode::Or;
 
-Applicable = {Equal, Cmp, Equable};
+And_ = LeftOptional<AndOp, Applicable_>;
+AndOp: OpCode = "&&" => OpCode::And;
 
-Equal = (Equable EqualSym)+ <Equable>;
-EqualSym = {"==", "!="};
-Equable = {BitOr, BitXor, Shift, Comparable}
+Applicable_ = {Equal, Cmp, Equable_};
 
-Cmp = (Comparable CmpSym)+ <Comparable>;
-CmpSym = {"<", ">", "<=", ">="};
-Comparable = {Add, Func};
+Equal: Term = Equable_ (EqualOp Equable_)+ => Term::EqualOp(MultiOp::new(<>));
+EqualOp: EqualOp = {
+    "==" => EqualOp::Equal,
+    "!=" => EqualOp::Unequal,
+};
+Equable_ = {BitOr, BitAnd, BitXor, Shift, Comparable_};
 
-Add = (Mul_ AddSym)+ <Mul_>;
-AddSym = {"+", "-"};
+Cmp: Term = Comparable_ (CmpOp Comparable_)+ => Term::CmpOp(MultiOp::new(<>));
+CmpOp: CmpOp = {
+    "<" => CmpOp::Less,
+    ">" => CmpOp::Greater,
+    "<=" => CmpOp::LessEqual,
+    ">=" => CmpOp::GreaterEqual,
+};
+Comparable_ = {Add, Mul, Func_};
 
-Mul = (Func MulSym)+ <Func>;
-Mul_ = (Func MulSym)* <Func>;
-MulSym = {"*", "/", "%"};
+Add = Left<AddOp, Mul_>;
+AddOp: OpCode = {
+    "+" => OpCode::Add,
+    "-" => OpCode::Sub,
+};
 
-BitOr = (BitAnd_ "|")+ <BitAnd_>;
-BitAnd = (Func "&")+ <Func>;
-BitAnd_ = (Func "&")* <Func>;
+Mul = Left<MulOp, Func_>;
+Mul_ = LeftOptional<MulOp, Func_>;
+MulOp: OpCode = {
+    "*" => OpCode::Mul,
+    "/" => OpCode::Div,
+    "%" => OpCode::Mod,
+};
 
-BitXor = (Func "^")+ <Func>;
+BitOr = Left<BitOrOp, BitAnd_>;
+BitOrOp: OpCode = "|" => OpCode::BitOr;
 
-Shift = (Func ShiftSym)+ <Func>;
-ShiftSym = {"<<", ">>"};
+BitAnd = Left<BitAndOp, Func_>;
+BitAnd_ = LeftOptional<BitAndOp, Func_>;
+BitAndOp: OpCode = "&" => OpCode::BitAnd;
 
-Func = (Term ".")* <Term>;
+BitXor = Left<BitXorOp, Func_>;
+BitXorOp: OpCode = "^" => OpCode::BitXor;
 
-Term = {
-    Num,
-    Ident,
+Shift = Left<ShiftOp, Func_>;
+ShiftOp: OpCode = {
+    "<<" => OpCode::BitShl, 
+    ">>" => OpCode::BitShr,
+};
+
+Func_: Term = {
+    Term FuncOp Func_ => Term::Op(Op::new(<>)),
+    Term,
+};
+FuncOp: OpCode = "." => OpCode::Func;
+
+Term: Term = {
+    Num => Term::Num(<>),
+    Ident => Term::Ident(<>),
     "(" <Expr> ")",
     "[" <Column> "]",
     "{" <Obj> "}",
 };
 
-Ident = r"[_a-zA-Z][_a-zA-Z0-9]*";
+Ident: Rc<String> = r"[_a-zA-Z][_a-zA-Z0-9]*" => Rc::new(<>.to_string());
 
-Num = r"[0-9]+";
+Num: u64 = r"[0-9]+" => u64::from_str(<>).unwrap();

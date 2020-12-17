@@ -1,78 +1,86 @@
 use std::rc::Rc;
 
-struct Expr(Vec<Stmt>);
-struct Stmt {
-    var: Vec<Opp>,
-    val: Opp,
+pub struct Expr(Vec<Stmt>);
+pub struct Stmt {
+    var: Vec<Op>,
+    val: Op,
 }
 
-struct Column(Vec<Row>);
-struct Row(Vec<Opp>);
+pub struct Column(Vec<Row>);
+pub struct Row(Vec<Op>);
 
-struct Obj(Vec<Entry>);
-struct Entry {
-    attr: Opp,
-    val: Opp,
+pub struct Obj(Vec<Entry>);
+pub struct Entry {
+    attr: Op,
+    val: Op,
 }
 
-struct Vec1<T> {
-    head: Box<T>,
-    tail: Vec<T>,
+pub struct Op {
+    pub left: Box<Term>,
+    pub right: Box<Term>,
+    pub op_code: OpCode,
 }
 
-struct OppVec<O> {
-    head: Box<Opp>,
-    tail: Vec1<(O, Opp)>,
+impl Op {
+    pub fn new(left: Term, op_code: OpCode, right: Term) -> Self {
+        Self {
+            left: Box::new(left),
+            right: Box::new(right),
+            op_code,
+        }
+    }
 }
 
-enum Opp {
-    App(OppVec<()>),
-    Or(OppVec<()>),
-    And(OppVec<()>),
-    Equal(OppVec<EqualOpp>),
-    Cmp(OppVec<CmpOpp>),
-    Add(OppVec<AddOpp>),
-    Mul(OppVec<MulOpp>),
-    BitOr(OppVec<()>),
-    BitAnd(OppVec<()>),
-    BitXor(OppVec<()>),
-    Shift(OppVec<ShiftOpp>),
-    Func(OppVec<()>),
-    Term(Box<Term>),
+pub struct MultiOp<O> {
+    pub head: Box<Term>,
+    pub tail: Vec<(O, Term)>,
 }
 
-enum EqualOpp {
+impl<O> MultiOp<O> {
+    pub fn new(head: Term, tail: Vec<(O, Term)>) -> Self {
+        Self {
+            head: Box::new(head),
+            tail,
+        }
+    }
+}
+
+pub enum OpCode {
+    App,
+    Or,
+    And,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    BitOr,
+    BitAnd,
+    BitXor,
+    BitShl,
+    BitShr,
+    Func,
+}
+
+pub enum Term {
+    Num(u64),
+    Ident(Rc<String>),
+    Op(Op),
+    EqualOp(MultiOp<EqualOp>),
+    CmpOp(MultiOp<CmpOp>),
+    Expr(Expr),
+    Column(Column),
+    Obj(Obj),
+}
+
+pub enum EqualOp {
     Equal,
     Unequal,
 }
 
-enum CmpOpp {
+pub enum CmpOp {
     Less,
     Greater,
     LessEqual,
     GreaterEqual,
-}
-
-enum AddOpp {
-    Add,
-    Sub,
-}
-
-enum MulOpp {
-    Mul,
-    Div,
-    Mod,
-}
-
-enum ShiftOpp {
-    Left,
-    Right,
-}
-
-enum Term {
-    Num(u64),
-    Ident(Rc<str>),
-    Expr(Expr),
-    Column(Column),
-    Obj(Obj),
 }
