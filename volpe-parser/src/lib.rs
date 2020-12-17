@@ -21,7 +21,7 @@ mod tests {
                 "my_object = {
                     alpha : something,
                     beta : 3404,
-                }"
+                };"
             )
             .is_ok());
         assert!(ExprParser::new().parse("a.b.(add a b) 10 20").is_ok());

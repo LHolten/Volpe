@@ -11,14 +11,30 @@ LeftOptional<O, N>: Term = {
     N,
 };
 
-pub Expr = (Stmt ";")* <Stmt> ";"?;
-Stmt = (App_ "=")* <App_>;
+Comma<T>: Vec<T> = <v:(<T> ",")+> <e:T?> => match e {
+    None => v,
+    Some(e) => {
+        let mut v = v;
+        v.push(e);
+        v
+    }
+};
 
-Column = (Row ";")* <Row> ";"?;
-Row = (App_ ",")* <App_>;
+pub Expr: Expr = <(<Stmt> ";")*> <App_?> => Expr::new(<>);
+Stmt: Stmt = <var:(<App_> "=")*> <val:App_> => Stmt{<>};
 
-Obj = (Entry ",")* <Entry> ","?;
-Entry = App_ ":" <App_>;
+Matrix: Vec<Vec<Term>> = <v:(<Row> ";")*> <e:Row?> => match e {
+    None => v,
+    Some(e) => {
+        let mut v = v;
+        v.push(e);
+        v
+    }
+};
+Row = Comma<App_>;
+
+Object = Comma<Entry>;
+Entry: Entry = <attr:App_> ":" <val:App_> => Entry{<>};
 
 App_ = LeftOptional<AppOp, Or_>;
 AppOp: OpCode = () => OpCode::App;
@@ -86,9 +102,9 @@ FuncOp: OpCode = "." => OpCode::Func;
 Term: Term = {
     Num => Term::Num(<>),
     Ident => Term::Ident(<>),
-    "(" <Expr> ")",
-    "[" <Column> "]",
-    "{" <Obj> "}",
+    "(" <Expr> ")" => Term::Expr(<>),
+    "[" <Matrix> "]" => Term::Matrix(<>),
+    "{" <Object> "}" => Term::Object(<>),
 };
 
 Ident: Rc<String> = r"[_a-zA-Z][_a-zA-Z0-9]*" => Rc::new(<>.to_string());

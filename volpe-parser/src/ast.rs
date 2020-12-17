@@ -1,20 +1,32 @@
 use std::rc::Rc;
 
-pub struct Expr(Vec<Stmt>);
+#[derive(Debug)]
+pub struct Expr {
+    pub body: Vec<Stmt>,
+    pub ret: Box<Option<Term>>,
+}
+
+impl Expr {
+    pub fn new(body: Vec<Stmt>, ret: Option<Term>) -> Self {
+        Self {
+            body,
+            ret: Box::new(ret),
+        }
+    }
+}
+#[derive(Debug)]
 pub struct Stmt {
-    var: Vec<Op>,
-    val: Op,
+    pub var: Vec<Term>,
+    pub val: Term,
 }
 
-pub struct Column(Vec<Row>);
-pub struct Row(Vec<Op>);
-
-pub struct Obj(Vec<Entry>);
+#[derive(Debug)]
 pub struct Entry {
-    attr: Op,
-    val: Op,
+    pub attr: Term,
+    pub val: Term,
 }
 
+#[derive(Debug)]
 pub struct Op {
     pub left: Box<Term>,
     pub right: Box<Term>,
@@ -31,6 +43,7 @@ impl Op {
     }
 }
 
+#[derive(Debug)]
 pub struct MultiOp<O> {
     pub head: Box<Term>,
     pub tail: Vec<(O, Term)>,
@@ -45,6 +58,7 @@ impl<O> MultiOp<O> {
     }
 }
 
+#[derive(Debug)]
 pub enum OpCode {
     App,
     Or,
@@ -62,6 +76,7 @@ pub enum OpCode {
     Func,
 }
 
+#[derive(Debug)]
 pub enum Term {
     Num(u64),
     Ident(Rc<String>),
@@ -69,15 +84,17 @@ pub enum Term {
     EqualOp(MultiOp<EqualOp>),
     CmpOp(MultiOp<CmpOp>),
     Expr(Expr),
-    Column(Column),
-    Obj(Obj),
+    Matrix(Vec<Vec<Term>>),
+    Object(Vec<Entry>),
 }
 
+#[derive(Debug)]
 pub enum EqualOp {
     Equal,
     Unequal,
 }
 
+#[derive(Debug)]
 pub enum CmpOp {
     Less,
     Greater,
