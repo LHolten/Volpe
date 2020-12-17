@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use crate::ast::*;
 
 grammar;
 
@@ -8,7 +9,7 @@ Stmt = (App "=")* <App>;
 Column = (Row ";")* <Row> ";"?;
 Row = (App ",")* <App>;
 
-Obj = (Entry ";")* <Entry> ";"?;
+Obj = (Entry ",")* <Entry> ","?;
 Entry = App ":" <App>;
 
 App = Or_* <Or_>;

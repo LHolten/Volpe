@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate lalrpop_util;
 
+mod ast;
+
 lalrpop_mod!(pub volpe);
 
 #[cfg(test)]
@@ -17,8 +19,8 @@ mod tests {
         assert!(ExprParser::new()
             .parse(
                 "my_object = {
-                    alpha : something;
-                    beta : 3404;
+                    alpha : something,
+                    beta : 3404,
                 }"
             )
             .is_ok());
