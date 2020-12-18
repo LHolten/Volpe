@@ -11,17 +11,17 @@ LeftOptional<O, N>: Term = {
     N,
 };
 
-Comma<T>: Vec<T> = <v:(<T> ",")+> <e:T?> => match e {
-    None => v,
-    Some(e) => {
-        let mut v = v;
-        v.push(e);
-        v
-    }
+Comma<T>: Vec<T> = <v:(<T> ",")*> <e:T> ","? => {
+    let mut v = v;
+    v.push(e);
+    v
 };
 
-pub Expr: Expr = <(<Stmt> ";")*> <App_?> => Expr::new(<>);
-Stmt: Stmt = <var:(<App_> "=")*> <val:App_> => Stmt{<>};
+pub Expr: Term = {
+    <(<App_> "=")*> <App_> ";" <Expr> => Term::Stmt(Stmt::new(<>)),
+    <App_> "=>" <App_> ";" <Expr> => Term::Ite(Ite::new(<>)),
+    <App_?> => if let Some(val) = <> {val} else {Term::Id},
+}
 
 Matrix: Vec<Vec<Term>> = <v:(<Row> ";")*> <e:Row?> => match e {
     None => v,
@@ -33,10 +33,17 @@ Matrix: Vec<Vec<Term>> = <v:(<Row> ";")*> <e:Row?> => match e {
 };
 Row = Comma<App_>;
 
-Object = Comma<Entry>;
+pub Object = Comma<Entry>;
 Entry: Entry = <attr:App_> ":" <val:App_> => Entry{<>};
 
-Tuple = Comma<Term>;
+Tuple: Vec<Term> = <v:(<App_> ",")*> <e:App_?> => match e {
+    None => v,
+    Some(e) => {
+        let mut v = v;
+        v.push(e);
+        v
+    }
+};
 
 App_ = LeftOptional<AppOp, Func_>;
 AppOp: OpCode = () => OpCode::App;
@@ -104,12 +111,12 @@ ShiftOp: OpCode = {
 Term: Term = {
     Num => Term::Num(<>),
     Ident => Term::Ident(<>),
-    "(" <Expr> ")" => Term::Expr(<>),
+    "(" <Expr> ")",
     "[" <Matrix> "]" => Term::Matrix(<>),
     "{" <Object> "}" => Term::Object(<>),
     "{" <Tuple> "}" => Term::Tuple(<>),
 };
 
-Ident: Rc<String> = r"[_a-zA-Z][_a-zA-Z0-9]*" => Rc::new(<>.to_string());
+Ident: Rc<String> = r"[_a-zA-Z][_a-zA-Z0-9]*\??" => Rc::new(<>.to_string());
 
 Num: u64 = r"[0-9]+" => u64::from_str(<>).unwrap();

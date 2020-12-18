@@ -1,23 +1,37 @@
 use std::rc::Rc;
 
 #[derive(Debug)]
-pub struct Expr {
-    pub body: Vec<Stmt>,
-    pub ret: Box<Option<Term>>,
+pub struct Stmt {
+    pub var: Vec<Term>,
+    pub val: Box<Term>,
+    pub next: Box<Term>,
 }
 
-impl Expr {
-    pub fn new(body: Vec<Stmt>, ret: Option<Term>) -> Self {
+impl Stmt {
+    pub fn new(var: Vec<Term>, val: Term, next: Term) -> Self {
         Self {
-            body,
-            ret: Box::new(ret),
+            var,
+            val: Box::new(val),
+            next: Box::new(next),
         }
     }
 }
+
 #[derive(Debug)]
-pub struct Stmt {
-    pub var: Vec<Term>,
-    pub val: Term,
+pub struct Ite {
+    pub cond: Box<Term>,
+    pub then: Box<Term>,
+    pub otherwise: Box<Term>,
+}
+
+impl Ite {
+    pub fn new(cond: Term, then: Term, otherwise: Term) -> Self {
+        Self {
+            cond: Box::new(cond),
+            then: Box::new(then),
+            otherwise: Box::new(otherwise),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -29,8 +43,8 @@ pub struct Entry {
 #[derive(Debug)]
 pub struct Op {
     pub left: Box<Term>,
-    pub right: Box<Term>,
     pub op_code: OpCode,
+    pub right: Box<Term>,
 }
 
 impl Op {
@@ -83,10 +97,12 @@ pub enum Term {
     Op(Op),
     EqualOp(MultiOp<EqualOp>),
     CmpOp(MultiOp<CmpOp>),
-    Expr(Expr),
+    Stmt(Stmt),
+    Ite(Ite),
     Matrix(Vec<Vec<Term>>),
     Object(Vec<Entry>),
     Tuple(Vec<Term>),
+    Id,
 }
 
 #[derive(Debug)]
