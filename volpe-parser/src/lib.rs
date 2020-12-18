@@ -25,5 +25,6 @@ mod tests {
             )
             .is_ok());
         assert!(ExprParser::new().parse("a.b.(add a b) 10 20").is_ok());
+        assert!(ExprParser::new().parse("{1, 2, 3}").is_ok());
     }
 }

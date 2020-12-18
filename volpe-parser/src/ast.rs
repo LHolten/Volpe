@@ -86,6 +86,7 @@ pub enum Term {
     Expr(Expr),
     Matrix(Vec<Vec<Term>>),
     Object(Vec<Entry>),
+    Tuple(Vec<Term>),
 }
 
 #[derive(Debug)]

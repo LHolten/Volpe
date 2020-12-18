@@ -36,8 +36,16 @@ Row = Comma<App_>;
 Object = Comma<Entry>;
 Entry: Entry = <attr:App_> ":" <val:App_> => Entry{<>};
 
-App_ = LeftOptional<AppOp, Or_>;
+Tuple = Comma<Term>;
+
+App_ = LeftOptional<AppOp, Func_>;
 AppOp: OpCode = () => OpCode::App;
+
+Func_: Term = {
+    Or_ FuncOp Func_ => Term::Op(Op::new(<>)),
+    Or_,
+};
+FuncOp: OpCode = "." => OpCode::Func;
 
 Or_ = LeftOptional<OrOp, And_>;
 OrOp: OpCode = "||" => OpCode::Or;
@@ -61,7 +69,7 @@ CmpOp: CmpOp = {
     "<=" => CmpOp::LessEqual,
     ">=" => CmpOp::GreaterEqual,
 };
-Comparable_ = {Add, Mul, Func_};
+Comparable_ = {Add, Mul, Term};
 
 Add = Left<AddOp, Mul_>;
 AddOp: OpCode = {
@@ -69,8 +77,8 @@ AddOp: OpCode = {
     "-" => OpCode::Sub,
 };
 
-Mul = Left<MulOp, Func_>;
-Mul_ = LeftOptional<MulOp, Func_>;
+Mul = Left<MulOp, Term>;
+Mul_ = LeftOptional<MulOp, Term>;
 MulOp: OpCode = {
     "*" => OpCode::Mul,
     "/" => OpCode::Div,
@@ -80,24 +88,18 @@ MulOp: OpCode = {
 BitOr = Left<BitOrOp, BitAnd_>;
 BitOrOp: OpCode = "|" => OpCode::BitOr;
 
-BitAnd = Left<BitAndOp, Func_>;
-BitAnd_ = LeftOptional<BitAndOp, Func_>;
+BitAnd = Left<BitAndOp, Term>;
+BitAnd_ = LeftOptional<BitAndOp, Term>;
 BitAndOp: OpCode = "&" => OpCode::BitAnd;
 
-BitXor = Left<BitXorOp, Func_>;
+BitXor = Left<BitXorOp, Term>;
 BitXorOp: OpCode = "^" => OpCode::BitXor;
 
-Shift = Left<ShiftOp, Func_>;
+Shift = Left<ShiftOp, Term>;
 ShiftOp: OpCode = {
     "<<" => OpCode::BitShl, 
     ">>" => OpCode::BitShr,
 };
-
-Func_: Term = {
-    Term FuncOp Func_ => Term::Op(Op::new(<>)),
-    Term,
-};
-FuncOp: OpCode = "." => OpCode::Func;
 
 Term: Term = {
     Num => Term::Num(<>),
@@ -105,6 +107,7 @@ Term: Term = {
     "(" <Expr> ")" => Term::Expr(<>),
     "[" <Matrix> "]" => Term::Matrix(<>),
     "{" <Object> "}" => Term::Object(<>),
+    "{" <Tuple> "}" => Term::Tuple(<>),
 };
 
 Ident: Rc<String> = r"[_a-zA-Z][_a-zA-Z0-9]*" => Rc::new(<>.to_string());
