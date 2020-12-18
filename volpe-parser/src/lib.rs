@@ -33,9 +33,8 @@ mod tests {
 
     #[test]
     fn complicated_ast() {
-        assert!(ObjectParser::new()
-            .parse(
-                "for: iter.func.{
+        assert!(dbg!(ObjectParser::new().parse(
+            "for: iter.func.{
                     exec: iter next {
                         some: val.(
                             func val;
@@ -61,7 +60,7 @@ mod tests {
                         print total;
                     ) exec;
                 ),"
-            )
-            .is_ok());
+        ))
+        .is_ok());
     }
 }

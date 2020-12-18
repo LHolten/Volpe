@@ -4,10 +4,10 @@ use crate::ast::*;
 
 grammar;
 
-Left<O, N>: Term = LeftOptional<O, N> O N => Term::Op(Op::new(<>));
+Left<O, N>: Term = LeftOptional<O, N> O N => Term::new_op(<>);
 
 LeftOptional<O, N>: Term = {
-    LeftOptional<O, N> O N => Term::Op(Op::new(<>)),
+    LeftOptional<O, N> O N => Term::new_op(<>),
     N,
 };
 
@@ -18,8 +18,8 @@ Comma<T>: Vec<T> = <v:(<T> ",")*> <e:T> ","? => {
 };
 
 pub Expr: Term = {
-    <(<App_> "=")*> <App_> ";" <Expr> => Term::Stmt(Stmt::new(<>)),
-    <App_> "=>" <App_> ";" <Expr> => Term::Ite(Ite::new(<>)),
+    <(<App_> "=")*> <App_> ";" <Expr> => Term::new_stmt(<>),
+    <App_> "=>" <App_> ";" <Expr> => Term::new_ite(<>),
     <App_?> => if let Some(val) = <> {val} else {Term::Id},
 }
 
@@ -49,7 +49,7 @@ App_ = LeftOptional<AppOp, Func_>;
 AppOp: OpCode = () => OpCode::App;
 
 Func_: Term = {
-    Or_ FuncOp Func_ => Term::Op(Op::new(<>)),
+    Or_ FuncOp Func_ => Term::new_op(<>),
     Or_,
 };
 FuncOp: OpCode = "." => OpCode::Func;
@@ -62,19 +62,19 @@ AndOp: OpCode = "&&" => OpCode::And;
 
 Applicable_ = {Equal, Cmp, Equable_};
 
-Equal: Term = Equable_ (EqualOp Equable_)+ => Term::EqualOp(MultiOp::new(<>));
-EqualOp: EqualOp = {
-    "==" => EqualOp::Equal,
-    "!=" => EqualOp::Unequal,
+Equal: Term = Equable_ (EqualOp Equable_)+ => Term::new_multi_op(<>);
+EqualOp: MultiOpCode = {
+    "==" => MultiOpCode::Equal,
+    "!=" => MultiOpCode::Unequal,
 };
 Equable_ = {BitOr, BitAnd, BitXor, Shift, Comparable_};
 
-Cmp: Term = Comparable_ (CmpOp Comparable_)+ => Term::CmpOp(MultiOp::new(<>));
-CmpOp: CmpOp = {
-    "<" => CmpOp::Less,
-    ">" => CmpOp::Greater,
-    "<=" => CmpOp::LessEqual,
-    ">=" => CmpOp::GreaterEqual,
+Cmp: Term = Comparable_ (CmpOp Comparable_)+ => Term::new_multi_op(<>);
+CmpOp: MultiOpCode = {
+    "<" => MultiOpCode::Less,
+    ">" => MultiOpCode::Greater,
+    "<=" => MultiOpCode::LessEqual,
+    ">=" => MultiOpCode::GreaterEqual,
 };
 Comparable_ = {Add, Mul, Term};
 
