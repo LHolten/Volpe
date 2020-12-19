@@ -21,45 +21,42 @@ mod tests {
                 "my_object = {
                     alpha : something,
                     beta : 3404,
-                };"
+                }; my_object"
             )
             .is_ok());
         assert!(ExprParser::new().parse("a.b.(add a b) 10 20").is_ok());
         assert!(ExprParser::new().parse("{1, 2, 3}").is_ok());
         assert!(ExprParser::new().parse("{1}").is_ok());
         assert!(ExprParser::new().parse("{}").is_ok());
-        assert!(ExprParser::new().parse("()").is_ok());
     }
 
     #[test]
     fn complicated_ast() {
         assert!(dbg!(ObjectParser::new().parse(
             "for: iter.func.{
-                    exec: iter next {
-                        some: val.(
-                            func val;
-                            exec;
-                        ),
-                        none: (),
-                    },
-                },
-                
-                range: from?.to.{
-                    next: (
-                        from >= to => {none};
-                        val = from;
-                        from? = from + 1;
-                        {some, val}
+                exec: iter {
+                    some: val.(
+                        func val;
+                        exec;
                     ),
+                    none: {},
                 },
-                
-                main: args.(
-                    total? = 0;
-                    for (range 10 20) val.(
-                        total? = total + val;
-                        print total;
-                    ) exec;
-                ),"
+            },
+            
+            range: from?.to.(
+                from >= to => {none};
+                val = from;
+                from? = from + 1;
+                {some, val}
+            ),
+            
+            main: args.(
+                total? = 0;
+                for (range 10 20) val.(
+                    total? = total + val;
+                    print total;
+                ) exec;
+            ),"
         ))
         .is_ok());
     }

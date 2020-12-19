@@ -32,7 +32,6 @@ pub enum Term {
     Matrix(Vec<Vec<Term>>),
     Object(Vec<Entry>),
     Tuple(Vec<Term>),
-    Id,
 }
 
 impl Term {
