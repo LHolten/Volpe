@@ -20,6 +20,7 @@ Comma<T>: Vec<T> = <v:(<T> ",")*> <e:T> ","? => {
 pub Expr: Term = {
     <(<App_> "=")*> <App_> ";" <Expr> => Term::new_stmt(<>),
     <App_> "=>" <App_> ";" <Expr> => Term::new_ite(<>),
+    <App_> "=>" <App_> => Term::new_assert(<>),
     <App_>,
 }
 

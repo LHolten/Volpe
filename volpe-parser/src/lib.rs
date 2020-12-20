@@ -25,6 +25,7 @@ mod tests {
         assert!(ExprParser::new().parse("{1, 2, 3}").is_ok());
         assert!(ExprParser::new().parse("{1}").is_ok());
         assert!(ExprParser::new().parse("{}").is_ok());
+        assert!(ExprParser::new().parse("1 > 2 => {}").is_ok());
     }
 
     #[test]

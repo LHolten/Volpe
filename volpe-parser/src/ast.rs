@@ -32,6 +32,10 @@ pub enum Term {
     Matrix(Vec<Vec<Term>>),
     Object(Vec<Entry>),
     Tuple(Vec<Term>),
+    Assert {
+        cond: Box<Term>,
+        val: Box<Term>,
+    },
 }
 
 impl Term {
@@ -63,6 +67,13 @@ impl Term {
         Self::MultiOp {
             head: Box::new(head),
             tail,
+        }
+    }
+
+    pub fn new_assert(cond: Term, val: Term) -> Self {
+        Self::Assert {
+            cond: Box::new(cond),
+            val: Box::new(val),
         }
     }
 }
