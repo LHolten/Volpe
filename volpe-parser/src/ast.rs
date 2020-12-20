@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 #[derive(Debug)]
 pub struct Entry {
     pub attr: Term,
@@ -9,10 +7,10 @@ pub struct Entry {
 #[derive(Debug)]
 pub enum Term {
     Num(u64),
-    Ident(Rc<String>),
+    Ident(String),
     Op {
         left: Box<Term>,
-        op_code: OpCode,
+        op: OpCode,
         right: Box<Term>,
     },
     MultiOp {
@@ -43,7 +41,7 @@ impl Term {
         Self::Op {
             left: Box::new(left),
             right: Box::new(right),
-            op_code,
+            op: op_code,
         }
     }
 
@@ -78,7 +76,7 @@ impl Term {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OpCode {
     App,
     Or,
@@ -96,7 +94,7 @@ pub enum OpCode {
     Func,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MultiOpCode {
     Equal,
     Unequal,

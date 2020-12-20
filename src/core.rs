@@ -1,0 +1,127 @@
+use volpe_parser::ast::{MultiOpCode, OpCode, Term};
+
+pub enum CoreTerm {
+    Num(u64),
+    Ident(String),
+    Op {
+        left: Box<CoreTerm>,
+        op: CoreOpCode,
+        right: Box<CoreTerm>,
+    },
+    Ite {
+        cond: Box<CoreTerm>,
+        then: Box<CoreTerm>,
+        otherwise: Box<CoreTerm>,
+    },
+    Matrix(Vec<Vec<CoreTerm>>),
+    Assert {
+        cond: Box<CoreTerm>,
+        val: Box<CoreTerm>,
+    },
+}
+
+pub enum CoreOpCode {
+    OpCode(OpCode),
+    MultiOpCode(MultiOpCode),
+}
+
+impl From<&Term> for CoreTerm {
+    fn from(term: &Term) -> Self {
+        match term {
+            Term::Num(val) => CoreTerm::Num(*val),
+            Term::Ident(name) => CoreTerm::Ident(name.clone()),
+            Term::Op { left, op, right } => CoreTerm::Op {
+                left: Box::new(left.as_ref().into()),
+                op: CoreOpCode::OpCode(op.clone()),
+                right: Box::new(right.as_ref().into()),
+            },
+            Term::MultiOp { head, tail } => {
+                let mut prev = head.as_ref().into();
+                for (op, next) in tail {
+                    prev = CoreTerm::Op {
+                        left: Box::new(prev),
+                        op: CoreOpCode::MultiOpCode(op.clone()),
+                        right: Box::new(next.into()),
+                    }
+                }
+                prev
+            }
+            Term::Stmt { var, val, next } => {
+                let mut func = next.as_ref().into();
+                for arg in var {
+                    func = CoreTerm::Op {
+                        left: Box::new(arg.into()),
+                        op: CoreOpCode::OpCode(OpCode::Func),
+                        right: Box::new(func),
+                    }
+                }
+                CoreTerm::Op {
+                    left: Box::new(val.as_ref().into()),
+                    op: CoreOpCode::OpCode(OpCode::App),
+                    right: Box::new(func),
+                }
+            }
+            Term::Ite {
+                cond,
+                then,
+                otherwise,
+            } => CoreTerm::Ite {
+                cond: Box::new(cond.as_ref().into()),
+                then: Box::new(then.as_ref().into()),
+                otherwise: Box::new(otherwise.as_ref().into()),
+            },
+            Term::Matrix(vec) => CoreTerm::Matrix(
+                vec.iter()
+                    .map(|v| v.iter().map(|v| v.into()).collect())
+                    .collect(),
+            ),
+            Term::Object(entries) => {
+                let (first, rest) = entries.split_first().unwrap();
+                // this code assumes all keys are distinct
+                let mut prev = CoreTerm::Assert {
+                    cond: Box::new(CoreTerm::Op {
+                        left: Box::new(CoreTerm::Ident("$".to_string())),
+                        op: CoreOpCode::MultiOpCode(MultiOpCode::Equal),
+                        right: Box::new((&first.attr).into()),
+                    }),
+                    val: Box::new((&first.val).into()),
+                };
+                for next in rest {
+                    prev = CoreTerm::Ite {
+                        cond: Box::new(CoreTerm::Op {
+                            left: Box::new(CoreTerm::Ident("$".to_string())),
+                            op: CoreOpCode::MultiOpCode(MultiOpCode::Equal),
+                            right: Box::new((&next.attr).into()),
+                        }),
+                        then: Box::new((&next.val).into()),
+                        otherwise: Box::new(prev),
+                    }
+                }
+                CoreTerm::Op {
+                    left: Box::new(CoreTerm::Ident("$".to_string())),
+                    op: CoreOpCode::OpCode(OpCode::Func),
+                    right: Box::new(prev),
+                }
+            }
+            Term::Tuple(values) => {
+                let mut prev = CoreTerm::Ident("$".to_string());
+                for val in values {
+                    prev = CoreTerm::Op {
+                        left: Box::new(prev),
+                        op: CoreOpCode::OpCode(OpCode::App),
+                        right: Box::new(val.into()),
+                    }
+                }
+                CoreTerm::Op {
+                    left: Box::new(CoreTerm::Ident("$".to_string())),
+                    op: CoreOpCode::OpCode(OpCode::Func),
+                    right: Box::new(prev),
+                }
+            }
+            Term::Assert { cond, val } => CoreTerm::Assert {
+                cond: Box::new(cond.as_ref().into()),
+                val: Box::new(val.as_ref().into()),
+            },
+        }
+    }
+}

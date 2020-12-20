@@ -1,5 +1,4 @@
 use std::str::FromStr;
-use std::rc::Rc;
 use crate::ast::*;
 
 grammar;
@@ -118,6 +117,6 @@ Term: Term = {
     "{" <Tuple> "}" => Term::Tuple(<>),
 };
 
-Ident: Rc<String> = r"[_a-zA-Z][_a-zA-Z0-9]*\??" => Rc::new(<>.to_string());
+Ident: String = r"[_a-zA-Z][_a-zA-Z0-9]*\??" => <>.to_string();
 
 Num: u64 = r"[0-9]+" => u64::from_str(<>).unwrap();
