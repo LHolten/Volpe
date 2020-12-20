@@ -2,8 +2,7 @@
 extern crate lalrpop_util;
 
 mod ast;
-
-lalrpop_mod!(pub volpe);
+mod volpe;
 
 #[cfg(test)]
 mod tests {
