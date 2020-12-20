@@ -1,12 +1,10 @@
-#[macro_use]
-extern crate lalrpop_util;
-
-mod ast;
-mod volpe;
+pub mod ast;
+#[allow(clippy::all)]
+pub mod parser;
 
 #[cfg(test)]
 mod tests {
-    use crate::volpe::{ExprParser, ObjectParser};
+    use crate::parser::{ExprParser, ObjectParser};
 
     #[test]
     fn functions() {
@@ -36,7 +34,7 @@ mod tests {
                 exec: iter {
                     some: val.(
                         func val;
-                        exec;
+                        exec
                     ),
                     none: {},
                 },
@@ -53,8 +51,8 @@ mod tests {
                 total? = 0;
                 for (range 10 20) val.(
                     total? = total + val;
-                    print total;
-                ) exec;
+                    print total
+                ) exec
             ),"
         ))
         .is_ok());
