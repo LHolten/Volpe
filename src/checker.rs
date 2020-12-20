@@ -1,21 +1,21 @@
 use volpe_parser::ast::{MultiOpCode, Term};
 use z3::{
     ast::{Ast, Bool, Dynamic, BV},
-    Context, Solver,
+    Context, SatResult, Solver,
 };
 
-fn walk<'ctx>(tree: &Term, ctx: &'ctx Context) -> Dynamic<'ctx> {
+fn walk<'ctx>(tree: &Term, ctx: &'ctx Context) -> Result<Dynamic<'ctx>, String> {
     match tree {
-        Term::Num(num) => BV::from_u64(ctx, *num, 64).into(),
+        Term::Num(num) => Ok(BV::from_u64(ctx, *num, 64).into()),
         Term::Assert { cond, val } => {
-            let cond = walk(cond, ctx)
+            let cond = walk(cond, ctx)?
                 .as_bool()
-                .expect("can only have assert on bool");
-            let val = walk(val, ctx);
+                .ok_or(format!("can only have assert on bool"))?;
             let solver = Solver::new(ctx);
             match solver.check_assumptions(&[cond.not()]) {
-                z3::SatResult::Unsat => val,
-                _ => panic!("assertion error!"),
+                SatResult::Unsat => walk(val, ctx),
+                SatResult::Unknown => Err(format!("couldn't check!")),
+                SatResult::Sat => Err(format!("assertion error!")),
             }
         }
         Term::Ite {
@@ -23,18 +23,20 @@ fn walk<'ctx>(tree: &Term, ctx: &'ctx Context) -> Dynamic<'ctx> {
             then,
             otherwise,
         } => {
-            let cond = walk(cond, ctx)
+            let cond = walk(cond, ctx)?
                 .as_bool()
-                .expect("can only have condition on bool");
-            let then = walk(then, ctx);
-            let otherwise = walk(otherwise, ctx);
-            cond.ite(&then, &otherwise)
+                .ok_or(format!("can only have condition on bool"))?;
+            let then = walk(then, ctx)?;
+            let otherwise = walk(otherwise, ctx)?;
+            // should check that `then` and `otherwise` are of the same type
+            Ok(cond.ite(&then, &otherwise))
         }
         Term::MultiOp { head, tail } => {
-            let mut prev = walk(head, ctx);
+            let mut prev = walk(head, ctx)?;
             let mut result = Bool::from_bool(ctx, true);
             for (op, next) in tail {
-                let next = walk(next, ctx);
+                let next = walk(next, ctx)?;
+                // should check that `prev` and `next` are of the same type
                 let cmp = match op {
                     MultiOpCode::Equal => prev._eq(&next),
                     _ => unimplemented!(),
@@ -42,7 +44,7 @@ fn walk<'ctx>(tree: &Term, ctx: &'ctx Context) -> Dynamic<'ctx> {
                 prev = next;
                 result = Bool::and(ctx, &[&result, &cmp]);
             }
-            result.into()
+            Ok(result.into())
         }
         _ => unimplemented!(),
     }
@@ -59,6 +61,7 @@ mod tests {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
 
-        walk(&ExprParser::new().parse("1 == 1 => 0").unwrap(), &ctx);
+        assert!(walk(&ExprParser::new().parse("1 == 1 => 0").unwrap(), &ctx).is_ok());
+        assert!(walk(&ExprParser::new().parse("1 == 1 => 0; 1").unwrap(), &ctx).is_ok());
     }
 }
