@@ -1,11 +1,11 @@
-use volpe_parser::ast::{MultiOpCode, OpCode, Term};
+use volpe_parser::ast::{IntOp, Op, Term};
 
 pub enum CoreTerm {
     Num(u64),
     Ident(String),
     Op {
         left: Box<CoreTerm>,
-        op: CoreOpCode,
+        op: Op,
         right: Box<CoreTerm>,
     },
     Ite {
@@ -20,11 +20,6 @@ pub enum CoreTerm {
     },
 }
 
-pub enum CoreOpCode {
-    OpCode(OpCode),
-    MultiOpCode(MultiOpCode),
-}
-
 impl From<&Term> for CoreTerm {
     fn from(term: &Term) -> Self {
         match term {
@@ -32,7 +27,7 @@ impl From<&Term> for CoreTerm {
             Term::Ident(name) => CoreTerm::Ident(name.clone()),
             Term::Op { left, op, right } => CoreTerm::Op {
                 left: Box::new(left.as_ref().into()),
-                op: CoreOpCode::OpCode(op.clone()),
+                op: op.clone(),
                 right: Box::new(right.as_ref().into()),
             },
             Term::MultiOp { head, tail } => {
@@ -40,7 +35,7 @@ impl From<&Term> for CoreTerm {
                 for (op, next) in tail {
                     prev = CoreTerm::Op {
                         left: Box::new(prev),
-                        op: CoreOpCode::MultiOpCode(op.clone()),
+                        op: op.clone(),
                         right: Box::new(next.into()),
                     }
                 }
@@ -51,13 +46,13 @@ impl From<&Term> for CoreTerm {
                 for arg in var {
                     func = CoreTerm::Op {
                         left: Box::new(arg.into()),
-                        op: CoreOpCode::OpCode(OpCode::Func),
+                        op: Op::Func,
                         right: Box::new(func),
                     }
                 }
                 CoreTerm::Op {
                     left: Box::new(val.as_ref().into()),
-                    op: CoreOpCode::OpCode(OpCode::App),
+                    op: Op::App,
                     right: Box::new(func),
                 }
             }
@@ -81,7 +76,7 @@ impl From<&Term> for CoreTerm {
                 let mut prev = CoreTerm::Assert {
                     cond: Box::new(CoreTerm::Op {
                         left: Box::new(CoreTerm::Ident("$".to_string())),
-                        op: CoreOpCode::MultiOpCode(MultiOpCode::Equal),
+                        op: Op::Int(IntOp::Equal),
                         right: Box::new((&first.attr).into()),
                     }),
                     val: Box::new((&first.val).into()),
@@ -90,7 +85,7 @@ impl From<&Term> for CoreTerm {
                     prev = CoreTerm::Ite {
                         cond: Box::new(CoreTerm::Op {
                             left: Box::new(CoreTerm::Ident("$".to_string())),
-                            op: CoreOpCode::MultiOpCode(MultiOpCode::Equal),
+                            op: Op::Int(IntOp::Equal),
                             right: Box::new((&next.attr).into()),
                         }),
                         then: Box::new((&next.val).into()),
@@ -99,7 +94,7 @@ impl From<&Term> for CoreTerm {
                 }
                 CoreTerm::Op {
                     left: Box::new(CoreTerm::Ident("$".to_string())),
-                    op: CoreOpCode::OpCode(OpCode::Func),
+                    op: Op::Func,
                     right: Box::new(prev),
                 }
             }
@@ -108,13 +103,13 @@ impl From<&Term> for CoreTerm {
                 for val in values {
                     prev = CoreTerm::Op {
                         left: Box::new(prev),
-                        op: CoreOpCode::OpCode(OpCode::App),
+                        op: Op::App,
                         right: Box::new(val.into()),
                     }
                 }
                 CoreTerm::Op {
                     left: Box::new(CoreTerm::Ident("$".to_string())),
-                    op: CoreOpCode::OpCode(OpCode::Func),
+                    op: Op::Func,
                     right: Box::new(prev),
                 }
             }

@@ -1,13 +1,15 @@
-use volpe_parser::ast::{MultiOpCode, Term};
+use volpe_parser::ast::{BoolOp, IntOp, Op};
 use z3::{
     ast::{Ast, Bool, Dynamic, BV},
     Context, SatResult, Solver,
 };
 
-fn walk<'ctx>(tree: &Term, ctx: &'ctx Context) -> Result<Dynamic<'ctx>, String> {
+use crate::core::CoreTerm;
+
+fn walk<'ctx>(tree: &CoreTerm, ctx: &'ctx Context) -> Result<Dynamic<'ctx>, String> {
     match tree {
-        Term::Num(num) => Ok(BV::from_u64(ctx, *num, 64).into()),
-        Term::Assert { cond, val } => {
+        CoreTerm::Num(num) => Ok(BV::from_u64(ctx, *num, 64).into()),
+        CoreTerm::Assert { cond, val } => {
             let cond = walk(cond, ctx)?
                 .as_bool()
                 .ok_or_else(|| "can only have assert on bool".to_string())?;
@@ -18,7 +20,7 @@ fn walk<'ctx>(tree: &Term, ctx: &'ctx Context) -> Result<Dynamic<'ctx>, String> 
                 SatResult::Sat => Err("assertion error!".to_string()),
             }
         }
-        Term::Ite {
+        CoreTerm::Ite {
             cond,
             then,
             otherwise,
@@ -31,28 +33,45 @@ fn walk<'ctx>(tree: &Term, ctx: &'ctx Context) -> Result<Dynamic<'ctx>, String> 
             // should check that `then` and `otherwise` are of the same type
             Ok(cond.ite(&then, &otherwise))
         }
-        Term::MultiOp { head, tail } => {
-            let mut prev = walk(head, ctx)?
-                .as_bv()
-                .ok_or_else(|| "can only compare ints".to_string())?;
-            let mut result = Bool::from_bool(ctx, true);
-            for (op, next) in tail {
-                let next = walk(next, ctx)?
-                    .as_bv()
-                    .ok_or_else(|| "can only compare ints".to_string())?;
-                // should check that `prev` and `next` are of the same type
-                let cmp = match op {
-                    MultiOpCode::Equal => prev._eq(&next),
-                    MultiOpCode::Unequal => prev._eq(&next).not(),
-                    MultiOpCode::Less => prev.bvslt(&next),
-                    MultiOpCode::Greater => prev.bvsgt(&next),
-                    MultiOpCode::LessEqual => prev.bvsle(&next),
-                    MultiOpCode::GreaterEqual => prev.bvsge(&next),
-                };
-                prev = next;
-                result = Bool::and(ctx, &[&result, &cmp]);
-            }
-            Ok(result.into())
+        CoreTerm::Op { left, op, right } => {
+            let left = walk(left, ctx)?;
+            let right = walk(right, ctx)?;
+            Ok(match op {
+                Op::Int(op) => {
+                    let left = left
+                        .as_bv()
+                        .ok_or_else(|| "op only works for ints".to_string())?;
+                    let right = right
+                        .as_bv()
+                        .ok_or_else(|| "op only works for ints".to_string())?;
+
+                    match op {
+                        IntOp::Equal => left._eq(&right),
+                        IntOp::Unequal => left._eq(&right).not(),
+                        IntOp::Less => left.bvslt(&right),
+                        IntOp::Greater => left.bvsgt(&right),
+                        IntOp::LessEqual => left.bvsle(&right),
+                        IntOp::GreaterEqual => left.bvsge(&right),
+                        _ => unimplemented!(),
+                    }
+                    .into()
+                }
+                Op::Bool(op) => {
+                    let left = left
+                        .as_bool()
+                        .ok_or_else(|| "op only works for bools".to_string())?;
+                    let right = right
+                        .as_bool()
+                        .ok_or_else(|| "op only works for bools".to_string())?;
+
+                    match op {
+                        BoolOp::And => Bool::and(ctx, &[&left, &right]),
+                        BoolOp::Or => Bool::or(ctx, &[&left, &right]),
+                    }
+                    .into()
+                }
+                _ => unimplemented!(),
+            })
         }
         _ => unimplemented!(),
     }
@@ -69,7 +88,15 @@ mod tests {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
 
-        assert!(walk(&ExprParser::new().parse("1 == 1 => 0").unwrap(), &ctx).is_ok());
-        assert!(walk(&ExprParser::new().parse("1 == 1 => 0; 1").unwrap(), &ctx).is_ok());
+        assert!(walk(
+            &(&ExprParser::new().parse("1 == 1 => 0").unwrap()).into(),
+            &ctx
+        )
+        .is_ok());
+        assert!(walk(
+            &(&ExprParser::new().parse("1 == 1 => 0; 1").unwrap()).into(),
+            &ctx
+        )
+        .is_ok());
     }
 }

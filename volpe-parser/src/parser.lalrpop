@@ -46,66 +46,66 @@ Tuple: Vec<Term> = <v:(<App_> ",")*> <e:App_?> => match e {
 };
 
 App_ = LeftOptional<AppOp, Func_>;
-AppOp: OpCode = () => OpCode::App;
+AppOp: Op = () => Op::App;
 
 Func_: Term = {
     Or_ FuncOp Func_ => Term::new_op(<>),
     Or_,
 };
-FuncOp: OpCode = "." => OpCode::Func;
+FuncOp: Op = "." => Op::Func;
 
 Or_ = LeftOptional<OrOp, And_>;
-OrOp: OpCode = "||" => OpCode::Or;
+OrOp: Op = "||" => Op::Bool(BoolOp::Or);
 
 And_ = LeftOptional<AndOp, Applicable_>;
-AndOp: OpCode = "&&" => OpCode::And;
+AndOp: Op = "&&" => Op::Bool(BoolOp::And);
 
 Applicable_ = {Equal, Cmp, Equable_};
 
 Equal: Term = Equable_ (EqualOp Equable_)+ => Term::new_multi_op(<>);
-EqualOp: MultiOpCode = {
-    "==" => MultiOpCode::Equal,
-    "!=" => MultiOpCode::Unequal,
+EqualOp: Op = {
+    "==" => Op::Int(IntOp::Equal),
+    "!=" => Op::Int(IntOp::Unequal),
 };
 Equable_ = {BitOr, BitAnd, BitXor, Shift, Comparable_};
 
 Cmp: Term = Comparable_ (CmpOp Comparable_)+ => Term::new_multi_op(<>);
-CmpOp: MultiOpCode = {
-    "<" => MultiOpCode::Less,
-    ">" => MultiOpCode::Greater,
-    "<=" => MultiOpCode::LessEqual,
-    ">=" => MultiOpCode::GreaterEqual,
+CmpOp: Op = {
+    "<" => Op::Int(IntOp::Less),
+    ">" => Op::Int(IntOp::Greater),
+    "<=" => Op::Int(IntOp::LessEqual),
+    ">=" => Op::Int(IntOp::GreaterEqual),
 };
 Comparable_ = {Add, Mul, Term};
 
 Add = Left<AddOp, Mul_>;
-AddOp: OpCode = {
-    "+" => OpCode::Add,
-    "-" => OpCode::Sub,
+AddOp: Op = {
+    "+" => Op::Int(IntOp::Add),
+    "-" => Op::Int(IntOp::Sub),
 };
 
 Mul = Left<MulOp, Term>;
 Mul_ = LeftOptional<MulOp, Term>;
-MulOp: OpCode = {
-    "*" => OpCode::Mul,
-    "/" => OpCode::Div,
-    "%" => OpCode::Mod,
+MulOp: Op = {
+    "*" => Op::Int(IntOp::Mul),
+    "/" => Op::Int(IntOp::Div),
+    "%" => Op::Int(IntOp::Mod),
 };
 
 BitOr = Left<BitOrOp, BitAnd_>;
-BitOrOp: OpCode = "|" => OpCode::BitOr;
+BitOrOp: Op = "|" => Op::Int(IntOp::BitOr);
 
 BitAnd = Left<BitAndOp, Term>;
 BitAnd_ = LeftOptional<BitAndOp, Term>;
-BitAndOp: OpCode = "&" => OpCode::BitAnd;
+BitAndOp: Op = "&" => Op::Int(IntOp::BitAnd);
 
 BitXor = Left<BitXorOp, Term>;
-BitXorOp: OpCode = "^" => OpCode::BitXor;
+BitXorOp: Op = "^" => Op::Int(IntOp::BitXor);
 
 Shift = Left<ShiftOp, Term>;
-ShiftOp: OpCode = {
-    "<<" => OpCode::BitShl, 
-    ">>" => OpCode::BitShr,
+ShiftOp: Op = {
+    "<<" => Op::Int(IntOp::BitShl), 
+    ">>" => Op::Int(IntOp::BitShr),
 };
 
 Term: Term = {

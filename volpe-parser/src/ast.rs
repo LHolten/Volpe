@@ -10,12 +10,12 @@ pub enum Term {
     Ident(String),
     Op {
         left: Box<Term>,
-        op: OpCode,
+        op: Op,
         right: Box<Term>,
     },
     MultiOp {
         head: Box<Term>,
-        tail: Vec<(MultiOpCode, Term)>,
+        tail: Vec<(Op, Term)>,
     },
     Stmt {
         var: Vec<Term>,
@@ -37,7 +37,7 @@ pub enum Term {
 }
 
 impl Term {
-    pub fn new_op(left: Term, op_code: OpCode, right: Term) -> Self {
+    pub fn new_op(left: Term, op_code: Op, right: Term) -> Self {
         Self::Op {
             left: Box::new(left),
             right: Box::new(right),
@@ -61,7 +61,7 @@ impl Term {
         }
     }
 
-    pub fn new_multi_op(head: Term, tail: Vec<(MultiOpCode, Term)>) -> Self {
+    pub fn new_multi_op(head: Term, tail: Vec<(Op, Term)>) -> Self {
         Self::MultiOp {
             head: Box::new(head),
             tail,
@@ -77,10 +77,27 @@ impl Term {
 }
 
 #[derive(Debug, Clone)]
-pub enum OpCode {
+pub enum Op {
+    Bool(BoolOp),
+    Int(IntOp),
+    Func,
     App,
-    Or,
+}
+
+#[derive(Debug, Clone)]
+pub enum BoolOp {
     And,
+    Or,
+}
+
+#[derive(Debug, Clone)]
+pub enum IntOp {
+    Equal,
+    Unequal,
+    Less,
+    Greater,
+    LessEqual,
+    GreaterEqual,
     Add,
     Sub,
     Mul,
@@ -91,15 +108,4 @@ pub enum OpCode {
     BitXor,
     BitShl,
     BitShr,
-    Func,
-}
-
-#[derive(Debug, Clone)]
-pub enum MultiOpCode {
-    Equal,
-    Unequal,
-    Less,
-    Greater,
-    LessEqual,
-    GreaterEqual,
 }
