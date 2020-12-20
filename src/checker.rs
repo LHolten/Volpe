@@ -10,12 +10,12 @@ fn walk<'ctx>(tree: &Term, ctx: &'ctx Context) -> Result<Dynamic<'ctx>, String> 
         Term::Assert { cond, val } => {
             let cond = walk(cond, ctx)?
                 .as_bool()
-                .ok_or(format!("can only have assert on bool"))?;
+                .ok_or_else(|| "can only have assert on bool".to_string())?;
             let solver = Solver::new(ctx);
             match solver.check_assumptions(&[cond.not()]) {
                 SatResult::Unsat => walk(val, ctx),
-                SatResult::Unknown => Err(format!("couldn't check!")),
-                SatResult::Sat => Err(format!("assertion error!")),
+                SatResult::Unknown => Err("couldn\'t check!".to_string()),
+                SatResult::Sat => Err("assertion error!".to_string()),
             }
         }
         Term::Ite {
@@ -25,21 +25,29 @@ fn walk<'ctx>(tree: &Term, ctx: &'ctx Context) -> Result<Dynamic<'ctx>, String> 
         } => {
             let cond = walk(cond, ctx)?
                 .as_bool()
-                .ok_or(format!("can only have condition on bool"))?;
+                .ok_or_else(|| "can only have condition on bool".to_string())?;
             let then = walk(then, ctx)?;
             let otherwise = walk(otherwise, ctx)?;
             // should check that `then` and `otherwise` are of the same type
             Ok(cond.ite(&then, &otherwise))
         }
         Term::MultiOp { head, tail } => {
-            let mut prev = walk(head, ctx)?;
+            let mut prev = walk(head, ctx)?
+                .as_bv()
+                .ok_or_else(|| "can only compare ints".to_string())?;
             let mut result = Bool::from_bool(ctx, true);
             for (op, next) in tail {
-                let next = walk(next, ctx)?;
+                let next = walk(next, ctx)?
+                    .as_bv()
+                    .ok_or_else(|| "can only compare ints".to_string())?;
                 // should check that `prev` and `next` are of the same type
                 let cmp = match op {
                     MultiOpCode::Equal => prev._eq(&next),
-                    _ => unimplemented!(),
+                    MultiOpCode::Unequal => prev._eq(&next).not(),
+                    MultiOpCode::Less => prev.bvslt(&next),
+                    MultiOpCode::Greater => prev.bvsgt(&next),
+                    MultiOpCode::LessEqual => prev.bvsle(&next),
+                    MultiOpCode::GreaterEqual => prev.bvsge(&next),
                 };
                 prev = next;
                 result = Bool::and(ctx, &[&result, &cmp]);
