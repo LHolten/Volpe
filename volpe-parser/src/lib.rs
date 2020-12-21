@@ -26,12 +26,14 @@ mod tests {
         assert!(ExprParser::new().parse("{1}").is_ok());
         assert!(ExprParser::new().parse("{}").is_ok());
         assert!(ExprParser::new().parse("1 > 2 => {}").is_ok());
+        assert!(ExprParser::new().parse("1 /* /* wow */ cool */ > 2 // hello").is_ok());
     }
 
     #[test]
     fn complicated_ast() {
         assert!(dbg!(ObjectParser::new().parse(
-            "for: iter.func.{
+            "// for loop implementation
+            for: iter.func.{
                 exec: iter {
                     some: val.(
                         func val;
@@ -47,7 +49,9 @@ mod tests {
                 from? = from + 1;
                 {some, val}
             ),
-            
+
+            /* this main closure will be called
+              when we execute the program */
             main: args.(
                 total? = 0;
                 for (range 10 20) val.(
