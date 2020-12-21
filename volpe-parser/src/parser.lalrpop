@@ -120,3 +120,11 @@ Term: Term = {
 Ident: String = r"[_a-zA-Z][_a-zA-Z0-9]*\??" => <>.to_string();
 
 Num: u64 = r"[0-9]+" => u64::from_str(<>).unwrap();
+
+// Comments
+match {
+    r"\s*" => { }, // ignore whitespace
+    r"//[^\n\r]*[\n\r]*" => { }, // ignore `// ...`
+    r"/\*([^\*]*\*+[^\*/])*([^\*]*\*+|[^\*])*\*/" => { }, // ignore `/* ... */`
+    _
+}
