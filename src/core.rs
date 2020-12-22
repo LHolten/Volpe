@@ -14,10 +14,7 @@ pub enum CoreTerm {
         otherwise: Box<CoreTerm>,
     },
     Matrix(Vec<Vec<CoreTerm>>),
-    Assert {
-        cond: Box<CoreTerm>,
-        val: Box<CoreTerm>,
-    },
+    Unreachable,
 }
 
 impl From<&Term> for CoreTerm {
@@ -71,17 +68,9 @@ impl From<&Term> for CoreTerm {
                     .collect(),
             ),
             Term::Object(entries) => {
-                let (first, rest) = entries.split_first().unwrap();
                 // this code assumes all keys are distinct
-                let mut prev = CoreTerm::Assert {
-                    cond: Box::new(CoreTerm::Op {
-                        left: Box::new(CoreTerm::Ident("$".to_string())),
-                        op: Op::Int(IntOp::Equal),
-                        right: Box::new((&first.attr).into()),
-                    }),
-                    val: Box::new((&first.val).into()),
-                };
-                for next in rest {
+                let mut prev = CoreTerm::Unreachable;
+                for next in entries {
                     prev = CoreTerm::Ite {
                         cond: Box::new(CoreTerm::Op {
                             left: Box::new(CoreTerm::Ident("$".to_string())),
@@ -113,10 +102,7 @@ impl From<&Term> for CoreTerm {
                     right: Box::new(prev),
                 }
             }
-            Term::Assert { cond, val } => CoreTerm::Assert {
-                cond: Box::new(cond.as_ref().into()),
-                val: Box::new(val.as_ref().into()),
-            },
+            Term::Unreachable => CoreTerm::Unreachable,
         }
     }
 }

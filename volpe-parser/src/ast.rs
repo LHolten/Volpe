@@ -30,10 +30,7 @@ pub enum Term {
     Matrix(Vec<Vec<Term>>),
     Object(Vec<Entry>),
     Tuple(Vec<Term>),
-    Assert {
-        cond: Box<Term>,
-        val: Box<Term>,
-    },
+    Unreachable,
 }
 
 impl Term {
@@ -53,11 +50,11 @@ impl Term {
         }
     }
 
-    pub fn new_ite(cond: Term, then: Term, otherwise: Term) -> Self {
+    pub fn new_ite(cond: Term, then: Term, otherwise: Option<Term>) -> Self {
         Self::Ite {
             cond: Box::new(cond),
             then: Box::new(then),
-            otherwise: Box::new(otherwise),
+            otherwise: Box::new(otherwise.unwrap_or(Term::Unreachable)),
         }
     }
 
@@ -65,13 +62,6 @@ impl Term {
         Self::MultiOp {
             head: Box::new(head),
             tail,
-        }
-    }
-
-    pub fn new_assert(cond: Term, val: Term) -> Self {
-        Self::Assert {
-            cond: Box::new(cond),
-            val: Box::new(val),
         }
     }
 }
