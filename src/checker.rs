@@ -32,24 +32,25 @@ fn walk<'ctx>(
             let cond = walk(cond, solver, scope)?
                 .as_bool()
                 .ok_or_else(|| "can only have condition on bool".to_string())?;
+            match solver.check_assumptions(&[cond.clone()]) {
+                SatResult::Unsat => return walk(otherwise, solver, scope),
+                SatResult::Unknown => return Err("couldn\'t check!".to_string()),
+                SatResult::Sat => {}
+            }
+            match solver.check_assumptions(&[cond.not()]) {
+                SatResult::Unsat => return walk(then, solver, scope),
+                SatResult::Unknown => return Err("couldn\'t check!".to_string()),
+                SatResult::Sat => {}
+            };
             solver.push();
             solver.assert(&cond);
             let then = walk(then, solver, scope);
             solver.pop(1);
             solver.push();
-            solver.assert(&cond.not());
-            let res = match solver.check() {
-                SatResult::Unsat => then,
-                SatResult::Unknown => Err("couldn\'t check!".to_string()),
-                SatResult::Sat => (|| {
-                    let then = then?;
-                    let otherwise = walk(otherwise, solver, scope)?;
-                    Type::ite(&cond, &then, &otherwise)
-                        .ok_or_else(|| "types not the same in ite".to_string())
-                })(),
-            };
+            let otherwise = walk(otherwise, solver, scope);
             solver.pop(1);
-            res
+            Type::ite(&cond, &then?, &otherwise?)
+                .ok_or_else(|| "types not the same in ite".to_string())
         }
         CoreTerm::Op { left, op, right } => Ok(match op {
             Op::Int(op) => {
