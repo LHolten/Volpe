@@ -62,15 +62,23 @@ fn walk<'ctx>(
                     .ok_or_else(|| "op only works for ints".to_string())?;
 
                 match op {
-                    IntOp::Equal => left._eq(&right),
-                    IntOp::Unequal => left._eq(&right).not(),
-                    IntOp::Less => left.bvslt(&right),
-                    IntOp::Greater => left.bvsgt(&right),
-                    IntOp::LessEqual => left.bvsle(&right),
-                    IntOp::GreaterEqual => left.bvsge(&right),
-                    _ => unimplemented!(),
+                    IntOp::Equal => left._eq(&right).into(),
+                    IntOp::Unequal => left._eq(&right).not().into(),
+                    IntOp::Less => left.bvslt(&right).into(),
+                    IntOp::Greater => left.bvsgt(&right).into(),
+                    IntOp::LessEqual => left.bvsle(&right).into(),
+                    IntOp::GreaterEqual => left.bvsge(&right).into(),
+                    IntOp::Add => left.bvadd(&right).into(),
+                    IntOp::Sub => left.bvsub(&right).into(),
+                    IntOp::Mul => left.bvmul(&right).into(),
+                    IntOp::Div => left.bvsdiv(&right).into(),
+                    IntOp::Mod => left.bvsmod(&right).into(),
+                    IntOp::BitOr => left.bvor(&right).into(),
+                    IntOp::BitAnd => left.bvand(&right).into(),
+                    IntOp::BitXor => left.bvxor(&right).into(),
+                    IntOp::BitShl => left.bvshl(&right).into(),
+                    IntOp::BitShr => left.bvlshr(&right).into(),
                 }
-                .into()
             }
             Op::Bool(op) => {
                 let left = walk(left, solver, scope)?
@@ -151,5 +159,6 @@ mod tests {
         assert!(check!("1 == 3 => 0; 2", s).is_ok());
         assert!(check!("a = 2; a == 2 => {}", s).is_ok());
         assert!(check!("a = 2; a == 3 => {}", s).is_err());
+        assert!(dbg!(check!("f = x.x + 1; (f 1) == 2 => {}", s)).is_ok());
     }
 }
