@@ -19,10 +19,10 @@ fn walk<'ctx>(
     let ctx = solver.get_context();
     match tree {
         CoreTerm::Num(num) => Ok(BV::from_u64(ctx, *num, 64).into()),
-        CoreTerm::Ident(name) => scope
+        CoreTerm::Ident(name) => Ok(scope
             .get(name)
             .cloned()
-            .ok_or_else(|| "ident not in scope".to_string()),
+            .unwrap_or_else(|| BV::new_const(ctx, name.as_str(), 64).into())),
         CoreTerm::Unreachable => Err("reached unreachable!".to_string()),
         CoreTerm::Ite {
             cond,
@@ -161,5 +161,7 @@ mod tests {
         assert!(check!("a = 2; a == 3 => {}", s).is_err());
         assert!(check!("f = x.x + 1; (f 1) == 2 => {}", s).is_ok());
         assert!(check!("1 < 2 < 3 => {}", s).is_ok());
+        assert!(check!("a > b || a == b || a < b => {}", s).is_ok());
+        assert!(check!("a > b || a < b => {}", s).is_err());
     }
 }
