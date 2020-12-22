@@ -3,6 +3,7 @@ extern crate z3;
 
 mod checker;
 mod core;
+mod types;
 
 fn main() {
     println!("Hello, world!");

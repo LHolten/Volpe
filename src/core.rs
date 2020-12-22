@@ -1,6 +1,6 @@
 use volpe_parser::ast::{IntOp, Op, Term};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CoreTerm {
     Num(u64),
     Ident(String),
@@ -49,9 +49,9 @@ impl From<&Term> for CoreTerm {
                     }
                 }
                 CoreTerm::Op {
-                    left: Box::new(val.as_ref().into()),
+                    left: Box::new(func),
                     op: Op::App,
-                    right: Box::new(func),
+                    right: Box::new(val.as_ref().into()),
                 }
             }
             Term::Ite {
