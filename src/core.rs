@@ -1,5 +1,6 @@
 use volpe_parser::ast::{IntOp, Op, Term};
 
+#[derive(Debug)]
 pub enum CoreTerm {
     Num(u64),
     Ident(String),

@@ -19,16 +19,23 @@ fn walk<'ctx>(tree: &CoreTerm, solver: &Solver<'ctx>) -> Result<Dynamic<'ctx>, S
             let cond = walk(cond, solver)?
                 .as_bool()
                 .ok_or_else(|| "can only have condition on bool".to_string())?;
-            let then = walk(then, solver)?;
-            match solver.check_assumptions(&[cond.not()]) {
-                SatResult::Unsat => Ok(then),
+            solver.push();
+            solver.assert(&cond);
+            let then = walk(then, solver);
+            solver.pop(1);
+            solver.push();
+            solver.assert(&cond.not());
+            let res = match solver.check() {
+                SatResult::Unsat => then,
                 SatResult::Unknown => Err("couldn\'t check!".to_string()),
-                SatResult::Sat => {
+                SatResult::Sat => (|| {
+                    let then = then?;
                     let otherwise = walk(otherwise, solver)?;
-                    // should check that `then` and `otherwise` are of the same type
                     Ok(cond.ite(&then, &otherwise))
-                }
-            }
+                })(),
+            };
+            solver.pop(1);
+            res
         }
         CoreTerm::Op { left, op, right } => {
             let left = walk(left, solver)?;
@@ -80,21 +87,20 @@ mod tests {
     use volpe_parser::parser::ExprParser;
     use z3::{Config, Context};
 
+    macro_rules! check {
+        ($s:literal, $solver:ident) => {
+            walk(&(&ExprParser::new().parse($s).unwrap()).into(), &$solver)
+        };
+    }
+
     #[test]
     fn simple_num() {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
-        let solver = Solver::new(&ctx);
+        let s = Solver::new(&ctx);
 
-        assert!(walk(
-            &(&ExprParser::new().parse("1 == 1 => 0").unwrap()).into(),
-            &solver
-        )
-        .is_ok());
-        assert!(walk(
-            &(&ExprParser::new().parse("1 == 1 => 0; 1").unwrap()).into(),
-            &solver
-        )
-        .is_ok());
+        assert!(check!("1 == 1 => 0", s).is_ok());
+        assert!(check!("1 == 3 => 0", s).is_err());
+        assert!(check!("1 == 3 => 0; 2", s).is_ok());
     }
 }
