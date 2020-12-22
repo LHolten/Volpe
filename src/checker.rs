@@ -159,6 +159,7 @@ mod tests {
         assert!(check!("1 == 3 => 0; 2", s).is_ok());
         assert!(check!("a = 2; a == 2 => {}", s).is_ok());
         assert!(check!("a = 2; a == 3 => {}", s).is_err());
-        assert!(dbg!(check!("f = x.x + 1; (f 1) == 2 => {}", s)).is_ok());
+        assert!(check!("f = x.x + 1; (f 1) == 2 => {}", s).is_ok());
+        assert!(check!("1 < 2 < 3 => {}", s).is_ok());
     }
 }

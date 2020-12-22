@@ -1,4 +1,4 @@
-use volpe_parser::ast::{IntOp, Op, Term};
+use volpe_parser::ast::{BoolOp, IntOp, Op, Term};
 
 #[derive(Debug, Clone)]
 pub enum CoreTerm {
@@ -29,15 +29,28 @@ impl From<&Term> for CoreTerm {
                 right: Box::new(right.as_ref().into()),
             },
             Term::MultiOp { head, tail } => {
-                let mut prev = head.as_ref().into();
-                for (op, next) in tail {
-                    prev = CoreTerm::Op {
-                        left: Box::new(prev),
-                        op: op.clone(),
-                        right: Box::new(next.into()),
-                    }
+                let ((op, next), rest) = tail.split_first().unwrap();
+                let next = CoreTerm::from(next);
+                let mut result = CoreTerm::Op {
+                    left: Box::new(head.as_ref().into()),
+                    op: op.clone(),
+                    right: Box::new(next.clone()),
+                };
+                let mut prev = next;
+                for (op, next) in rest {
+                    let next = CoreTerm::from(next);
+                    result = CoreTerm::Op {
+                        left: Box::new(result),
+                        op: Op::Bool(BoolOp::And),
+                        right: Box::new(CoreTerm::Op {
+                            left: Box::new(prev),
+                            op: op.clone(),
+                            right: Box::new(next.clone()),
+                        }),
+                    };
+                    prev = next;
                 }
-                prev
+                result
             }
             Term::Stmt { var, val, next } => {
                 let mut func = next.as_ref().into();
