@@ -54,7 +54,7 @@ impl From<&Term> for CoreTerm {
             }
             Term::Stmt { var, val, next } => {
                 let mut func = next.as_ref().into();
-                for arg in var {
+                for arg in var.iter().rev() {
                     func = CoreTerm::Op {
                         left: Box::new(arg.into()),
                         op: Op::Func,
@@ -62,11 +62,20 @@ impl From<&Term> for CoreTerm {
                     }
                 }
                 CoreTerm::Op {
-                    left: Box::new(func),
+                    left: Box::new(val.as_ref().into()),
                     op: Op::App,
-                    right: Box::new(val.as_ref().into()),
+                    right: Box::new(func),
                 }
             }
+            Term::Astmt { var, val, next } => CoreTerm::Op {
+                left: Box::new(CoreTerm::Op {
+                    left: Box::new(var.as_ref().into()),
+                    op: Op::Func,
+                    right: Box::new(next.as_ref().into()),
+                }),
+                op: Op::App,
+                right: Box::new(val.as_ref().into()),
+            },
             Term::Ite {
                 cond,
                 then,

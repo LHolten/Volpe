@@ -176,12 +176,12 @@ mod tests {
         assert!(check!("1 == 1 => 0", s).is_ok());
         assert!(check!("1 == 3 => 0", s).is_err());
         assert!(check!("1 == 3 => 0; 2", s).is_ok());
-        assert!(check!("a = 2; a == 2 => {}", s).is_ok());
-        assert!(check!("a = 2; a == 3 => {}", s).is_err());
-        assert!(check!("f = x.x + 1; (f 1) == 2 => {}", s).is_ok());
+        assert!(check!("a := 2; a == 2 => {}", s).is_ok());
+        assert!(check!("a := 2; a == 3 => {}", s).is_err());
+        assert!(check!("f := x.x + 1; (f 1) == 2 => {}", s).is_ok());
         assert!(check!("1 < 2 < 3 => {}", s).is_ok());
         assert!(check!("a > b || a == b || a < b => {}", s).is_ok());
         assert!(check!("a > b || a < b => {}", s).is_err());
-        assert!(check!("x = n % 2; x == 0 || x == 1 => {}", s).is_ok());
+        assert!(check!("x := n % 2; x == 0 || x == 1 => {}", s).is_ok());
     }
 }

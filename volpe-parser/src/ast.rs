@@ -17,6 +17,11 @@ pub enum Term {
         head: Box<Term>,
         tail: Vec<(Op, Term)>,
     },
+    Astmt {
+        var: Box<Term>,
+        val: Box<Term>,
+        next: Box<Term>,
+    },
     Stmt {
         var: Vec<Term>,
         val: Box<Term>,
@@ -45,6 +50,14 @@ impl Term {
     pub fn new_stmt(var: Vec<Term>, val: Term, next: Term) -> Self {
         Self::Stmt {
             var,
+            val: Box::new(val),
+            next: Box::new(next),
+        }
+    }
+
+    pub fn new_astmt(var: Term, val: Term, next: Term) -> Self {
+        Self::Astmt {
+            var: Box::new(var),
             val: Box::new(val),
             next: Box::new(next),
         }
