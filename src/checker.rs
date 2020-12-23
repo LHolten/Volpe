@@ -47,6 +47,7 @@ fn walk<'ctx>(
             let then = walk(then, solver, scope);
             solver.pop(1);
             solver.push();
+            solver.assert(&cond.not());
             let otherwise = walk(otherwise, solver, scope);
             solver.pop(1);
             Type::ite(&cond, &then?, &otherwise?)
@@ -103,26 +104,44 @@ fn walk<'ctx>(
                 },
             )]),
             Op::App => {
-                let left = walk(left, solver, scope)?
+                let funcs = walk(left, solver, scope)?
                     .as_func()
                     .ok_or_else(|| "can only call func".to_string())?;
                 let val = walk(right, solver, scope)?;
-                let ((_, prev), others) = left.split_last().unwrap();
-                let mut new_scope = prev.scope.clone();
-                assign(&mut new_scope, &prev.arg, &val);
-                let mut prev = walk(&prev.body, solver, &new_scope)?;
-                for (cond, f) in others.iter().rev() {
-                    let mut new_scope = f.scope.clone();
-                    assign(&mut new_scope, &f.arg, &val);
-                    let val = walk(&f.body, solver, &new_scope)?;
-                    prev = Type::ite(cond, &val, &prev)
-                        .ok_or_else(|| "types not the same in ite".to_string())?;
-                }
-                prev
+                apply(solver, funcs.as_slice(), &val)?
             }
         }),
         _ => unimplemented!(),
     }
+}
+
+fn apply<'ctx>(
+    solver: &Solver<'ctx>,
+    funcs: &[(Bool<'ctx>, Func<'ctx>)],
+    val: &Type<'ctx>,
+) -> Result<Type<'ctx>, String> {
+    let ((cond, f), funcs) = funcs.split_first().unwrap();
+    let mut scope = f.scope.clone();
+    assign(&mut scope, &f.arg, val);
+    match solver.check_assumptions(&[cond.clone()]) {
+        SatResult::Unsat => return apply(solver, funcs, val),
+        SatResult::Unknown => return Err("couldn\'t check!".to_string()),
+        SatResult::Sat => {}
+    }
+    match solver.check_assumptions(&[cond.not()]) {
+        SatResult::Unsat => return walk(&f.body, solver, &scope),
+        SatResult::Unknown => return Err("couldn\'t check!".to_string()),
+        SatResult::Sat => {}
+    };
+    solver.push();
+    solver.assert(&cond);
+    let then = walk(&f.body, solver, &scope);
+    solver.pop(1);
+    solver.push();
+    solver.assert(&cond.not());
+    let otherwise = apply(solver, funcs, val);
+    solver.pop(1);
+    Type::ite(&cond, &then?, &otherwise?).ok_or_else(|| "types not the same in ite".to_string())
 }
 
 fn assign<'ctx>(scope: &mut HashMap<String, Type<'ctx>>, arg: &CoreTerm, val: &Type<'ctx>) {
@@ -163,5 +182,6 @@ mod tests {
         assert!(check!("1 < 2 < 3 => {}", s).is_ok());
         assert!(check!("a > b || a == b || a < b => {}", s).is_ok());
         assert!(check!("a > b || a < b => {}", s).is_err());
+        assert!(check!("x = n % 2; x == 0 || x == 1 => {}", s).is_ok());
     }
 }
