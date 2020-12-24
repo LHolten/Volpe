@@ -5,17 +5,16 @@ use z3::ast::{Ast, Bool, BV};
 use crate::core::CoreTerm;
 
 #[derive(Debug, Clone)]
-pub struct Func<'ctx> {
-    pub arg: CoreTerm,
-    pub body: CoreTerm,
-    pub scope: HashMap<String, Type<'ctx>>,
+pub struct Lazy {
+    pub val: CoreTerm,
+    pub scope: HashMap<String, Lazy>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Type<'ctx> {
     Bool(Bool<'ctx>),
     BV(BV<'ctx>),
-    Func(Vec<(Bool<'ctx>, Func<'ctx>)>),
+    Func(Vec<(Bool<'ctx>, Lazy)>),
 }
 
 impl<'ctx> Type<'ctx> {
@@ -35,7 +34,7 @@ impl<'ctx> Type<'ctx> {
         }
     }
 
-    pub fn as_func(self) -> Option<Vec<(Bool<'ctx>, Func<'ctx>)>> {
+    pub fn as_func(self) -> Option<Vec<(Bool<'ctx>, Lazy)>> {
         if let Type::Func(val) = self {
             Some(val)
         } else {

@@ -8,21 +8,24 @@ use z3::{
 
 use crate::{
     core::CoreTerm,
-    types::{Func, Type},
+    types::{Lazy, Type},
 };
 
 fn walk<'ctx>(
     tree: &CoreTerm,
     solver: &Solver<'ctx>,
-    scope: &HashMap<String, Type<'ctx>>,
+    scope: &HashMap<String, Lazy>,
 ) -> Result<Type<'ctx>, String> {
     let ctx = solver.get_context();
     match tree {
         CoreTerm::Num(num) => Ok(BV::from_u64(ctx, *num, 64).into()),
-        CoreTerm::Ident(name) => Ok(scope
-            .get(name)
-            .cloned()
-            .unwrap_or_else(|| BV::new_const(ctx, name.as_str(), 64).into())),
+        CoreTerm::Ident(name) => {
+            if let Some(Lazy { val, scope }) = scope.get(name) {
+                walk(val, solver, scope)
+            } else {
+                Ok(BV::new_const(ctx, name.as_str(), 64).into())
+            }
+        }
         CoreTerm::Unreachable => Err("reached unreachable!".to_string()),
         CoreTerm::Ite {
             cond,
@@ -97,9 +100,8 @@ fn walk<'ctx>(
             }
             Op::Func => Type::Func(vec![(
                 Bool::from_bool(ctx, true),
-                Func {
-                    arg: left.as_ref().clone(),
-                    body: right.as_ref().clone(),
+                Lazy {
+                    val: tree.clone(),
                     scope: scope.clone(),
                 },
             )]),
@@ -107,8 +109,14 @@ fn walk<'ctx>(
                 let funcs = walk(left, solver, scope)?
                     .as_func()
                     .ok_or_else(|| "can only call func".to_string())?;
-                let val = walk(right, solver, scope)?;
-                apply(solver, funcs.as_slice(), &val)?
+                apply(
+                    solver,
+                    funcs.as_slice(),
+                    &Lazy {
+                        val: right.as_ref().clone(),
+                        scope: scope.clone(),
+                    },
+                )?
             }
         }),
         _ => unimplemented!(),
@@ -117,25 +125,33 @@ fn walk<'ctx>(
 
 fn apply<'ctx>(
     solver: &Solver<'ctx>,
-    funcs: &[(Bool<'ctx>, Func<'ctx>)],
-    val: &Type<'ctx>,
+    funcs: &[(Bool<'ctx>, Lazy)],
+    val: &Lazy,
 ) -> Result<Type<'ctx>, String> {
     let ((cond, f), funcs) = funcs.split_first().unwrap();
+    let (arg, body) = match f.val.clone() {
+        CoreTerm::Op {
+            left,
+            op: Op::Func,
+            right,
+        } => (left, right),
+        _ => return Err("can only call functions".to_string()),
+    };
     let mut scope = f.scope.clone();
-    assign(&mut scope, &f.arg, val);
+    assign(&mut scope, arg.as_ref(), val);
     match solver.check_assumptions(&[cond.clone()]) {
         SatResult::Unsat => return apply(solver, funcs, val),
         SatResult::Unknown => return Err("couldn\'t check!".to_string()),
         SatResult::Sat => {}
     }
     match solver.check_assumptions(&[cond.not()]) {
-        SatResult::Unsat => return walk(&f.body, solver, &scope),
+        SatResult::Unsat => return walk(body.as_ref(), solver, &scope),
         SatResult::Unknown => return Err("couldn\'t check!".to_string()),
         SatResult::Sat => {}
     };
     solver.push();
     solver.assert(&cond);
-    let then = walk(&f.body, solver, &scope);
+    let then = walk(body.as_ref(), solver, &scope);
     solver.pop(1);
     solver.push();
     solver.assert(&cond.not());
@@ -144,7 +160,7 @@ fn apply<'ctx>(
     Type::ite(&cond, &then?, &otherwise?).ok_or_else(|| "types not the same in ite".to_string())
 }
 
-fn assign<'ctx>(scope: &mut HashMap<String, Type<'ctx>>, arg: &CoreTerm, val: &Type<'ctx>) {
+fn assign(scope: &mut HashMap<String, Lazy>, arg: &CoreTerm, val: &Lazy) {
     let _ = match arg {
         CoreTerm::Ident(name) => scope.insert(name.clone(), val.clone()),
         _ => None,
@@ -183,5 +199,16 @@ mod tests {
         assert!(check!("a > b || a == b || a < b => {}", s).is_ok());
         assert!(check!("a > b || a < b => {}", s).is_err());
         assert!(check!("x := n % 2; x == 0 || x == 1 => {}", s).is_ok());
+        assert!(check!(
+            "assume := cond.then.(cond => then; {});
+            assert := cond.(cond => {});
+            
+            assume 0 <= x;
+            assume 0 <= y;
+            assume x / 2 == y / 2;
+            assert x == y || x + 1 == y || x == y + 1",
+            s
+        )
+        .is_ok());
     }
 }
