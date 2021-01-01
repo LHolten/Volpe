@@ -18,72 +18,58 @@ pub enum CoreTerm {
     Unreachable,
 }
 
-impl From<&Term> for CoreTerm {
-    fn from(term: &Term) -> Self {
-        match term {
+impl CoreTerm {
+    pub fn new_op(left: CoreTerm, op: Op, right: CoreTerm) -> Self {
+        Self::Op {
+            left: Box::new(left),
+            op,
+            right: Box::new(right),
+        }
+    }
+}
+
+impl<T: AsRef<Term>> From<T> for CoreTerm {
+    fn from(term: T) -> Self {
+        match term.as_ref() {
             Term::Num(val) => CoreTerm::Num(*val),
             Term::Ident(name) => CoreTerm::Ident(name.clone()),
-            Term::Op { left, op, right } => CoreTerm::Op {
-                left: Box::new(left.as_ref().into()),
-                op: op.clone(),
-                right: Box::new(right.as_ref().into()),
-            },
+            Term::Op { left, op, right } => CoreTerm::new_op(left.into(), *op, right.into()),
             Term::MultiOp { head, tail } => {
                 let ((op, next), rest) = tail.split_first().unwrap();
                 let next = CoreTerm::from(next);
-                let mut result = CoreTerm::Op {
-                    left: Box::new(head.as_ref().into()),
-                    op: op.clone(),
-                    right: Box::new(next.clone()),
-                };
+                let mut result = CoreTerm::new_op(head.into(), *op, next.clone());
                 let mut prev = next;
                 for (op, next) in rest {
                     let next = CoreTerm::from(next);
-                    result = CoreTerm::Op {
-                        left: Box::new(result),
-                        op: Op::Bool(BoolOp::And),
-                        right: Box::new(CoreTerm::Op {
-                            left: Box::new(prev),
-                            op: op.clone(),
-                            right: Box::new(next.clone()),
-                        }),
-                    };
+                    result = CoreTerm::new_op(
+                        result,
+                        Op::Bool(BoolOp::And),
+                        CoreTerm::new_op(prev, *op, next.clone()),
+                    );
                     prev = next;
                 }
                 result
             }
             Term::Stmt { var, val, next } => {
-                let mut func = next.as_ref().into();
+                let mut func = next.into();
                 for arg in var.iter().rev() {
-                    func = CoreTerm::Op {
-                        left: Box::new(arg.into()),
-                        op: Op::Func,
-                        right: Box::new(func),
-                    }
+                    func = CoreTerm::new_op(arg.into(), Op::Func, func)
                 }
-                CoreTerm::Op {
-                    left: Box::new(val.as_ref().into()),
-                    op: Op::App,
-                    right: Box::new(func),
-                }
+                CoreTerm::new_op(val.into(), Op::App, func)
             }
-            Term::Astmt { var, val, next } => CoreTerm::Op {
-                left: Box::new(CoreTerm::Op {
-                    left: Box::new(var.as_ref().into()),
-                    op: Op::Func,
-                    right: Box::new(next.as_ref().into()),
-                }),
-                op: Op::App,
-                right: Box::new(val.as_ref().into()),
-            },
+            Term::Astmt { var, val, next } => CoreTerm::new_op(
+                CoreTerm::new_op(var.into(), Op::Func, next.into()),
+                Op::App,
+                val.into(),
+            ),
             Term::Ite {
                 cond,
                 then,
                 otherwise,
             } => CoreTerm::Ite {
-                cond: Box::new(cond.as_ref().into()),
-                then: Box::new(then.as_ref().into()),
-                otherwise: Box::new(otherwise.as_ref().into()),
+                cond: Box::new(cond.into()),
+                then: Box::new(then.into()),
+                otherwise: Box::new(otherwise.into()),
             },
             Term::Matrix(vec) => CoreTerm::Matrix(
                 vec.iter()
@@ -95,35 +81,23 @@ impl From<&Term> for CoreTerm {
                 let mut prev = CoreTerm::Unreachable;
                 for next in entries {
                     prev = CoreTerm::Ite {
-                        cond: Box::new(CoreTerm::Op {
-                            left: Box::new(CoreTerm::Ident("$".to_string())),
-                            op: Op::Int(IntOp::Equal),
-                            right: Box::new((&next.attr).into()),
-                        }),
+                        cond: Box::new(CoreTerm::new_op(
+                            CoreTerm::Ident("$".to_string()),
+                            Op::Int(IntOp::Equal),
+                            (&next.attr).into(),
+                        )),
                         then: Box::new((&next.val).into()),
                         otherwise: Box::new(prev),
                     }
                 }
-                CoreTerm::Op {
-                    left: Box::new(CoreTerm::Ident("$".to_string())),
-                    op: Op::Func,
-                    right: Box::new(prev),
-                }
+                CoreTerm::new_op(CoreTerm::Ident("$".to_string()), Op::Func, prev)
             }
             Term::Tuple(values) => {
                 let mut prev = CoreTerm::Ident("$".to_string());
                 for val in values {
-                    prev = CoreTerm::Op {
-                        left: Box::new(prev),
-                        op: Op::App,
-                        right: Box::new(val.into()),
-                    }
+                    prev = CoreTerm::new_op(prev, Op::App, val.into())
                 }
-                CoreTerm::Op {
-                    left: Box::new(CoreTerm::Ident("$".to_string())),
-                    op: Op::Func,
-                    right: Box::new(prev),
-                }
+                CoreTerm::new_op(CoreTerm::Ident("$".to_string()), Op::Func, prev)
             }
             Term::Unreachable => CoreTerm::Unreachable,
         }

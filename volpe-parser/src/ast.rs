@@ -79,7 +79,13 @@ impl Term {
     }
 }
 
-#[derive(Debug, Clone)]
+impl AsRef<Term> for Term {
+    fn as_ref(&self) -> &Term {
+        &self
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum Op {
     Bool(BoolOp),
     Int(IntOp),
@@ -87,13 +93,13 @@ pub enum Op {
     App,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum BoolOp {
     And,
     Or,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum IntOp {
     Equal,
     Unequal,
