@@ -1,6 +1,6 @@
-use volpe_parser::ast::{BoolOp, IntOp, Op, Term};
+use volpe_parser::ast::{BoolOp, CmpOp, IntOp, Op, Term};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CoreTerm {
     Num(u64),
     Ident(String),
@@ -25,6 +25,12 @@ impl CoreTerm {
             op,
             right: Box::new(right),
         }
+    }
+}
+
+impl AsRef<CoreTerm> for CoreTerm {
+    fn as_ref(&self) -> &CoreTerm {
+        &self
     }
 }
 
@@ -83,7 +89,7 @@ impl<T: AsRef<Term>> From<T> for CoreTerm {
                     prev = CoreTerm::Ite {
                         cond: Box::new(CoreTerm::new_op(
                             CoreTerm::Ident("$".to_string()),
-                            Op::Int(IntOp::Equal),
+                            Op::Cmp(CmpOp::Equal),
                             (&next.attr).into(),
                         )),
                         then: Box::new((&next.val).into()),

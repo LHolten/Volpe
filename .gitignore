@@ -5,3 +5,4 @@ volpe-parser/src/parser.rs
 
 # IDE files
 .vscode
+.idea

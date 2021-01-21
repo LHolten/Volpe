@@ -85,28 +85,33 @@ impl AsRef<Term> for Term {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Op {
     Bool(BoolOp),
     Int(IntOp),
+    Cmp(CmpOp),
     Func,
     App,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BoolOp {
     And,
     Or,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum IntOp {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CmpOp {
     Equal,
     Unequal,
     Less,
     Greater,
     LessEqual,
     GreaterEqual,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IntOp {
     Add,
     Sub,
     Mul,
