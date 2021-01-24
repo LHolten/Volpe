@@ -26,6 +26,14 @@ impl CoreTerm {
             right: Box::new(right),
         }
     }
+
+    pub fn as_str(&self) -> Option<&str> {
+        if let Self::Ident(name) = self {
+            Some(name.as_str())
+        } else {
+            None
+        }
+    }
 }
 
 impl AsRef<CoreTerm> for CoreTerm {
