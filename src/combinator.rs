@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 use volpe_parser::ast::Op;
 
 use crate::core::CoreTerm;
 
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 pub struct CombinatorTerm<'b> {
     pub term: &'b CoreTerm,
     pub scope: HashMap<&'b str, &'b CombinatorTerm<'b>>,
@@ -12,11 +12,23 @@ pub struct CombinatorTerm<'b> {
 
 impl<'b> PartialEq for CombinatorTerm<'b> {
     fn eq(&self, other: &Self) -> bool {
-        Combinator::from(self.clone()) == Combinator::from(other.clone())
+        Combinator::from(self).eq(&Combinator::from(other))
     }
 }
 
-#[derive(PartialEq)]
+impl<'b> Hash for CombinatorTerm<'b> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        Combinator::from(self).hash(state)
+    }
+}
+
+impl<'b> Debug for CombinatorTerm<'b> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Combinator::from(self).fmt(f)
+    }
+}
+
+#[derive(Debug, PartialEq, Hash)]
 pub enum Combinator<'b> {
     Num(u64),
     Ident(&'b str),
@@ -33,13 +45,13 @@ pub enum Combinator<'b> {
     Unreachable,
 }
 
-impl<'b> From<CombinatorTerm<'b>> for Combinator<'b> {
-    fn from(other: CombinatorTerm<'b>) -> Self {
+impl<'b> From<&CombinatorTerm<'b>> for Combinator<'b> {
+    fn from(other: &CombinatorTerm<'b>) -> Self {
         match other.term {
             CoreTerm::Num(num) => Combinator::Num(*num),
             CoreTerm::Ident(name) => {
                 if let Some(value) = other.scope.get(name.as_str()) {
-                    Combinator::from((*value).clone())
+                    Combinator::from(*value)
                 } else {
                     Combinator::Ident(name.as_str())
                 }
@@ -49,7 +61,7 @@ impl<'b> From<CombinatorTerm<'b>> for Combinator<'b> {
                 op: Op::Func,
                 right: body,
             } => {
-                let mut scope = other.scope;
+                let mut scope = other.scope.clone();
                 scope.remove(name.as_str().unwrap());
                 Combinator::Op {
                     left: CombinatorTerm {
@@ -71,7 +83,7 @@ impl<'b> From<CombinatorTerm<'b>> for Combinator<'b> {
                 op: *op,
                 right: CombinatorTerm {
                     term: right.as_ref(),
-                    scope: other.scope,
+                    scope: other.scope.clone(),
                 },
             },
             CoreTerm::Ite {
@@ -89,7 +101,7 @@ impl<'b> From<CombinatorTerm<'b>> for Combinator<'b> {
                 },
                 otherwise: CombinatorTerm {
                     term: otherwise.as_ref(),
-                    scope: other.scope,
+                    scope: other.scope.clone(),
                 },
             },
             CoreTerm::Unreachable => Combinator::Unreachable,
