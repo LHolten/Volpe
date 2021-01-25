@@ -6,6 +6,7 @@ use volpe_parser::ast::{BoolOp, CmpOp, IntOp, Op};
 use crate::{
     combinator::{Combinator, CombinatorTerm},
     core::CoreTerm,
+    env::Env,
 };
 
 pub enum UnitTerm<'a> {
@@ -40,9 +41,9 @@ struct CoreTermBuilder<'a> {
 #[derive(Clone)]
 struct State<'a, 'b> {
     args: Vec<&'b CombinatorTerm<'b>>,
-    unit: HashMap<&'b CombinatorTerm<'b>, &'a Cell<UnitTerm<'a>>>,
-    bool: HashMap<&'b CombinatorTerm<'b>, &'a Cell<BoolTerm<'a>>>,
-    int: HashMap<&'b CombinatorTerm<'b>, &'a Cell<IntTerm<'a>>>,
+    unit: &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<UnitTerm<'a>>>,
+    bool: &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<BoolTerm<'a>>>,
+    int: &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<IntTerm<'a>>>,
 }
 
 impl<'a> CoreTermBuilder<'a> {
@@ -61,10 +62,11 @@ impl<'a> CoreTermBuilder<'a> {
     ) -> &'a Cell<UnitTerm<'a>> {
         let mut state = state.clone();
         if let Some(val) = state.unit.get(term) {
-            *val
+            val
         } else {
             let cell = Cell::from_mut(self.unit_arena.alloc(UnitTerm::Link(None)));
-            state.unit.insert(term, cell);
+            let env = state.unit.insert(term, cell);
+            state.unit = &env;
             cell.set(self.unit(term, state));
             cell
         }
@@ -97,9 +99,10 @@ impl<'a> CoreTermBuilder<'a> {
                 right: mut body,
             } => {
                 let val = state.args.pop().unwrap();
-                body.scope.insert(name.term.as_str().unwrap(), val);
+                let scope = body.scope;
+                body.scope = scope.insert(name.term.as_str().unwrap(), Some(val));
                 if let Some(val) = state.unit.get(&body) {
-                    UnitTerm::Link(Some(*val))
+                    UnitTerm::Link(Some(val))
                 } else {
                     self.unit(&body, state)
                 }
@@ -123,10 +126,11 @@ impl<'a> CoreTermBuilder<'a> {
     ) -> &'a Cell<BoolTerm<'a>> {
         let mut state = state.clone();
         if let Some(val) = state.bool.get(term) {
-            *val
+            val
         } else {
             let cell = Cell::from_mut(self.bool_arena.alloc(BoolTerm::Link(None)));
-            state.bool.insert(term, cell);
+            let env = state.bool.insert(term, cell);
+            state.bool = &env;
             cell.set(self.bool(term, state));
             cell
         }
@@ -159,9 +163,10 @@ impl<'a> CoreTermBuilder<'a> {
                 right: mut body,
             } => {
                 let val = state.args.pop().unwrap();
-                body.scope.insert(name.term.as_str().unwrap(), val);
+                let scope = body.scope;
+                body.scope = scope.insert(name.term.as_str().unwrap(), Some(val));
                 if let Some(val) = state.bool.get(&body) {
-                    BoolTerm::Link(Some(*val))
+                    BoolTerm::Link(Some(val))
                 } else {
                     self.bool(&body, state)
                 }
@@ -204,10 +209,11 @@ impl<'a> CoreTermBuilder<'a> {
     ) -> &'a Cell<IntTerm<'a>> {
         let mut state = state.clone();
         if let Some(val) = state.int.get(term) {
-            *val
+            val
         } else {
             let cell = Cell::from_mut(self.int_arena.alloc(IntTerm::Link(None)));
-            state.int.insert(term, cell);
+            let env = state.int.insert(term, cell);
+            state.int = &env;
             cell.set(self.int(term, state));
             cell
         }
@@ -240,9 +246,10 @@ impl<'a> CoreTermBuilder<'a> {
                 right: mut body,
             } => {
                 let val = state.args.pop().unwrap();
-                body.scope.insert(name.term.as_str().unwrap(), val);
+                let scope = body.scope;
+                body.scope = scope.insert(name.term.as_str().unwrap(), Some(val));
                 if let Some(val) = state.int.get(&body) {
-                    IntTerm::Link(Some(*val))
+                    IntTerm::Link(Some(val))
                 } else {
                     self.int(&body, state)
                 }
@@ -279,18 +286,18 @@ mod tests {
         let builder = CoreTermBuilder::new();
         let unit = CombinatorTerm {
             term: &CoreTerm::Unreachable,
-            scope: HashMap::new(),
+            scope: Env::new(),
         };
         builder.unit_cell(
             &CombinatorTerm {
                 term: &ExprParser::new().parse("x.(x x) x.(x x)").unwrap().into(),
-                scope: HashMap::new(),
+                scope: Env::new(),
             },
             &State {
                 args: vec![&unit],
-                unit: HashMap::new(),
-                bool: HashMap::new(),
-                int: HashMap::new(),
+                unit: &Env::new(),
+                bool: &Env::new(),
+                int: &Env::new(),
             },
         );
     }

@@ -2,12 +2,12 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 use volpe_parser::ast::Op;
 
-use crate::core::CoreTerm;
+use crate::{core::CoreTerm, env::Env};
 
-#[derive(Clone, Eq)]
+#[derive(Clone)]
 pub struct CombinatorTerm<'b> {
     pub term: &'b CoreTerm,
-    pub scope: HashMap<&'b str, &'b CombinatorTerm<'b>>,
+    pub scope: Env<'b, &'b str, Option<&'b CombinatorTerm<'b>>>,
 }
 
 impl<'b> PartialEq for CombinatorTerm<'b> {
@@ -45,13 +45,13 @@ pub enum Combinator<'b> {
     Unreachable,
 }
 
-impl<'b> From<&CombinatorTerm<'b>> for Combinator<'b> {
-    fn from(other: &CombinatorTerm<'b>) -> Self {
+impl<'b> From<&'b CombinatorTerm<'b>> for Combinator<'b> {
+    fn from(other: &'b CombinatorTerm<'b>) -> Self {
         match other.term {
             CoreTerm::Num(num) => Combinator::Num(*num),
             CoreTerm::Ident(name) => {
-                if let Some(value) = other.scope.get(name.as_str()) {
-                    Combinator::from(*value)
+                if let Some(value) = other.scope.get(name.as_str()).unwrap() {
+                    Combinator::from(value)
                 } else {
                     Combinator::Ident(name.as_str())
                 }
@@ -61,12 +61,11 @@ impl<'b> From<&CombinatorTerm<'b>> for Combinator<'b> {
                 op: Op::Func,
                 right: body,
             } => {
-                let mut scope = other.scope.clone();
-                scope.remove(name.as_str().unwrap());
+                let scope = other.scope.insert(name.as_str().unwrap(), None);
                 Combinator::Op {
                     left: CombinatorTerm {
                         term: name.as_ref(),
-                        scope: HashMap::new(),
+                        scope: scope.clone(),
                     },
                     op: Op::Func,
                     right: CombinatorTerm {
