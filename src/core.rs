@@ -1,4 +1,4 @@
-use volpe_parser::ast::{BoolOp, CmpOp, IntOp, Op, Term};
+use volpe_parser::ast::{BoolOp, CmpOp, Op, Term};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CoreTerm {

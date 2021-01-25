@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash};
 
 use volpe_parser::ast::Op;
 
