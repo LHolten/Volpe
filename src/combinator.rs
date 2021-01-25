@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 use volpe_parser::ast::Op;
 
-use crate::{core::CoreTerm, env::Env};
+use crate::{core::CoreTerm, state::Env};
 
 #[derive(Clone)]
 pub struct CombinatorTerm<'b> {

@@ -1,4 +1,4 @@
-use std::{cell::Cell, collections::HashMap};
+use std::cell::Cell;
 
 use typed_arena::Arena;
 use volpe_parser::ast::{BoolOp, CmpOp, IntOp, Op};
@@ -6,7 +6,7 @@ use volpe_parser::ast::{BoolOp, CmpOp, IntOp, Op};
 use crate::{
     combinator::{Combinator, CombinatorTerm},
     core::CoreTerm,
-    env::Env,
+    state::{Arg, Env},
 };
 
 pub enum UnitTerm<'a> {
@@ -38,9 +38,9 @@ struct CoreTermBuilder<'a> {
     int_arena: Arena<IntTerm<'a>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct State<'a, 'b> {
-    args: Vec<&'b CombinatorTerm<'b>>,
+    args: &'b Arg<'b, &'b CombinatorTerm<'b>>,
     unit: &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<UnitTerm<'a>>>,
     bool: &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<BoolTerm<'a>>>,
     int: &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<IntTerm<'a>>>,
@@ -58,9 +58,9 @@ impl<'a> CoreTermBuilder<'a> {
     fn unit_cell(
         &'a self,
         term: &CombinatorTerm<'_>,
-        state: &State<'a, '_>,
+        state: State<'a, '_>,
     ) -> &'a Cell<UnitTerm<'a>> {
-        let mut state = state.clone();
+        let mut state = state;
         if let Some(val) = state.unit.get(term) {
             val
         } else {
@@ -81,13 +81,13 @@ impl<'a> CoreTermBuilder<'a> {
                 otherwise,
             } => {
                 if Combinator::from(&otherwise) == Combinator::Unreachable {
-                    UnitTerm::Assert(self.bool_cell(&cond, &state), self.unit_cell(&then, &state))
+                    UnitTerm::Assert(self.bool_cell(&cond, state), self.unit_cell(&then, state))
                 } else {
                     UnitTerm::Ite(
-                        self.bool_cell(&cond, &state),
+                        self.bool_cell(&cond, state),
                         [
-                            self.unit_cell(&then, &state),
-                            self.unit_cell(&otherwise, &state),
+                            self.unit_cell(&then, state),
+                            self.unit_cell(&otherwise, state),
                         ],
                     )
                 }
@@ -98,7 +98,8 @@ impl<'a> CoreTermBuilder<'a> {
                 op: Op::Func,
                 right: mut body,
             } => {
-                let val = state.args.pop().unwrap();
+                let (args, val) = state.args.pop().unwrap();
+                state.args = args;
                 let scope = body.scope;
                 body.scope = scope.insert(name.term.as_str().unwrap(), Some(val));
                 if let Some(val) = state.unit.get(&body) {
@@ -112,7 +113,8 @@ impl<'a> CoreTermBuilder<'a> {
                 op: Op::App,
                 right: val,
             } => {
-                state.args.push(&val);
+                let args = state.args.push(&val);
+                state.args = &args;
                 self.unit(&func, state)
             }
             _ => unimplemented!(),
@@ -122,9 +124,9 @@ impl<'a> CoreTermBuilder<'a> {
     fn bool_cell(
         &'a self,
         term: &CombinatorTerm<'_>,
-        state: &State<'a, '_>,
+        state: State<'a, '_>,
     ) -> &'a Cell<BoolTerm<'a>> {
-        let mut state = state.clone();
+        let mut state = state;
         if let Some(val) = state.bool.get(term) {
             val
         } else {
@@ -145,13 +147,13 @@ impl<'a> CoreTermBuilder<'a> {
                 otherwise,
             } => {
                 if Combinator::from(&otherwise) == Combinator::Unreachable {
-                    BoolTerm::Assert(self.bool_cell(&cond, &state), self.bool_cell(&then, &state))
+                    BoolTerm::Assert(self.bool_cell(&cond, state), self.bool_cell(&then, state))
                 } else {
                     BoolTerm::Ite(
-                        self.bool_cell(&cond, &state),
+                        self.bool_cell(&cond, state),
                         [
-                            self.bool_cell(&then, &state),
-                            self.bool_cell(&otherwise, &state),
+                            self.bool_cell(&then, state),
+                            self.bool_cell(&otherwise, state),
                         ],
                     )
                 }
@@ -162,7 +164,8 @@ impl<'a> CoreTermBuilder<'a> {
                 op: Op::Func,
                 right: mut body,
             } => {
-                let val = state.args.pop().unwrap();
+                let (args, val) = state.args.pop().unwrap();
+                state.args = args;
                 let scope = body.scope;
                 body.scope = scope.insert(name.term.as_str().unwrap(), Some(val));
                 if let Some(val) = state.bool.get(&body) {
@@ -176,7 +179,8 @@ impl<'a> CoreTermBuilder<'a> {
                 op: Op::App,
                 right: val,
             } => {
-                state.args.push(&val);
+                let args = state.args.push(&val);
+                state.args = &args;
                 self.bool(&func, state)
             }
             Combinator::Op {
@@ -185,10 +189,7 @@ impl<'a> CoreTermBuilder<'a> {
                 right,
             } => BoolTerm::BoolOp(
                 op,
-                [
-                    self.bool_cell(&left, &state),
-                    self.bool_cell(&right, &state),
-                ],
+                [self.bool_cell(&left, state), self.bool_cell(&right, state)],
             ),
             Combinator::Op {
                 left,
@@ -196,7 +197,7 @@ impl<'a> CoreTermBuilder<'a> {
                 right,
             } => BoolTerm::CmpOp(
                 op,
-                [self.int_cell(&left, &state), self.int_cell(&right, &state)],
+                [self.int_cell(&left, state), self.int_cell(&right, state)],
             ),
             _ => unimplemented!(),
         }
@@ -205,9 +206,9 @@ impl<'a> CoreTermBuilder<'a> {
     fn int_cell(
         &'a self,
         term: &CombinatorTerm<'_>,
-        state: &State<'a, '_>,
+        state: State<'a, '_>,
     ) -> &'a Cell<IntTerm<'a>> {
-        let mut state = state.clone();
+        let mut state = state;
         if let Some(val) = state.int.get(term) {
             val
         } else {
@@ -228,13 +229,13 @@ impl<'a> CoreTermBuilder<'a> {
                 otherwise,
             } => {
                 if Combinator::from(&otherwise) == Combinator::Unreachable {
-                    IntTerm::Assert(self.bool_cell(&cond, &state), self.int_cell(&then, &state))
+                    IntTerm::Assert(self.bool_cell(&cond, state), self.int_cell(&then, state))
                 } else {
                     IntTerm::Ite(
-                        self.bool_cell(&cond, &state),
+                        self.bool_cell(&cond, state),
                         [
-                            self.int_cell(&then, &state),
-                            self.int_cell(&otherwise, &state),
+                            self.int_cell(&then, state),
+                            self.int_cell(&otherwise, state),
                         ],
                     )
                 }
@@ -245,7 +246,8 @@ impl<'a> CoreTermBuilder<'a> {
                 op: Op::Func,
                 right: mut body,
             } => {
-                let val = state.args.pop().unwrap();
+                let (args, val) = state.args.pop().unwrap();
+                state.args = args;
                 let scope = body.scope;
                 body.scope = scope.insert(name.term.as_str().unwrap(), Some(val));
                 if let Some(val) = state.int.get(&body) {
@@ -259,7 +261,8 @@ impl<'a> CoreTermBuilder<'a> {
                 op: Op::App,
                 right: val,
             } => {
-                state.args.push(&val);
+                let args = state.args.push(&val);
+                state.args = &args;
                 self.int(&func, state)
             }
             Combinator::Op {
@@ -268,7 +271,7 @@ impl<'a> CoreTermBuilder<'a> {
                 right,
             } => IntTerm::IntOp(
                 op,
-                [self.int_cell(&left, &state), self.int_cell(&right, &state)],
+                [self.int_cell(&left, state), self.int_cell(&right, state)],
             ),
             Combinator::Num(num) => IntTerm::Int(num as i64),
             _ => unimplemented!(),
@@ -284,17 +287,38 @@ mod tests {
     #[test]
     fn test_unit() {
         let builder = CoreTermBuilder::new();
-        let unit = CombinatorTerm {
-            term: &CoreTerm::Unreachable,
-            scope: Env::new(),
-        };
         builder.unit_cell(
             &CombinatorTerm {
                 term: &ExprParser::new().parse("x.(x x) x.(x x)").unwrap().into(),
                 scope: Env::new(),
             },
-            &State {
-                args: vec![&unit],
+            State {
+                args: &Arg::new(),
+                unit: &Env::new(),
+                bool: &Env::new(),
+                int: &Env::new(),
+            },
+        );
+    }
+
+    #[test]
+    fn test_int() {
+        let builder = CoreTermBuilder::new();
+        builder.int_cell(
+            &CombinatorTerm {
+                term: &ExprParser::new()
+                    .parse(
+                        "
+                        fix := f.(x.(f (x x)) x.(f (x x)));
+                        fix rec.(rec + 1)
+                        ",
+                    )
+                    .unwrap()
+                    .into(),
+                scope: Env::new(),
+            },
+            State {
+                args: &Arg::new(),
                 unit: &Env::new(),
                 bool: &Env::new(),
                 int: &Env::new(),

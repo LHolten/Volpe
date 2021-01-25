@@ -4,7 +4,7 @@ extern crate z3;
 
 mod combinator;
 mod core;
-mod env;
+mod state;
 mod tree;
 
 fn main() {
