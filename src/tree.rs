@@ -1,213 +1,150 @@
 use std::cell::Cell;
 
 use typed_arena::Arena;
-use volpe_parser::ast::{BoolOp, CmpOp, IntOp, Op};
+use volpe_parser::ast::Op;
 
 use crate::{
-    combinator::{Combinator, CombinatorTerm},
+    core::CoreTerm,
     state::{Arg, Env},
 };
 
-pub enum UnitTerm<'a> {
-    // Unit,
-    Ite(&'a Cell<BoolTerm<'a>>, [&'a Cell<UnitTerm<'a>>; 2]),
-    Link(Option<&'a Cell<UnitTerm<'a>>>),
-}
-pub enum BoolTerm<'a> {
-    Bool(bool),
-    BoolOp(BoolOp, [&'a Cell<BoolTerm<'a>>; 2]),
-    CmpOp(CmpOp, [&'a Cell<IntTerm<'a>>; 2]),
-    Ite(&'a Cell<BoolTerm<'a>>, [&'a Cell<BoolTerm<'a>>; 2]),
-    Link(Option<&'a Cell<BoolTerm<'a>>>),
-}
-
-pub enum IntTerm<'a> {
-    Int(i64),
-    IntOp(IntOp, [&'a Cell<IntTerm<'a>>; 2]),
-    Ite(&'a Cell<BoolTerm<'a>>, [&'a Cell<IntTerm<'a>>; 2]),
-    Link(Option<&'a Cell<IntTerm<'a>>>),
-}
-
-struct ArenaStore<'a> {
-    unit: Arena<UnitTerm<'a>>,
-    bool: Arena<BoolTerm<'a>>,
-    int: Arena<IntTerm<'a>>,
-}
-
-impl<'a> ArenaStore<'a> {
-    fn new() -> Self {
-        Self {
-            unit: Arena::new(),
-            bool: Arena::new(),
-            int: Arena::new(),
-        }
-    }
+#[derive(Clone, Copy, PartialEq)]
+pub enum TreeTerm<'a> {
+    Num(u64),
+    Var(usize),
+    Ite(&'a Cell<TreeTerm<'a>>, [&'a Cell<TreeTerm<'a>>; 2]),
+    App(&'a Cell<TreeTerm<'a>>, &'a Cell<TreeTerm<'a>>),
+    Op(Op, [&'a Cell<TreeTerm<'a>>; 2]),
+    Link(Option<&'a Cell<TreeTerm<'a>>>),
 }
 
 #[derive(Clone, Copy)]
 struct TreeBuilder<'a, 'b> {
-    args: &'b Arg<'b, &'b CombinatorTerm<'b>>,
-    unit: &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<UnitTerm<'a>>>,
-    bool: &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<BoolTerm<'a>>>,
-    int: &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<IntTerm<'a>>>,
-    arena: &'a ArenaStore<'a>,
+    args: &'b Arg<'b, Combinator<'b>>,
+    prev: &'b Env<'b, &'a Cell<TreeTerm<'a>>, &'a Cell<TreeTerm<'a>>>,
+    arena: &'a Arena<TreeTerm<'a>>,
 }
 
-trait TreeTerm<'a>: Sized {
-    fn env<'b, 'c>(
-        builder: &'c mut TreeBuilder<'a, 'b>,
-    ) -> &'c mut &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<Self>>;
-    fn arena<'b>(builder: TreeBuilder<'a, 'b>) -> &'a Arena<Self>;
-    fn ite<'b>(cond: &'a Cell<BoolTerm<'a>>, then_else: [&'a Cell<Self>; 2]) -> Self;
-    fn link<'b>(value: Option<&'a Cell<Self>>) -> Self;
-    fn convert<'b>(state: TreeBuilder<'a, 'b>, term: Combinator<'b>) -> Self;
+#[derive(Clone, Copy)]
+pub struct Combinator<'b> {
+    pub term: &'b CoreTerm,
+    pub local: &'b Arg<'b, &'b CoreTerm>,
+    pub scope: &'b Env<'b, &'b CoreTerm, Combinator<'b>>,
 }
 
-impl<'a> TreeTerm<'a> for UnitTerm<'a> {
-    fn env<'b, 'c>(
-        builder: &'c mut TreeBuilder<'a, 'b>,
-    ) -> &'c mut &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<Self>> {
-        &mut builder.unit
-    }
-
-    fn arena<'b>(builder: TreeBuilder<'a, 'b>) -> &'a Arena<Self> {
-        &builder.arena.unit
-    }
-
-    fn ite<'b>(cond: &'a Cell<BoolTerm<'a>>, then_else: [&'a Cell<Self>; 2]) -> Self {
-        Self::Ite(cond, then_else)
-    }
-
-    fn link<'b>(value: Option<&'a Cell<Self>>) -> Self {
-        Self::Link(value)
-    }
-
-    fn convert<'b>(_state: TreeBuilder<'a, 'b>, _term: Combinator<'b>) -> Self {
-        unimplemented!()
+impl<'b> Combinator<'b> {
+    pub fn make<T: AsRef<CoreTerm>>(mut self, term: &'b T) -> Self {
+        self.term = term.as_ref();
+        self
     }
 }
 
-impl<'a> TreeTerm<'a> for BoolTerm<'a> {
-    fn env<'b, 'c>(
-        builder: &'c mut TreeBuilder<'a, 'b>,
-    ) -> &'c mut &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<Self>> {
-        &mut builder.bool
-    }
-
-    fn arena<'b>(builder: TreeBuilder<'a, 'b>) -> &'a Arena<Self> {
-        &builder.arena.bool
-    }
-
-    fn ite<'b>(cond: &'a Cell<BoolTerm<'a>>, then_else: [&'a Cell<Self>; 2]) -> Self {
-        Self::Ite(cond, then_else)
-    }
-
-    fn link<'b>(value: Option<&'a Cell<Self>>) -> Self {
-        Self::Link(value)
-    }
-
-    fn convert<'b>(state: TreeBuilder<'a, 'b>, term: Combinator<'b>) -> Self {
-        match term {
-            Combinator::Op {
-                left,
-                op: Op::Bool(op),
-                right,
-            } => BoolTerm::BoolOp(op, [state.convert_cell(&left), state.convert_cell(&right)]),
-            Combinator::Op {
-                left,
-                op: Op::Cmp(op),
-                right,
-            } => BoolTerm::CmpOp(op, [state.convert_cell(&left), state.convert_cell(&right)]),
-            Combinator::Num(num) => BoolTerm::Bool(num != 0),
-            _ => unimplemented!(),
-        }
-    }
+struct Convert<'a> {
+    val: &'a Cell<TreeTerm<'a>>,
+    total: bool,
 }
 
-impl<'a> TreeTerm<'a> for IntTerm<'a> {
-    fn env<'b, 'c>(
-        builder: &'c mut TreeBuilder<'a, 'b>,
-    ) -> &'c mut &'b Env<'b, &'b CombinatorTerm<'b>, &'a Cell<Self>> {
-        &mut builder.int
+impl<'a> Convert<'a> {
+    fn total(val: &'a Cell<TreeTerm<'a>>) -> Self {
+        Self { val, total: true }
     }
-
-    fn arena<'b>(builder: TreeBuilder<'a, 'b>) -> &'a Arena<Self> {
-        &builder.arena.int
-    }
-
-    fn ite<'b>(cond: &'a Cell<BoolTerm<'a>>, then_else: [&'a Cell<Self>; 2]) -> Self {
-        Self::Ite(cond, then_else)
-    }
-
-    fn link<'b>(value: Option<&'a Cell<Self>>) -> Self {
-        Self::Link(value)
-    }
-
-    fn convert<'b>(state: TreeBuilder<'a, 'b>, term: Combinator<'b>) -> Self {
-        match term {
-            Combinator::Op {
-                left,
-                op: Op::Int(op),
-                right,
-            } => IntTerm::IntOp(op, [state.convert_cell(&left), state.convert_cell(&right)]),
-            Combinator::Num(num) => IntTerm::Int(num as i64),
-            _ => unimplemented!(),
-        }
+    fn partial(val: &'a Cell<TreeTerm<'a>>) -> Self {
+        Self { val, total: false }
     }
 }
 
 impl<'a, 'b> TreeBuilder<'a, 'b> {
-    fn convert_cell<T: TreeTerm<'a>>(self, term: &'b CombinatorTerm<'b>) -> &'a Cell<T> {
-        let mut state = self;
-        if let Some(val) = T::env(&mut state).get(term) {
-            val
-        } else {
-            let cell = Cell::from_mut(T::arena(state).alloc(T::link(None)));
-            let env = T::env(&mut state).insert(term, cell);
-            *T::env(&mut state) = &env;
-            cell.set(state.convert(term));
-            cell
-        }
+    fn alloc(self, term: TreeTerm<'a>) -> &'a Cell<TreeTerm<'a>> {
+        Cell::from_mut(self.arena.alloc(term))
     }
 
-    fn convert<T: 'a + TreeTerm<'a>>(self, term: &'b CombinatorTerm<'b>) -> T {
+    pub fn convert(self, comb: Combinator<'b>) -> Convert<'a> {
         let mut state = self;
-        match Combinator::from(term) {
-            Combinator::Unreachable => T::link(None),
-            Combinator::Ite {
+        match comb.term {
+            CoreTerm::Ident(_) => {
+                if let Some(index) = comb.local.find(comb.term) {
+                    Convert::total(state.alloc(TreeTerm::Var(index)))
+                } else {
+                    state.convert(comb.scope.get(&comb.term).unwrap())
+                }
+            }
+            CoreTerm::Num(num) => Convert::total(self.alloc(TreeTerm::Num(*num))),
+            CoreTerm::Unreachable => Convert::total(self.alloc(TreeTerm::Link(None))),
+            CoreTerm::Op {
+                left: name,
+                op: Op::Func,
+                right: body,
+            } => {
+                let test_func = state.convert(Combinator {
+                    term: body.as_ref(),
+                    local: &comb.local.push(name.as_ref()),
+                    scope: comb.scope,
+                });
+                if let Some((args, value)) = state.args.pop() {
+                    if let Some(val) = state.prev.get(test_func.val) {
+                        Convert::total(val)
+                    } else {
+                        let result = state.alloc(TreeTerm::Link(None));
+                        let state = TreeBuilder {
+                            args,
+                            prev: &state.prev.insert(test_func.val, result),
+                            arena: state.arena,
+                        };
+                        let test_value = state.convert(value);
+                        if test_value.total {
+                            result.set(TreeTerm::App(test_func.val, test_value.val));
+                            Convert {
+                                val: result,
+                                total: test_func.total,
+                            }
+                        } else {
+                            let func = state.convert(Combinator {
+                                term: body.as_ref(),
+                                local: comb.local,
+                                scope: &comb.scope.insert(name.as_ref(), value),
+                            });
+                            result.set(TreeTerm::Link(Some(func.val)));
+                            Convert {
+                                val: result,
+                                total: func.total,
+                            }
+                        }
+                    }
+                } else {
+                    Convert::partial(test_func.val)
+                }
+            }
+            CoreTerm::Op {
+                left: func,
+                op: Op::App,
+                right: value,
+            } => {
+                let args = state.args.push(comb.make(value));
+                state.args = &args;
+                state.convert(comb.make(func))
+            }
+            CoreTerm::Op { left, op, right } => Convert::total(state.alloc(TreeTerm::Op(
+                *op,
+                [
+                    state.convert(comb.make(left)).val,
+                    state.convert(comb.make(right)).val,
+                ],
+            ))),
+            CoreTerm::Ite {
                 cond,
                 then,
                 otherwise,
-            } => T::ite(
-                state.convert_cell(&cond),
-                [state.convert_cell(&then), state.convert_cell(&otherwise)],
-            ),
-            Combinator::Ident(_) => unimplemented!(),
-            Combinator::Op {
-                left: name,
-                op: Op::Func,
-                right: mut body,
             } => {
-                let (args, val) = state.args.pop().unwrap();
-                state.args = args;
-                let scope = body.scope;
-                body.scope = scope.insert(name.term.as_str().unwrap(), Some(val));
-                if let Some(val) = T::env(&mut state).get(&body) {
-                    T::link(Some(val))
-                } else {
-                    state.convert(&body)
+                let then = state.convert(comb.make(then));
+                Convert {
+                    val: self.alloc(TreeTerm::Ite(
+                        state.convert(comb.make(cond)).val,
+                        [then.val, state.convert(comb.make(otherwise)).val],
+                    )),
+                    total: then.total,
                 }
             }
-            Combinator::Op {
-                left: func,
-                op: Op::App,
-                right: val,
-            } => {
-                let args = state.args.push(&val);
-                state.args = &args;
-                state.convert(&func)
-            }
-            other => T::convert(state, other),
+            CoreTerm::Matrix(_) => unimplemented!(),
         }
     }
 }
@@ -221,14 +158,13 @@ mod tests {
     fn test_unit() {
         let builder = TreeBuilder {
             args: &Arg::new(),
-            unit: &Env::new(),
-            bool: &Env::new(),
-            int: &Env::new(),
-            arena: &ArenaStore::new(),
+            prev: &Env::new(),
+            arena: &Arena::new(),
         };
-        builder.convert_cell::<UnitTerm>(&CombinatorTerm {
+        builder.convert(Combinator {
             term: &ExprParser::new().parse("x.(x x) x.(x x)").unwrap().into(),
-            scope: Env::new(),
+            scope: &Env::new(),
+            local: &Arg::new(),
         });
     }
 
@@ -236,12 +172,10 @@ mod tests {
     fn test_int() {
         let builder = TreeBuilder {
             args: &Arg::new(),
-            unit: &Env::new(),
-            bool: &Env::new(),
-            int: &Env::new(),
-            arena: &ArenaStore::new(),
+            prev: &Env::new(),
+            arena: &Arena::new(),
         };
-        builder.convert_cell::<IntTerm>(&CombinatorTerm {
+        builder.convert(Combinator {
             term: &ExprParser::new()
                 .parse(
                     "
@@ -251,7 +185,30 @@ mod tests {
                 )
                 .unwrap()
                 .into(),
-            scope: Env::new(),
+            scope: &Env::new(),
+            local: &Arg::new(),
+        });
+    }
+
+    #[test]
+    fn test_complex() {
+        let builder = TreeBuilder {
+            args: &Arg::new(),
+            prev: &Env::new(),
+            arena: &Arena::new(),
+        };
+        builder.convert(Combinator {
+            term: &ExprParser::new()
+                .parse(
+                    "
+                        fix := f.(x.(f (x x)) x.(f (x x)));
+                        fix rec.x.(x == 0 => 0; rec x - 1) 10
+                        ",
+                )
+                .unwrap()
+                .into(),
+            scope: &Env::new(),
+            local: &Arg::new(),
         });
     }
 }
