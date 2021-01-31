@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::{cell::Cell, fmt::Debug};
 
 use typed_arena::Arena;
 use volpe_parser::ast::Op;
@@ -16,6 +16,34 @@ pub enum TreeTerm<'a> {
     App(&'a Cell<TreeTerm<'a>>, &'a Cell<TreeTerm<'a>>),
     Op(Op, [&'a Cell<TreeTerm<'a>>; 2]),
     Link(Option<&'a Cell<TreeTerm<'a>>>),
+}
+
+impl<'a> Debug for TreeTerm<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TreeTerm::Num(num) => f.debug_tuple("Num").field(num).finish(),
+            TreeTerm::Var(index) => f.debug_tuple("Var").field(index).finish(),
+            TreeTerm::Ite(i, [t, e]) => f
+                .debug_tuple("Ite")
+                .field(&i.get())
+                .field(&t.get())
+                .field(&e.get())
+                .finish(),
+            TreeTerm::App(func, arg) => f
+                .debug_tuple("App")
+                .field(&func.get())
+                .field(&arg.get())
+                .finish(),
+            TreeTerm::Op(op, [l, r]) => f
+                .debug_tuple("Op")
+                .field(op)
+                .field(&l.get())
+                .field(&r.get())
+                .finish(),
+            TreeTerm::Link(None) => f.write_str("Error"),
+            TreeTerm::Link(_) => f.write_str("..."),
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -42,6 +70,15 @@ impl<'b> Combinator<'b> {
 struct Convert<'a> {
     val: &'a Cell<TreeTerm<'a>>,
     total: bool,
+}
+
+impl<'a> Debug for Convert<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Convert")
+            .field("val", &self.val.get())
+            .field("total", &self.total)
+            .finish()
+    }
 }
 
 impl<'a> Convert<'a> {
@@ -82,7 +119,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                 });
                 if let Some((args, value)) = state.args.pop() {
                     if let Some(val) = state.prev.get(test_func.val) {
-                        Convert::total(val)
+                        Convert::total(state.alloc(TreeTerm::Link(Some(val))))
                     } else {
                         let result = state.alloc(TreeTerm::Link(None));
                         let state = TreeBuilder {
@@ -103,7 +140,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                                 local: comb.local,
                                 scope: &comb.scope.insert(name.as_ref(), value),
                             });
-                            result.set(TreeTerm::Link(Some(func.val)));
+                            result.swap(func.val);
                             Convert {
                                 val: result,
                                 total: func.total,
