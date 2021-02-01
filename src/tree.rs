@@ -56,8 +56,7 @@ pub struct TreeBuilder<'a, 'b> {
 #[derive(Clone, Copy)]
 pub struct Combinator<'b> {
     pub term: &'b CoreTerm,
-    pub local: &'b Arg<'b, &'b CoreTerm>,
-    pub scope: &'b Env<'b, &'b CoreTerm, Combinator<'b>>,
+    pub scope: &'b Env<'b, &'b CoreTerm, Option<Combinator<'b>>>,
 }
 
 impl<'b> Combinator<'b> {
@@ -99,10 +98,10 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
         let mut state = self;
         match comb.term {
             CoreTerm::Ident(_) => {
-                if let Some(index) = comb.local.find(comb.term) {
-                    Convert::total(state.alloc(TreeTerm::Var(index)))
+                if let Some(val) = comb.scope.get(&comb.term).unwrap() {
+                    state.convert(val)
                 } else {
-                    state.convert(comb.scope.get(&comb.term).unwrap())
+                    Convert::total(state.alloc(TreeTerm::Var(comb.scope.find(comb.term).unwrap())))
                 }
             }
             CoreTerm::Num(num) => Convert::total(self.alloc(TreeTerm::Num(*num))),
@@ -117,16 +116,10 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                     let mut args = old_args;
 
                     state.args = &no_arg;
-                    let test_value = state.convert(value);
-
-                    let mut app = {
-                        let test_func = state.convert(comb);
-                        vec![test_func, test_value]
-                    };
+                    let mut app = vec![state.convert(comb), state.convert(value)];
 
                     while let Some((new_args, value)) = args.pop() {
-                        let test_value = state.convert(value);
-                        app.push(test_value);
+                        app.push(state.convert(value));
                         args = new_args;
                     }
 
@@ -155,8 +148,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                         let final_app = if app[1].total {
                             let func = state.convert(Combinator {
                                 term: body.as_ref(),
-                                local: &comb.local.push(name.as_ref()),
-                                scope: comb.scope,
+                                scope: &comb.scope.insert(name.as_ref(), None),
                             });
                             Convert {
                                 val: state.alloc(TreeTerm::App(func.val, app[1].val)),
@@ -165,8 +157,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                         } else {
                             state.convert(Combinator {
                                 term: body.as_ref(),
-                                local: comb.local,
-                                scope: &comb.scope.insert(name.as_ref(), value),
+                                scope: &comb.scope.insert(name.as_ref(), Some(value)),
                             })
                         };
 
@@ -176,8 +167,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                 } else {
                     let func = state.convert(Combinator {
                         term: body.as_ref(),
-                        local: &comb.local.push(name.as_ref()),
-                        scope: comb.scope,
+                        scope: &comb.scope.insert(name.as_ref(), None),
                     });
                     Convert::partial(func.val)
                 }
@@ -235,7 +225,6 @@ mod tests {
         builder.convert(Combinator {
             term: &ExprParser::new().parse("x.(x x) x.(x x)").unwrap().into(),
             scope: &Env::new(),
-            local: &Arg::new(),
         });
     }
 
@@ -257,7 +246,6 @@ mod tests {
                 .unwrap()
                 .into(),
             scope: &Env::new(),
-            local: &Arg::new(),
         });
     }
 
@@ -279,7 +267,6 @@ mod tests {
                 .unwrap()
                 .into(),
             scope: &Env::new(),
-            local: &Arg::new(),
         });
     }
 }

@@ -29,7 +29,17 @@ impl<'b, K: PartialEq, V: Copy> Env<'b, K, V> {
             tail: self,
         }))
     }
+
+    pub fn find(&'b self, key: K) -> Option<usize> {
+        let inner = self.0.as_ref()?;
+        if inner.key == key {
+            Some(0)
+        } else {
+            inner.tail.find(key).map(|index| index + 1)
+        }
+    }
 }
+
 #[derive(Clone, Copy)]
 struct ArgInner<'b, V> {
     value: V,
