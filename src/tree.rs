@@ -49,7 +49,7 @@ impl<'a> Debug for TreeTerm<'a> {
 #[derive(Clone, Copy)]
 pub struct TreeBuilder<'a, 'b> {
     pub args: &'b Arg<'b, Combinator<'b>>,
-    pub prev: &'b Env<'b, &'a Cell<TreeTerm<'a>>, &'a Cell<TreeTerm<'a>>>,
+    pub prev: &'b Env<'b, &'b Vec<Option<&'a Cell<TreeTerm<'a>>>>, &'a Cell<TreeTerm<'a>>>,
     pub arena: &'a Arena<TreeTerm<'a>>,
 }
 
@@ -112,39 +112,66 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                 op: Op::Func,
                 right: body,
             } => {
-                if let Some((args, value)) = state.args.pop() {
+                if let Some((old_args, value)) = state.args.pop() {
                     let no_arg = Arg::new();
+                    let mut args = old_args;
+
                     state.args = &no_arg;
                     let test_value = state.convert(value);
-                    state.args = args;
-                    let test_func = state.convert(Combinator {
-                        term: body.as_ref(),
-                        local: &comb.local.push(name.as_ref()),
-                        scope: comb.scope,
-                    });
-                    let test_app = state.alloc(TreeTerm::App(test_func.val, test_value.val));
 
-                    if test_value.total {
-                        Convert {
-                            val: test_app,
-                            total: test_func.total,
+                    let mut app = {
+                        let test_func = state.convert(comb);
+                        vec![test_func, test_value]
+                    };
+
+                    while let Some((new_args, value)) = args.pop() {
+                        let test_value = state.convert(value);
+                        app.push(test_value);
+                        args = new_args;
+                    }
+
+                    let mut signature = Vec::new();
+                    for arg in &app {
+                        if arg.total {
+                            signature.push(None)
+                        } else {
+                            signature.push(Some(arg.val))
                         }
-                    } else if let Some(val) = state.prev.get(test_app) {
-                        Convert::total(state.alloc(TreeTerm::Link(Some(val))))
+                    }
+
+                    if let Some(mut result) = state.prev.get(&signature) {
+                        for arg in &app {
+                            if arg.total {
+                                result = state.alloc(TreeTerm::App(result, arg.val))
+                            }
+                        }
+                        Convert::total(result)
                     } else {
                         let result = state.alloc(TreeTerm::Link(None));
-                        let new_prev = state.prev.insert(test_app, result);
+                        let new_prev = state.prev.insert(&signature, result);
                         state.prev = &new_prev;
-                        let func = state.convert(Combinator {
-                            term: body.as_ref(),
-                            local: comb.local,
-                            scope: &comb.scope.insert(name.as_ref(), value),
-                        });
-                        result.swap(func.val);
-                        Convert {
-                            val: result,
-                            total: func.total,
-                        }
+                        state.args = old_args;
+
+                        let final_app = if app[1].total {
+                            let func = state.convert(Combinator {
+                                term: body.as_ref(),
+                                local: &comb.local.push(name.as_ref()),
+                                scope: comb.scope,
+                            });
+                            Convert {
+                                val: state.alloc(TreeTerm::App(func.val, app[1].val)),
+                                total: func.total,
+                            }
+                        } else {
+                            state.convert(Combinator {
+                                term: body.as_ref(),
+                                local: comb.local,
+                                scope: &comb.scope.insert(name.as_ref(), value),
+                            })
+                        };
+
+                        result.replace(TreeTerm::Link(Some(final_app.val)));
+                        final_app
                     }
                 } else {
                     let func = state.convert(Combinator {
@@ -164,24 +191,27 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                 state.args = &args;
                 state.convert(comb.make(func))
             }
-            CoreTerm::Op { left, op, right } => Convert::total(state.alloc(TreeTerm::Op(
-                *op,
-                [
-                    state.convert(comb.make(left)).val,
-                    state.convert(comb.make(right)).val,
-                ],
-            ))),
+            CoreTerm::Op { left, op, right } => {
+                assert!(state.args.pop().is_none());
+                let left = state.convert(comb.make(left));
+                let right = state.convert(comb.make(right));
+                assert!(left.total && right.total);
+                Convert::total(state.alloc(TreeTerm::Op(*op, [left.val, right.val])))
+            }
             CoreTerm::Ite {
                 cond,
                 then,
                 otherwise,
             } => {
                 let then = state.convert(comb.make(then));
+                let otherwise = state.convert(comb.make(otherwise));
+                let no_arg = Arg::new();
+                state.args = &no_arg;
+                let cond = state.convert(comb.make(cond));
+                assert!(cond.total);
+                assert!(then.total == otherwise.total);
                 Convert {
-                    val: self.alloc(TreeTerm::Ite(
-                        state.convert(comb.make(cond)).val,
-                        [then.val, state.convert(comb.make(otherwise)).val],
-                    )),
+                    val: self.alloc(TreeTerm::Ite(cond.val, [then.val, otherwise.val])),
                     total: then.total,
                 }
             }
