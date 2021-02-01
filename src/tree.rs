@@ -47,10 +47,10 @@ impl<'a> Debug for TreeTerm<'a> {
 }
 
 #[derive(Clone, Copy)]
-struct TreeBuilder<'a, 'b> {
-    args: &'b Arg<'b, Combinator<'b>>,
-    prev: &'b Env<'b, &'a Cell<TreeTerm<'a>>, &'a Cell<TreeTerm<'a>>>,
-    arena: &'a Arena<TreeTerm<'a>>,
+pub struct TreeBuilder<'a, 'b> {
+    pub args: &'b Arg<'b, Combinator<'b>>,
+    pub prev: &'b Env<'b, &'a Cell<TreeTerm<'a>>, &'a Cell<TreeTerm<'a>>>,
+    pub arena: &'a Arena<TreeTerm<'a>>,
 }
 
 #[derive(Clone, Copy)]
@@ -67,7 +67,7 @@ impl<'b> Combinator<'b> {
     }
 }
 
-struct Convert<'a> {
+pub struct Convert<'a> {
     val: &'a Cell<TreeTerm<'a>>,
     total: bool,
 }
@@ -112,43 +112,47 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                 op: Op::Func,
                 right: body,
             } => {
-                let test_func = state.convert(Combinator {
-                    term: body.as_ref(),
-                    local: &comb.local.push(name.as_ref()),
-                    scope: comb.scope,
-                });
                 if let Some((args, value)) = state.args.pop() {
-                    if let Some(val) = state.prev.get(test_func.val) {
+                    let no_arg = Arg::new();
+                    state.args = &no_arg;
+                    let test_value = state.convert(value);
+                    state.args = args;
+                    let test_func = state.convert(Combinator {
+                        term: body.as_ref(),
+                        local: &comb.local.push(name.as_ref()),
+                        scope: comb.scope,
+                    });
+                    let test_app = state.alloc(TreeTerm::App(test_func.val, test_value.val));
+
+                    if test_value.total {
+                        Convert {
+                            val: test_app,
+                            total: test_func.total,
+                        }
+                    } else if let Some(val) = state.prev.get(test_app) {
                         Convert::total(state.alloc(TreeTerm::Link(Some(val))))
                     } else {
                         let result = state.alloc(TreeTerm::Link(None));
-                        let state = TreeBuilder {
-                            args,
-                            prev: &state.prev.insert(test_func.val, result),
-                            arena: state.arena,
-                        };
-                        let test_value = state.convert(value);
-                        if test_value.total {
-                            result.set(TreeTerm::App(test_func.val, test_value.val));
-                            Convert {
-                                val: result,
-                                total: test_func.total,
-                            }
-                        } else {
-                            let func = state.convert(Combinator {
-                                term: body.as_ref(),
-                                local: comb.local,
-                                scope: &comb.scope.insert(name.as_ref(), value),
-                            });
-                            result.swap(func.val);
-                            Convert {
-                                val: result,
-                                total: func.total,
-                            }
+                        let new_prev = state.prev.insert(test_app, result);
+                        state.prev = &new_prev;
+                        let func = state.convert(Combinator {
+                            term: body.as_ref(),
+                            local: comb.local,
+                            scope: &comb.scope.insert(name.as_ref(), value),
+                        });
+                        result.swap(func.val);
+                        Convert {
+                            val: result,
+                            total: func.total,
                         }
                     }
                 } else {
-                    Convert::partial(test_func.val)
+                    let func = state.convert(Combinator {
+                        term: body.as_ref(),
+                        local: &comb.local.push(name.as_ref()),
+                        scope: comb.scope,
+                    });
+                    Convert::partial(func.val)
                 }
             }
             CoreTerm::Op {
