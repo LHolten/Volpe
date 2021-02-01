@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 #[derive(Debug)]
 pub struct Entry {
     pub attr: Term,
@@ -85,13 +87,25 @@ impl AsRef<Term> for Term {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Op {
     Bool(BoolOp),
     Int(IntOp),
     Cmp(CmpOp),
     Func,
     App,
+}
+
+impl Debug for Op {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Op::Bool(op) => f.write_str(format!("Bool({:?})", op).as_str()),
+            Op::Int(op) => f.write_str(format!("Int({:?})", op).as_str()),
+            Op::Cmp(op) => f.write_str(format!("Cmp({:?})", op).as_str()),
+            Op::Func => f.write_str("Func"),
+            Op::App => f.write_str("App"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

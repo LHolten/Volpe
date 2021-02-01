@@ -21,8 +21,8 @@ pub enum TreeTerm<'a> {
 impl<'a> Debug for TreeTerm<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TreeTerm::Num(num) => f.debug_tuple("Num").field(num).finish(),
-            TreeTerm::Var(index) => f.debug_tuple("Var").field(index).finish(),
+            TreeTerm::Num(num) => f.write_str(format!("Num({})", num).as_str()),
+            TreeTerm::Var(index) => f.write_str(format!("Var({})", index).as_str()),
             TreeTerm::Ite(i, [t, e]) => f
                 .debug_tuple("Ite")
                 .field(&i.get())
