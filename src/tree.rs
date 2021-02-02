@@ -101,7 +101,17 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                 if let Some(val) = comb.scope.get(&comb.term).unwrap() {
                     state.convert(val)
                 } else {
-                    Convert::total(state.alloc(TreeTerm::Var(comb.scope.find(comb.term).unwrap())))
+                    let mut result =
+                        state.alloc(TreeTerm::Var(comb.scope.find(comb.term).unwrap()));
+                    let no_arg = Arg::new();
+                    let mut args = state.args;
+                    state.args = &no_arg;
+
+                    while let Some((new_args, value)) = args.pop() {
+                        args = new_args;
+                        result = state.alloc(TreeTerm::App(result, state.convert(value).val));
+                    }
+                    Convert::total(result)
                 }
             }
             CoreTerm::Num(num) => Convert::total(self.alloc(TreeTerm::Num(*num))),
@@ -131,6 +141,7 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                             signature.push(Some(arg.val))
                         }
                     }
+                    println!("{:?}", &signature);
 
                     if let Some(mut result) = state.prev.get(&signature) {
                         for arg in &app {
