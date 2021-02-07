@@ -1,18 +1,6 @@
 use std::{cell::Cell, rc::Rc};
 
 pub type IResult<'t> = Result<Tracker<'t>, ()>;
-pub trait Parser: Copy {
-    fn parse(self, t: Tracker) -> IResult;
-}
-
-impl<F> Parser for F
-where
-    for<'r> F: Fn(Tracker<'r>) -> IResult<'r> + Copy,
-{
-    fn parse(self, t: Tracker) -> IResult {
-        self(t)
-    }
-}
 
 pub struct Rule {
     pub length: usize,
@@ -23,21 +11,26 @@ pub struct Rule {
 
 pub struct Position {
     pub lexem: String, // white space in front
-    pub rules: [Cell<Option<Rule>>; 7],
+    pub rules: [Cell<Option<Rule>>; 14],
     pub next: Option<Rc<Position>>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum RuleKind {
-    Ident,
-    Num,
-    Symbol,
-    Unknown,
-    OpAnd,
-    OpOr,
-    Operator,
-    Function,
-    Application,
+    Expr,
+    Stmt,
+    App,
+    Func,
+    Or,
+    And,
+    Equal,
+    Cmp,
+    BitOr,
+    BitAnd,
+    BitShift,
+    Add,
+    Mul,
+    Tuple,
 }
 
 impl Position {
@@ -88,7 +81,7 @@ pub fn tag(lexem: &'static str) -> impl Fn(Tracker) -> IResult {
     }
 }
 
-pub fn rule(kind: RuleKind, f: impl Parser) -> impl Fn(Tracker) -> IResult {
+pub fn rule(kind: RuleKind, f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
     move |mut t| {
         t.add_child(Some(kind), t.input.clone());
         if let Some(res) = t.input.with_rule(kind, |r| {
@@ -113,7 +106,7 @@ pub fn rule(kind: RuleKind, f: impl Parser) -> impl Fn(Tracker) -> IResult {
                 children: &Cell::new(Vec::new()),
                 length: &Cell::new(0),
             };
-            let next = if let Ok(t3) = f.parse(t2.clone()) {
+            let next = if let Ok(t3) = f(t2.clone()) {
                 Some((t3.offset, t3.input))
             } else {
                 None
@@ -138,40 +131,49 @@ pub fn rule(kind: RuleKind, f: impl Parser) -> impl Fn(Tracker) -> IResult {
     }
 }
 
-pub fn separated(symbol: impl Parser, next: impl Parser) -> impl Fn(Tracker) -> IResult {
-    move |t| many1(&pair(symbol, next))(next.parse(t)?)
+pub fn separated(
+    symbol: impl Fn(Tracker) -> IResult,
+    next: impl Fn(Tracker) -> IResult,
+) -> impl Fn(Tracker) -> IResult {
+    move |t| many1(pair(&symbol, &next))(next(t)?)
 }
 
-pub fn many1(f: impl Parser) -> impl Fn(Tracker) -> IResult {
-    move |t| pair(f, &many0(f))(t)
+pub fn many1(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
+    move |t| pair(&f, many0(&f))(t)
 }
 
-pub fn many0(f: impl Parser) -> impl Fn(Tracker) -> IResult {
+pub fn many0(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
     move |mut t| {
-        while let Ok(new_t) = f.parse(t.clone()) {
+        while let Ok(new_t) = f(t.clone()) {
             t = new_t
         }
         Ok(t)
     }
 }
 
-pub fn pair(f: impl Parser, g: impl Parser) -> impl Fn(Tracker) -> IResult {
-    move |t| g.parse(f.parse(t)?)
+pub fn pair(
+    f: impl Fn(Tracker) -> IResult,
+    g: impl Fn(Tracker) -> IResult,
+) -> impl Fn(Tracker) -> IResult {
+    move |t| g(f(t)?)
 }
 
-pub fn alt(f: impl Parser, g: impl Parser) -> impl Fn(Tracker) -> IResult {
+pub fn alt(
+    f: impl Fn(Tracker) -> IResult,
+    g: impl Fn(Tracker) -> IResult,
+) -> impl Fn(Tracker) -> IResult {
     move |t| {
-        if let Ok(t) = f.parse(t.clone()) {
+        if let Ok(t) = f(t.clone()) {
             Ok(t)
         } else {
-            g.parse(t)
+            g(t)
         }
     }
 }
 
-pub fn opt(f: impl Parser) -> impl Fn(Tracker) -> IResult {
+pub fn opt(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
     move |t| {
-        if let Ok(t) = f.parse(t.clone()) {
+        if let Ok(t) = f(t.clone()) {
             Ok(t)
         } else {
             Ok(t)
