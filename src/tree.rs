@@ -141,7 +141,6 @@ impl<'a, 'b> TreeBuilder<'a, 'b> {
                             signature.push(Some(arg.val))
                         }
                     }
-                    println!("{:?}", &signature);
 
                     if let Some(mut result) = state.prev.get(&signature) {
                         for arg in &app {
