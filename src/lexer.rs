@@ -74,6 +74,12 @@ pub enum Lexem {
     #[token(")")]
     RBrace,
 
+    #[token("{")]
+    LCurlyBrace,
+
+    #[token("}")]
+    RCurlyBrace,
+
     #[regex(r"[;\n]")]
     NewLine,
 

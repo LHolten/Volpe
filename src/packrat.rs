@@ -1,22 +1,21 @@
-use std::{cell::Cell, mem::take, rc::Rc};
+use std::{cell::Cell, fmt::Debug, mem::take, rc::Rc};
 
 use crate::lexer::Lexem;
 use crate::logos::Logos;
 
 pub type IResult<'t> = Result<Tracker<'t>, ()>;
 
-pub struct Rule {
+struct Rule {
     length: usize,
-    kind: RuleKind,
     children: Vec<(Option<RuleKind>, SharedPosition)>,
     next: Option<(usize, SharedPosition)>,
 }
 
 #[derive(Default, Clone)]
-struct SharedPosition(Rc<Cell<Position>>);
+pub struct SharedPosition(Rc<Cell<Position>>);
 
 #[derive(Default)]
-pub struct Position {
+struct Position {
     lexem: String, // white space and unknown in front
     kind: Lexem,
     rules: [Option<Rule>; 10],
@@ -38,6 +37,13 @@ pub enum RuleKind {
 }
 
 impl SharedPosition {
+    pub fn new() -> Self {
+        Self(Rc::new(Cell::new(Position {
+            lexem: " ".to_string(),
+            ..Default::default()
+        })))
+    }
+
     fn with_pos<R>(&self, f: impl FnOnce(&mut Position) -> R) -> R {
         let mut pos = self.0.replace(Position::default());
         let res = f(&mut pos);
@@ -69,62 +75,75 @@ impl SharedPosition {
         self.with_pos(|pos| take(&mut pos.lexem))
     }
 
-    pub fn patch(&self, kind: RuleKind, string: &str, offset: usize, length: usize) {
-        let rule = self.with_pos(|pos| pos.rules[kind as usize].take().unwrap());
+    pub fn patch(
+        &self,
+        kind: Option<RuleKind>,
+        string: &str,
+        mut offset: usize,
+        length: usize,
+    ) -> Result<usize, ()> {
+        if let Some(k) = kind {
+            let len = self.with_rule(k, |r| r.length).unwrap();
+            if len > offset {
+                let rule = self.with_pos(|pos| pos.rules[k as usize].take().unwrap());
 
-        let mut child_offset = 0;
-        for child in rule.children {
-            if let Some(k) = child.0 {
-                let child_length = child.1.with_rule(k, |r| r.length).unwrap();
-                if child_length + child_offset > offset {
-                    child.1.patch(k, string, offset - child_offset, length);
-                    break;
+                for child in rule.children {
+                    offset = child.1.patch(child.0, string, offset, length)?;
                 }
-                child_offset += child
-                    .1
-                    .with_rule(k, |r| (r.next.as_ref().unwrap().0))
-                    .unwrap();
-            } else {
-                let child_length = child.1.len();
-                if child_length + child_offset >= offset {
-                    let mut first = child.1;
-                    let first_overlap = child_length + child_offset - offset;
-                    let mut last = first.clone();
-                    loop {
-                        child_offset += last.len();
-                        last = last.next();
-                        if child_offset + last.len() > offset + length {
-                            break;
-                        }
-                    }
-                    let last_overlap = child_offset + last.len() - offset - length;
-
-                    let mut new_input = first.take_lexem();
-                    new_input.truncate(new_input.len() - first_overlap);
-                    new_input.push_str(string);
-                    new_input.push_str(&last.take_lexem()[last_overlap..]);
-
-                    let mut buffer = String::default();
-                    let mut lex = Lexem::lexer(&new_input);
-                    while let Some(val) = lex.next() {
-                        buffer.push_str(lex.slice());
-                        if val != Lexem::Error {
-                            let temp = SharedPosition::default();
-                            first.0.set(Position {
-                                lexem: take(&mut buffer),
-                                kind: val,
-                                next: Some(temp.clone()),
-                                rules: Default::default(),
-                            });
-                            first = temp;
-                        }
-                    }
-                    first.with_pos(|pos| pos.next = Some(last.next()));
-                    break;
-                }
-                child_offset += child_length
             }
+            offset -= self.with_rule(k, |r| (r.next.as_ref().unwrap().0)).unwrap()
+        } else {
+            let len = self.len();
+            if len >= offset {
+                let first_overlap = len - offset;
+                let mut last = self.clone();
+                let mut last_offset = 0;
+                loop {
+                    last_offset += last.len();
+                    if last_offset > offset + length {
+                        break;
+                    }
+                    last = last.next();
+                }
+                let last_overlap = last_offset - offset - length;
+
+                let mut input = String::default();
+                self.with_pos(|pos| input.push_str(&pos.lexem[..pos.lexem.len() - first_overlap]));
+                input.push_str(string);
+                last.with_pos(|pos| input.push_str(&pos.lexem[last_overlap..]));
+
+                let mut buffer = String::default();
+                let mut lex = Lexem::lexer(&input);
+                let mut current = self.clone();
+                while let Some(val) = lex.next() {
+                    buffer.push_str(lex.slice());
+                    if val != Lexem::Error {
+                        let temp = SharedPosition::default();
+                        current.0.set(Position {
+                            lexem: take(&mut buffer),
+                            kind: val,
+                            next: Some(temp.clone()),
+                            rules: Default::default(),
+                        });
+                        current = temp;
+                    }
+                }
+                current.with_pos(|pos| pos.next = Some(last.next()));
+                return Err(());
+            }
+            offset -= len;
         }
+        Ok(offset)
+    }
+
+    pub fn parse(&self, func: impl Fn(Tracker) -> IResult) -> Result<(), ()> {
+        func(Tracker {
+            pos: self.clone(),
+            offset: 0,
+            children: &Default::default(),
+            length: &Default::default(),
+        })?;
+        Ok(())
     }
 }
 
@@ -195,7 +214,6 @@ pub fn rule(kind: RuleKind, f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) 
             };
             let rule = Rule {
                 length: t2.length.get(),
-                kind,
                 children: t2.children.replace(Vec::new()),
                 next: next.clone(),
             };

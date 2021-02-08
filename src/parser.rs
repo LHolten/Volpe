@@ -3,7 +3,7 @@ use crate::{
     packrat::{alt, many0, many1, opt, pair, rule, separated, tag, IResult, RuleKind, Tracker},
 };
 
-fn expr(t: Tracker) -> IResult {
+pub fn expr(t: Tracker) -> IResult {
     rule(RuleKind::Expr, alt(astmt, alt(ite, alt(stmt, opt(app)))))(t)
 }
 
@@ -106,38 +106,43 @@ fn block(mut t: Tracker) -> IResult {
 }
 
 fn tuple(t: Tracker) -> IResult {
-    todo!()
-    // rule(RuleKind::Tuple, |mut t| {
-    //     t = tag("{")(t)?;
-    //     t = many0(func)(t)?;
-    //     opt(tag("}"))(t)
-    // })(t)
+    rule(RuleKind::Tuple, |mut t| {
+        t = tag(L::LCurlyBrace)(t)?;
+        t = many0(func)(t)?;
+        opt(tag(L::RCurlyBrace))(t)
+    })(t)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     macro_rules! test_expr {
-//         ($s:literal) => {
-//             assert!(ExprParser::new().parse($s).is_ok())
-//         };
-//     }
+#[cfg(test)]
+mod tests {
+    use crate::packrat::SharedPosition;
 
-//     #[test]
-//     fn functions() {
-//         test_expr!("hello world");
-//         test_expr!("[1, 2, 3; 4, 5, 6] 10 (cool thing)");
-//         test_expr!("(a = 1; b = 2; add a b)");
-//         test_expr!(
-//             "my_object = {
-//                 alpha : something,
-//                 beta : 3404,
-//             }; my_object"
-//         );
-//         test_expr!("a.b.(add a b) 10 20");
-//         test_expr!("{1, 2, 3}");
-//         test_expr!("{1}");
-//         test_expr!("{}");
-//         test_expr!("1 > 2 => {}");
-//         test_expr!("1 /* /* wow */ cool */ > 2 // hello");
-//     }
-// }
+    use super::expr;
+
+    macro_rules! test_expr {
+        ($s:literal) => {
+            let pos = SharedPosition::new();
+            pos.patch(None, $s, 0, 0).unwrap_err();
+            assert!(pos.parse(expr).is_ok())
+        };
+    }
+
+    #[test]
+    fn functions() {
+        test_expr!("hello world");
+        // test_expr!("[1, 2, 3; 4, 5, 6] 10 (cool thing)");
+        test_expr!("(a = 1; b = 2; add a b)");
+        // test_expr!(
+        //     "my_object = {
+        //         alpha : something,
+        //         beta : 3404,
+        //     }; my_object"
+        // );
+        test_expr!("a.b.(add a b) 10 20");
+        test_expr!("{1, 2, 3}");
+        test_expr!("{1}");
+        test_expr!("{}");
+        test_expr!("1 > 2 => {}");
+        // test_expr!("1 /* /* wow */ cool */ > 2 // hello");
+    }
+}
