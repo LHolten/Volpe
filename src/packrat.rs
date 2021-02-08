@@ -5,10 +5,41 @@ use crate::logos::Logos;
 
 pub type IResult<'t> = Result<Tracker<'t>, ()>;
 
+#[derive(Clone)]
 struct Rule {
     length: usize,
-    children: Vec<(Option<RuleKind>, SharedPosition)>,
+    children: Vec<RuleRef>,
     next: Option<(usize, SharedPosition)>,
+}
+
+#[derive(Clone)]
+pub struct RuleRef(pub Option<RuleKind>, pub SharedPosition);
+
+impl RuleRef {
+    fn is_succes(&self) -> bool {
+        self.0.is_none()
+            || self
+                .1
+                .with_rule(self.0.unwrap(), |r| r.next.is_some())
+                .unwrap()
+    }
+}
+
+impl Debug for RuleRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(kind) = self.0 {
+            self.1
+                .clone_rule(kind)
+                .unwrap()
+                .children
+                .into_iter()
+                .filter(RuleRef::is_succes)
+                .collect::<Vec<RuleRef>>()
+                .fmt(f)
+        } else {
+            self.1.with_pos(|pos| pos.lexem.fmt(f))
+        }
+    }
 }
 
 #[derive(Default, Clone)]
@@ -71,8 +102,8 @@ impl SharedPosition {
         self.with_pos(|pos| pos.kind)
     }
 
-    fn take_lexem(&mut self) -> String {
-        self.with_pos(|pos| take(&mut pos.lexem))
+    fn clone_rule(&self, kind: RuleKind) -> Option<Rule> {
+        self.with_pos(|pos| pos.rules[kind as usize].clone())
     }
 
     pub fn patch(
@@ -151,14 +182,14 @@ impl SharedPosition {
 pub struct Tracker<'t> {
     pos: SharedPosition,
     offset: usize,
-    children: &'t Cell<Vec<(Option<RuleKind>, SharedPosition)>>,
+    children: &'t Cell<Vec<RuleRef>>,
     length: &'t Cell<usize>,
 }
 
 impl<'t> Tracker<'t> {
     pub fn add_child(&self, kind: Option<RuleKind>, pos: SharedPosition) {
         let mut children = self.children.replace(Vec::new());
-        children.push((kind, pos));
+        children.push(RuleRef(kind, pos));
         self.children.set(children)
     }
 

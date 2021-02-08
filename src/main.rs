@@ -1,3 +1,10 @@
+use packrat::RuleRef;
+
+use crate::{
+    packrat::{RuleKind, SharedPosition},
+    parser::expr,
+};
+
 extern crate logos;
 extern crate typed_arena;
 extern crate volpe_parser;
@@ -11,5 +18,8 @@ mod state;
 mod tree;
 
 fn main() {
-    println!("Hello, world!");
+    let pos = SharedPosition::new();
+    pos.patch(None, "hello world", 0, 0).unwrap_err();
+    assert!(pos.parse(expr).is_ok());
+    dbg!(RuleRef(Some(RuleKind::Expr), pos));
 }
