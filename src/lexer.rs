@@ -1,6 +1,6 @@
 use logos::Logos;
 
-#[derive(Logos, Debug, PartialEq)]
+#[derive(Logos, Debug, PartialEq, Clone, Copy)]
 pub enum Lexem {
     #[token("=")]
     Assign,
@@ -86,4 +86,12 @@ pub enum Lexem {
     #[error]
     #[regex(r"[ \t]+")]
     Error,
+
+    End,
+}
+
+impl Default for Lexem {
+    fn default() -> Self {
+        Lexem::End
+    }
 }
