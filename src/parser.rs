@@ -1,5 +1,6 @@
-use crate::packrat::{
-    alt, many0, many1, opt, pair, rule, separated, tag, IResult, RuleKind, Tracker,
+use crate::{
+    lexer::Lexem as L,
+    packrat::{alt, many0, many1, opt, pair, rule, separated, tag, IResult, RuleKind, Tracker},
 };
 
 fn expr(t: Tracker) -> IResult {
@@ -8,17 +9,17 @@ fn expr(t: Tracker) -> IResult {
 
 fn astmt(mut t: Tracker) -> IResult {
     t = opt(app)(t)?;
-    t = tag("=")(t)?;
+    t = tag(L::Assign)(t)?;
     t = opt(app)(t)?;
-    t = opt(tag(";"))(t)?;
+    t = opt(tag(L::NewLine))(t)?;
     opt(expr)(t)
 }
 
 fn ite(mut t: Tracker) -> IResult {
     t = opt(app)(t)?;
-    t = tag("=>")(t)?;
+    t = tag(L::Ite)(t)?;
     t = opt(app)(t)?;
-    t = opt(tag(";"))(t)?;
+    t = opt(tag(L::NewLine))(t)?;
     opt(expr)(t)
 }
 
@@ -26,8 +27,11 @@ fn stmt(t: Tracker) -> IResult {
     rule(RuleKind::Stmt, |mut t| {
         t = opt(app)(t)?;
         t = alt(
-            pair(many1(pair(tag(":="), opt(app))), opt(tag(";"))),
-            tag(";"),
+            pair(
+                many1(pair(tag(L::MultiAssign), opt(app))),
+                opt(tag(L::NewLine)),
+            ),
+            tag(L::NewLine),
         )(t)?;
         opt(expr)(t)
     })(t)
@@ -38,79 +42,102 @@ fn app(t: Tracker) -> IResult {
 }
 
 fn func(t: Tracker) -> IResult {
-    rule(RuleKind::Func, separated(tag("."), or))(t)
+    rule(RuleKind::Func, separated(tag(L::Func), or))(t)
 }
 
 fn or(t: Tracker) -> IResult {
-    rule(RuleKind::Or, separated(tag("||"), and))(t)
+    rule(RuleKind::Or, separated(tag(L::Or), and))(t)
 }
 
 fn and(t: Tracker) -> IResult {
-    rule(RuleKind::And, separated(tag(""), equal))(t)
+    rule(RuleKind::And, separated(tag(L::And), op1))(t)
 }
 
-fn equal(t: Tracker) -> IResult {
-    rule(RuleKind::Equal, separated(alt(tag("=="), tag("!=")), cmp))(t)
-}
-
-fn cmp(t: Tracker) -> IResult {
+fn op1(t: Tracker) -> IResult {
     rule(
-        RuleKind::Cmp,
+        RuleKind::Op1,
         separated(
-            alt(alt(tag("<"), tag(">")), alt(tag("<="), tag(">="))),
-            bit_or,
+            alt(
+                alt(tag(L::Equals), tag(L::UnEquals)),
+                alt(
+                    alt(tag(L::Less), tag(L::Greater)),
+                    alt(tag(L::GreaterEqual), tag(L::LessEqual)),
+                ),
+            ),
+            op2,
         ),
     )(t)
 }
 
-fn bit_or(t: Tracker) -> IResult {
-    rule(RuleKind::BitOr, separated(tag("|"), bit_and))(t)
-}
-
-fn bit_and(t: Tracker) -> IResult {
-    rule(RuleKind::BitAnd, separated(tag(""), bit_shift))(t)
-}
-
-fn bit_shift(t: Tracker) -> IResult {
+fn op2(t: Tracker) -> IResult {
     rule(
-        RuleKind::BitShift,
-        separated(alt(tag("<<"), tag(">>")), add),
+        RuleKind::Op2,
+        separated(
+            alt(
+                alt(tag(L::Plus), tag(L::Minus)),
+                alt(tag(L::BitOr), alt(tag(L::BitShl), tag(L::BitShr))),
+            ),
+            op3,
+        ),
     )(t)
 }
 
-fn add(t: Tracker) -> IResult {
-    rule(RuleKind::Add, separated(alt(tag("+"), tag("-")), mul))(t)
-}
-
-fn mul(t: Tracker) -> IResult {
+fn op3(t: Tracker) -> IResult {
     rule(
-        RuleKind::Mul,
-        separated(alt(alt(tag("*"), tag("/")), tag("%")), term),
+        RuleKind::Op3,
+        separated(
+            alt(
+                alt(tag(L::Mul), tag(L::Div)),
+                alt(tag(L::Mod), tag(L::BitAnd)),
+            ),
+            term,
+        ),
     )(t)
 }
 
 fn term(t: Tracker) -> IResult {
-    opt(alt(alt(num, ident), alt(block, tuple)))(t)
-}
-
-fn num(t: Tracker) -> IResult {
-    todo!()
-}
-
-fn ident(t: Tracker) -> IResult {
-    todo!()
+    opt(alt(alt(tag(L::Num), tag(L::Ident)), alt(block, tuple)))(t)
 }
 
 fn block(mut t: Tracker) -> IResult {
-    t = tag("(")(t)?;
+    t = tag(L::LBrace)(t)?;
     t = stmt(t)?;
-    many0(tag(")"))(t)
+    opt(tag(L::RBrace))(t)
 }
 
 fn tuple(t: Tracker) -> IResult {
-    rule(RuleKind::Tuple, |mut t| {
-        t = tag("{")(t)?;
-        t = many0(func)(t)?;
-        many0(tag("}"))(t)
-    })(t)
+    todo!()
+    // rule(RuleKind::Tuple, |mut t| {
+    //     t = tag("{")(t)?;
+    //     t = many0(func)(t)?;
+    //     opt(tag("}"))(t)
+    // })(t)
 }
+
+// #[cfg(test)]
+// mod tests {
+//     macro_rules! test_expr {
+//         ($s:literal) => {
+//             assert!(ExprParser::new().parse($s).is_ok())
+//         };
+//     }
+
+//     #[test]
+//     fn functions() {
+//         test_expr!("hello world");
+//         test_expr!("[1, 2, 3; 4, 5, 6] 10 (cool thing)");
+//         test_expr!("(a = 1; b = 2; add a b)");
+//         test_expr!(
+//             "my_object = {
+//                 alpha : something,
+//                 beta : 3404,
+//             }; my_object"
+//         );
+//         test_expr!("a.b.(add a b) 10 20");
+//         test_expr!("{1, 2, 3}");
+//         test_expr!("{1}");
+//         test_expr!("{}");
+//         test_expr!("1 > 2 => {}");
+//         test_expr!("1 /* /* wow */ cool */ > 2 // hello");
+//     }
+// }

@@ -13,3 +13,4 @@ edition = "2018"
 volpe-parser = { path = "volpe-parser" }
 z3 = "~0.9.0"
 typed-arena = "~2.0.1"
+logos = "~0.12.0"

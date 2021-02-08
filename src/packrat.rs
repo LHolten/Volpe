@@ -1,5 +1,7 @@
 use std::{cell::Cell, rc::Rc};
 
+use crate::lexer::Lexem;
+
 pub type IResult<'t> = Result<Tracker<'t>, ()>;
 
 pub struct Rule {
@@ -11,7 +13,8 @@ pub struct Rule {
 
 pub struct Position {
     pub lexem: String, // white space in front
-    pub rules: [Cell<Option<Rule>>; 14],
+    pub kind: Lexem,
+    pub rules: [Cell<Option<Rule>>; 10],
     pub next: Option<Rc<Position>>,
 }
 
@@ -23,13 +26,9 @@ pub enum RuleKind {
     Func,
     Or,
     And,
-    Equal,
-    Cmp,
-    BitOr,
-    BitAnd,
-    BitShift,
-    Add,
-    Mul,
+    Op1,
+    Op2,
+    Op3,
     Tuple,
 }
 
@@ -67,12 +66,12 @@ impl<'t> Tracker<'t> {
     }
 }
 
-pub fn tag(lexem: &'static str) -> impl Fn(Tracker) -> IResult {
+pub fn tag(kind: Lexem) -> impl Fn(Tracker) -> IResult {
     move |mut t| {
         t.add_child(None, t.input.clone());
-        t.update_length(lexem.len());
-        if t.input.lexem == lexem {
-            t.offset += lexem.len();
+        t.update_length(t.input.lexem.len());
+        if t.input.kind == kind {
+            t.offset += t.input.lexem.len();
             t.input = t.input.next.clone().unwrap();
             Ok(t)
         } else {
