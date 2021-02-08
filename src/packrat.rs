@@ -28,6 +28,7 @@ impl RuleRef {
 impl Debug for RuleRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(kind) = self.0 {
+            f.write_str(&format!("{:?}", kind))?;
             self.1
                 .clone_rule(kind)
                 .unwrap()
@@ -49,11 +50,11 @@ pub struct SharedPosition(Rc<Cell<Position>>);
 struct Position {
     lexem: String, // white space and unknown in front
     kind: Lexem,
-    rules: [Option<Rule>; 10],
+    rules: [Option<Rule>; 9],
     next: Option<SharedPosition>,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum RuleKind {
     Expr,
     Stmt,
@@ -64,7 +65,6 @@ pub enum RuleKind {
     Op1,
     Op2,
     Op3,
-    Tuple,
 }
 
 impl SharedPosition {
@@ -266,7 +266,7 @@ pub fn separated(
     symbol: impl Fn(Tracker) -> IResult,
     next: impl Fn(Tracker) -> IResult,
 ) -> impl Fn(Tracker) -> IResult {
-    move |t| many1(pair(&symbol, &next))(next(t)?)
+    move |t| many0(pair(&symbol, &next))(next(t)?)
 }
 
 pub fn many1(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
@@ -276,6 +276,9 @@ pub fn many1(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
 pub fn many0(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
     move |mut t| {
         while let Ok(new_t) = f(t.clone()) {
+            if t.offset == new_t.offset {
+                return Ok(new_t);
+            }
             t = new_t
         }
         Ok(t)

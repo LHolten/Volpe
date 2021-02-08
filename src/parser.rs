@@ -4,41 +4,38 @@ use crate::{
 };
 
 pub fn expr(t: Tracker) -> IResult {
-    rule(RuleKind::Expr, alt(astmt, alt(ite, alt(stmt, opt(app)))))(t)
+    rule(RuleKind::Expr, alt(astmt, alt(ite, alt(stmt, app))))(t)
 }
 
 fn astmt(mut t: Tracker) -> IResult {
-    t = opt(app)(t)?;
+    t = app(t)?;
     t = tag(L::Assign)(t)?;
-    t = opt(app)(t)?;
+    t = app(t)?;
     t = opt(tag(L::NewLine))(t)?;
-    opt(expr)(t)
+    expr(t)
 }
 
 fn ite(mut t: Tracker) -> IResult {
-    t = opt(app)(t)?;
+    t = app(t)?;
     t = tag(L::Ite)(t)?;
-    t = opt(app)(t)?;
+    t = app(t)?;
     t = opt(tag(L::NewLine))(t)?;
-    opt(expr)(t)
+    expr(t)
 }
 
 fn stmt(t: Tracker) -> IResult {
     rule(RuleKind::Stmt, |mut t| {
-        t = opt(app)(t)?;
+        t = app(t)?;
         t = alt(
-            pair(
-                many1(pair(tag(L::MultiAssign), opt(app))),
-                opt(tag(L::NewLine)),
-            ),
+            pair(many1(pair(tag(L::MultiAssign), app)), opt(tag(L::NewLine))),
             tag(L::NewLine),
         )(t)?;
-        opt(expr)(t)
+        expr(t)
     })(t)
 }
 
 fn app(t: Tracker) -> IResult {
-    rule(RuleKind::App, many1(func))(t)
+    rule(RuleKind::App, many0(func))(t)
 }
 
 fn func(t: Tracker) -> IResult {
@@ -105,12 +102,10 @@ fn block(mut t: Tracker) -> IResult {
     opt(tag(L::RBrace))(t)
 }
 
-fn tuple(t: Tracker) -> IResult {
-    rule(RuleKind::Tuple, |mut t| {
-        t = tag(L::LCurlyBrace)(t)?;
-        t = many0(func)(t)?;
-        opt(tag(L::RCurlyBrace))(t)
-    })(t)
+fn tuple(mut t: Tracker) -> IResult {
+    t = tag(L::LCurlyBrace)(t)?;
+    t = app(t)?;
+    opt(tag(L::RCurlyBrace))(t)
 }
 
 #[cfg(test)]
