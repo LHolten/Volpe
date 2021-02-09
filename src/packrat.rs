@@ -20,7 +20,9 @@ impl RuleRef {
         self.0.is_none()
             || self
                 .1
-                .with_rule(self.0.unwrap(), |r| r.next.is_some())
+                .with_rule(self.0.unwrap(), |r| {
+                    r.next.is_some() && r.next.as_ref().unwrap().0 != 0
+                })
                 .unwrap()
     }
 }
