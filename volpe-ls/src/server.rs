@@ -1,33 +1,26 @@
-use std::time::Duration;
-
-use crossbeam::channel::{Receiver, Sender};
-use lsp_server::{Message, Notification, Request, Response};
-use lsp_types::{self, MessageType, ShowMessageParams, notification::{Exit, Notification as _, ShowMessage}, request::{self, Request as _, Shutdown}};
+// use crossbeam::channel::{Receiver, Sender};
+use lsp_server::{Connection, Message, Notification, Request, Response};
+use lsp_types::{self, MessageType, ShowMessageParams, notification::ShowMessage};
 
 pub struct Server {
-    sender: Sender<Message>,
-    receiver: Receiver<Message>,
+    connection: Connection,
 }
 
 // https://github.com/rust-analyzer/rust-analyzer/blob/master/crates/rust-analyzer/src/global_state.rs
 impl Server {
-    pub fn new(sender: Sender<Message>, receiver: Receiver<Message>) -> Server {
-        Server { sender, receiver }
+    pub fn new(connection: Connection) -> Server {
+        Server { connection }
     }
 
     pub fn run(&mut self) {
         self.show_info_message("Started :)".to_string());
         
-        while let Ok(message) = self.receiver.recv() {
+        while let Ok(message) = self.connection.receiver.recv() {
             self.show_info_message(format!("{:?}", message));
             match message {
                 Message::Request(request) => {
                     self.show_info_message(format!("received a request! (id: {})", request.id));
-                    if &request.method == Shutdown::METHOD {
-                        self.show_warning_message("it's a shutdown request".to_string());
-                        self.send(Response::new_ok(request.id, serde_json::Value::Null).into());
-                        break;
-                    }
+                    if self.connection.handle_shutdown(&request).unwrap() { break };
                 },
                 Message::Response(response) => {
                     self.show_info_message(format!("received a response! (id: {})", response.id));
@@ -37,13 +30,6 @@ impl Server {
                 }
             }
         }
-
-        // try to recv exit notification
-        // TODO Figure out how this works
-        let message = self.receiver.recv_timeout(Duration::from_secs(1));
-        if let Ok(message) = message {
-            self.show_info_message(format!("after shutdown message {:?}", message));
-        };
     }
 
     pub fn send_notification<N: lsp_types::notification::Notification>(
@@ -77,7 +63,7 @@ impl Server {
     // }
 
     fn send(&mut self, message: Message) {
-        self.sender.send(message).unwrap()
+        self.connection.sender.send(message).unwrap()
     }
 }
 

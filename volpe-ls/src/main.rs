@@ -11,5 +11,5 @@ fn main() {
     let server_capabilities = serde_json::to_value(&ServerCapabilities::default()).unwrap();
     let init_params = connection.initialize(server_capabilities).unwrap();
 
-    Server::new(connection.sender, connection.receiver).run();
+    Server::new(connection).run();
 }
