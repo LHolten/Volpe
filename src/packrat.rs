@@ -1,7 +1,7 @@
 use std::{cell::Cell, fmt::Debug, mem::take, rc::Rc};
 
-use crate::lexer::Lexem;
 use crate::logos::Logos;
+use crate::{lexer::Lexem, parser::expr};
 
 pub type IResult<'t> = Result<Tracker<'t>, ()>;
 
@@ -69,6 +69,30 @@ pub enum RuleKind {
     Op3,
 }
 
+impl From<usize> for RuleKind {
+    fn from(val: usize) -> Self {
+        match val {
+            v if v == RuleKind::Expr as usize => RuleKind::Expr,
+            v if v == RuleKind::Stmt as usize => RuleKind::Stmt,
+            v if v == RuleKind::App as usize => RuleKind::App,
+            v if v == RuleKind::Func as usize => RuleKind::Func,
+            v if v == RuleKind::Or as usize => RuleKind::Or,
+            v if v == RuleKind::And as usize => RuleKind::And,
+            v if v == RuleKind::Op1 as usize => RuleKind::Op1,
+            v if v == RuleKind::Op2 as usize => RuleKind::Op2,
+            v if v == RuleKind::Op3 as usize => RuleKind::Op3,
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl Debug for SharedPosition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let kind = self.best_kind();
+        RuleRef(kind, self.clone()).fmt(f)
+    }
+}
+
 impl SharedPosition {
     pub fn new() -> Self {
         Self(Rc::new(Cell::new(Position {
@@ -108,7 +132,21 @@ impl SharedPosition {
         self.with_pos(|pos| pos.rules[kind as usize].clone())
     }
 
-    pub fn patch(
+    fn best_kind(&self) -> Option<RuleKind> {
+        self.with_pos(|pos| {
+            (0..9)
+                .find(|k| {
+                    if let Some(rule) = pos.rules[*k].as_ref() {
+                        rule.next.is_some()
+                    } else {
+                        false
+                    }
+                })
+                .map(RuleKind::from)
+        })
+    }
+
+    fn patch_rule(
         &self,
         kind: Option<RuleKind>,
         string: &str,
@@ -121,7 +159,7 @@ impl SharedPosition {
                 let rule = self.with_pos(|pos| pos.rules[k as usize].take().unwrap());
 
                 for child in rule.children {
-                    offset = child.1.patch(child.0, string, offset, length)?;
+                    offset = child.1.patch_rule(child.0, string, offset, length)?;
                 }
             }
             offset -= self.with_rule(k, |r| (r.next.as_ref().unwrap().0)).unwrap()
@@ -169,14 +207,16 @@ impl SharedPosition {
         Ok(offset)
     }
 
-    pub fn parse(&self, func: impl Fn(Tracker) -> IResult) -> Result<(), ()> {
-        func(Tracker {
+    pub fn parse(&self, string: &str, offset: usize, length: usize) {
+        let kind = self.best_kind();
+        self.patch_rule(kind, string, offset, length).unwrap_err();
+        expr(Tracker {
             pos: self.clone(),
             offset: 0,
             children: &Default::default(),
             length: &Default::default(),
-        })?;
-        Ok(())
+        })
+        .unwrap();
     }
 }
 

@@ -1,12 +1,13 @@
 use crate::{
     lexer::Lexem as L,
-    packrat::{
-        alt, many0, many1, many2, opt, pair, rule, separated, tag, IResult, RuleKind, Tracker,
-    },
+    packrat::{alt, many2, opt, pair, rule, separated, tag, IResult, RuleKind, Tracker},
 };
 
 pub fn expr(t: Tracker) -> IResult {
-    rule(RuleKind::Expr, pair(app, opt(alt(astmt, alt(ite, stmt)))))(t)
+    alt(
+        rule(RuleKind::Expr, pair(app, alt(ite, astmt))),
+        alt(stmt, app),
+    )(t)
 }
 
 fn astmt(mut t: Tracker) -> IResult {
@@ -26,8 +27,8 @@ fn ite(mut t: Tracker) -> IResult {
 fn stmt(t: Tracker) -> IResult {
     rule(RuleKind::Stmt, |mut t| {
         t = alt(
-            pair(many1(pair(tag(L::MultiAssign), app)), opt(tag(L::NewLine))),
-            tag(L::NewLine),
+            pair(separated(tag(L::MultiAssign), app), opt(tag(L::NewLine))),
+            pair(app, tag(L::NewLine)),
         )(t)?;
         expr(t)
     })(t)
@@ -114,8 +115,7 @@ mod tests {
     macro_rules! test_expr {
         ($s:literal) => {
             let pos = SharedPosition::new();
-            pos.patch(None, $s, 0, 0).unwrap_err();
-            assert!(pos.parse(expr).is_ok())
+            pos.parse($s, 0, 0);
         };
     }
 
