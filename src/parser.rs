@@ -4,11 +4,10 @@ use crate::{
 };
 
 pub fn expr(t: Tracker) -> IResult {
-    rule(RuleKind::Expr, alt(astmt, alt(ite, alt(stmt, app))))(t)
+    rule(RuleKind::Expr, pair(app, opt(alt(astmt, alt(ite, stmt)))))(t)
 }
 
 fn astmt(mut t: Tracker) -> IResult {
-    t = app(t)?;
     t = tag(L::Assign)(t)?;
     t = app(t)?;
     t = opt(tag(L::NewLine))(t)?;
@@ -16,7 +15,6 @@ fn astmt(mut t: Tracker) -> IResult {
 }
 
 fn ite(mut t: Tracker) -> IResult {
-    t = app(t)?;
     t = tag(L::Ite)(t)?;
     t = app(t)?;
     t = opt(tag(L::NewLine))(t)?;
@@ -25,7 +23,6 @@ fn ite(mut t: Tracker) -> IResult {
 
 fn stmt(t: Tracker) -> IResult {
     rule(RuleKind::Stmt, |mut t| {
-        t = app(t)?;
         t = alt(
             pair(many1(pair(tag(L::MultiAssign), app)), opt(tag(L::NewLine))),
             tag(L::NewLine),
@@ -35,7 +32,7 @@ fn stmt(t: Tracker) -> IResult {
 }
 
 fn app(t: Tracker) -> IResult {
-    rule(RuleKind::App, many0(func))(t)
+    rule(RuleKind::App, many1(func))(t)
 }
 
 fn func(t: Tracker) -> IResult {
@@ -54,13 +51,9 @@ fn op1(t: Tracker) -> IResult {
     rule(
         RuleKind::Op1,
         separated(
-            alt(
-                alt(tag(L::Equals), tag(L::UnEquals)),
-                alt(
-                    alt(tag(L::Less), tag(L::Greater)),
-                    alt(tag(L::GreaterEqual), tag(L::LessEqual)),
-                ),
-            ),
+            tag(L::Equals | L::UnEquals | L::Less | L::Greater | {
+                L::GreaterEqual | L::LessEqual
+            }),
             op2,
         ),
     )(t)
@@ -70,10 +63,7 @@ fn op2(t: Tracker) -> IResult {
     rule(
         RuleKind::Op2,
         separated(
-            alt(
-                alt(tag(L::Plus), tag(L::Minus)),
-                alt(tag(L::BitOr), alt(tag(L::BitShl), tag(L::BitShr))),
-            ),
+            tag(L::Plus | L::Minus | L::BitOr | L::BitShl | L::BitShr),
             op3,
         ),
     )(t)
@@ -82,29 +72,25 @@ fn op2(t: Tracker) -> IResult {
 fn op3(t: Tracker) -> IResult {
     rule(
         RuleKind::Op3,
-        separated(
-            alt(
-                alt(tag(L::Mul), tag(L::Div)),
-                alt(tag(L::Mod), tag(L::BitAnd)),
-            ),
-            term,
-        ),
+        separated(tag(L::Mul | L::Div | L::Mod | L::BitAnd), term),
     )(t)
 }
 
 fn term(t: Tracker) -> IResult {
-    opt(alt(alt(tag(L::Num), tag(L::Ident)), alt(block, tuple)))(t)
+    opt(alt(tag(L::Num | L::Ident), alt(block, tuple)))(t)
 }
 
 fn block(mut t: Tracker) -> IResult {
     t = tag(L::LBrace)(t)?;
     t = stmt(t)?;
+    // t = many0(tag(L::RCurlyBrace))(t)?;
     opt(tag(L::RBrace))(t)
 }
 
 fn tuple(mut t: Tracker) -> IResult {
     t = tag(L::LCurlyBrace)(t)?;
     t = app(t)?;
+    // t = many0(tag(L::LBrace))(t)?;
     opt(tag(L::RCurlyBrace))(t)
 }
 

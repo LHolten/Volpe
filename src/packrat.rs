@@ -199,11 +199,11 @@ impl<'t> Tracker<'t> {
     }
 }
 
-pub fn tag(kind: Lexem) -> impl Fn(Tracker) -> IResult {
+pub fn tag(kind: impl Into<usize> + Copy) -> impl Fn(Tracker) -> IResult {
     move |mut t: Tracker| {
         t.add_child(None, t.pos.clone());
         t.update_length(t.pos.len());
-        if t.pos.kind() == kind {
+        if 1 << t.pos.kind() as usize & kind.into() != 0 {
             t.offset += t.pos.len();
             t.pos = t.pos.next();
             Ok(t)
@@ -270,7 +270,14 @@ pub fn separated(
 }
 
 pub fn many1(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
-    move |t| pair(&f, many0(&f))(t)
+    move |t| {
+        let new_t = f(t.clone())?;
+        if new_t.offset == t.offset {
+            Ok(new_t)
+        } else {
+            many0(&f)(new_t)
+        }
+    }
 }
 
 pub fn many0(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {

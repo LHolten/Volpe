@@ -1,3 +1,5 @@
+use std::ops::BitOr;
+
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq, Clone, Copy)]
@@ -94,6 +96,28 @@ pub enum Lexem {
     Error,
 
     End,
+}
+
+impl BitOr<Lexem> for Lexem {
+    type Output = usize;
+
+    fn bitor(self, rhs: Lexem) -> Self::Output {
+        usize::from(self) | rhs
+    }
+}
+
+impl BitOr<Lexem> for usize {
+    type Output = usize;
+
+    fn bitor(self, rhs: Lexem) -> Self::Output {
+        self | usize::from(rhs)
+    }
+}
+
+impl From<Lexem> for usize {
+    fn from(val: Lexem) -> Self {
+        1 << val as usize
+    }
 }
 
 impl Default for Lexem {
