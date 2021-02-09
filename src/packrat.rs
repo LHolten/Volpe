@@ -48,7 +48,7 @@ impl Debug for RuleRef {
 #[derive(Default, Clone)]
 pub struct SharedPosition(Rc<Cell<Position>>);
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Position {
     lexem: String, // white space and unknown in front
     kind: Lexem,
@@ -88,19 +88,20 @@ impl From<usize> for RuleKind {
 
 impl Debug for SharedPosition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // self.with_pos(|pos| {
+        //     f.write_str(&pos.lexem).unwrap();
+        //     if let Some(next) = pos.next.as_ref() {
+        //         next.fmt(f)
+        //     } else {
+        //         Ok(())
+        //     }
+        // })
         let kind = self.best_kind();
         RuleRef(kind, self.clone()).fmt(f)
     }
 }
 
 impl SharedPosition {
-    pub fn new() -> Self {
-        Self(Rc::new(Cell::new(Position {
-            lexem: " ".to_string(),
-            ..Default::default()
-        })))
-    }
-
     fn with_pos<R>(&self, f: impl FnOnce(&mut Position) -> R) -> R {
         let mut pos = self.0.replace(Position::default());
         let res = f(&mut pos);
@@ -168,20 +169,22 @@ impl SharedPosition {
             if len >= offset {
                 let first_overlap = len - offset;
                 let mut last = self.clone();
-                let mut last_offset = 0;
+                let mut last_len = 0;
                 loop {
-                    last_offset += last.len();
-                    if last_offset > offset + length {
+                    last_len += last.len();
+                    if last_len > offset + length || last.kind() == Lexem::End {
+                        assert!(last_len >= offset + length);
                         break;
                     }
                     last = last.next();
                 }
-                let last_overlap = last_offset - offset - length;
+                let last_extra = last_len - offset - length;
+                let last_internal = last.with_pos(|pos| pos.clone());
 
                 let mut input = String::default();
                 self.with_pos(|pos| input.push_str(&pos.lexem[..pos.lexem.len() - first_overlap]));
                 input.push_str(string);
-                last.with_pos(|pos| input.push_str(&pos.lexem[last_overlap..]));
+                last.with_pos(|pos| input.push_str(&pos.lexem[pos.lexem.len() - last_extra..]));
 
                 let mut buffer = String::default();
                 let mut lex = Lexem::lexer(&input);
@@ -199,7 +202,15 @@ impl SharedPosition {
                         current = temp;
                     }
                 }
-                current.with_pos(|pos| pos.next = Some(last.next()));
+                if last_internal.kind == Lexem::End {
+                    current.0.set(Position {
+                        lexem: buffer,
+                        ..Default::default()
+                    });
+                } else {
+                    assert!(buffer.is_empty());
+                    current.0.swap(&last_internal.next.unwrap().0);
+                }
                 return Err(());
             }
             offset -= len;

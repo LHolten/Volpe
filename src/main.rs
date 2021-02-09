@@ -13,7 +13,8 @@ mod state;
 mod tree;
 
 fn main() {
-    let pos = SharedPosition::new();
-    pos.parse("alpha + beta", 0, 0);
+    let pos = SharedPosition::default();
+    pos.parse("hello world", 0, 0);
+    pos.parse(" +", 5, 0);
     dbg!(pos);
 }

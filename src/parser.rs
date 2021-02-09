@@ -110,11 +110,9 @@ fn tuple(mut t: Tracker) -> IResult {
 mod tests {
     use crate::packrat::SharedPosition;
 
-    use super::expr;
-
     macro_rules! test_expr {
         ($s:literal) => {
-            let pos = SharedPosition::new();
+            let pos = SharedPosition::default();
             pos.parse($s, 0, 0);
         };
     }
