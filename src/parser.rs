@@ -32,47 +32,56 @@ fn stmt(t: Tracker) -> IResult {
 }
 
 fn app(t: Tracker) -> IResult {
-    rule(RuleKind::App, many1(func))(t)
+    rule(RuleKind::App, many1(pair(term, func)))(t)
 }
 
 fn func(t: Tracker) -> IResult {
-    rule(RuleKind::Func, separated(tag(L::Func), or))(t)
+    alt(rule(RuleKind::Func, many1(pair(tag(L::Func), or))), or)(t)
 }
 
 fn or(t: Tracker) -> IResult {
-    rule(RuleKind::Or, separated(tag(L::Or), and))(t)
+    alt(rule(RuleKind::Or, many1(pair(tag(L::Or), and))), and)(t)
 }
 
 fn and(t: Tracker) -> IResult {
-    rule(RuleKind::And, separated(tag(L::And), op1))(t)
+    alt(rule(RuleKind::And, many1(pair(tag(L::And), op1))), op1)(t)
 }
 
 fn op1(t: Tracker) -> IResult {
-    rule(
-        RuleKind::Op1,
-        separated(
-            tag(L::Equals | L::UnEquals | L::Less | L::Greater | {
-                L::GreaterEqual | L::LessEqual
-            }),
-            op2,
+    alt(
+        rule(
+            RuleKind::Op1,
+            many1(pair(
+                tag(L::Equals | L::UnEquals | L::Less | L::Greater | {
+                    L::GreaterEqual | L::LessEqual
+                }),
+                op2,
+            )),
         ),
+        op2,
     )(t)
 }
 
 fn op2(t: Tracker) -> IResult {
-    rule(
-        RuleKind::Op2,
-        separated(
-            tag(L::Plus | L::Minus | L::BitOr | L::BitShl | L::BitShr),
-            op3,
+    alt(
+        rule(
+            RuleKind::Op2,
+            many1(pair(
+                tag(L::Plus | L::Minus | L::BitOr | L::BitShl | L::BitShr),
+                op3,
+            )),
         ),
+        op3,
     )(t)
 }
 
 fn op3(t: Tracker) -> IResult {
-    rule(
-        RuleKind::Op3,
-        separated(tag(L::Mul | L::Div | L::Mod | L::BitAnd), term),
+    alt(
+        rule(
+            RuleKind::Op3,
+            many1(pair(tag(L::Mul | L::Div | L::Mod | L::BitAnd), term)),
+        ),
+        term,
     )(t)
 }
 
