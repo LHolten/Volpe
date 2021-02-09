@@ -1,6 +1,8 @@
 use crate::{
     lexer::Lexem as L,
-    packrat::{alt, many0, many1, opt, pair, rule, separated, tag, IResult, RuleKind, Tracker},
+    packrat::{
+        alt, many0, many1, many2, opt, pair, rule, separated, tag, IResult, RuleKind, Tracker,
+    },
 };
 
 pub fn expr(t: Tracker) -> IResult {
@@ -32,31 +34,31 @@ fn stmt(t: Tracker) -> IResult {
 }
 
 fn app(t: Tracker) -> IResult {
-    rule(RuleKind::App, many1(pair(term, func)))(t)
+    alt(rule(RuleKind::App, many2(func)), func)(t)
 }
 
 fn func(t: Tracker) -> IResult {
-    alt(rule(RuleKind::Func, many1(pair(tag(L::Func), or))), or)(t)
+    alt(rule(RuleKind::Func, separated(tag(L::Func), or)), or)(t)
 }
 
 fn or(t: Tracker) -> IResult {
-    alt(rule(RuleKind::Or, many1(pair(tag(L::Or), and))), and)(t)
+    alt(rule(RuleKind::Or, separated(tag(L::Or), and)), and)(t)
 }
 
 fn and(t: Tracker) -> IResult {
-    alt(rule(RuleKind::And, many1(pair(tag(L::And), op1))), op1)(t)
+    alt(rule(RuleKind::And, separated(tag(L::And), op1)), op1)(t)
 }
 
 fn op1(t: Tracker) -> IResult {
     alt(
         rule(
             RuleKind::Op1,
-            many1(pair(
+            separated(
                 tag(L::Equals | L::UnEquals | L::Less | L::Greater | {
                     L::GreaterEqual | L::LessEqual
                 }),
                 op2,
-            )),
+            ),
         ),
         op2,
     )(t)
@@ -66,10 +68,10 @@ fn op2(t: Tracker) -> IResult {
     alt(
         rule(
             RuleKind::Op2,
-            many1(pair(
+            separated(
                 tag(L::Plus | L::Minus | L::BitOr | L::BitShl | L::BitShr),
                 op3,
-            )),
+            ),
         ),
         op3,
     )(t)
@@ -79,7 +81,7 @@ fn op3(t: Tracker) -> IResult {
     alt(
         rule(
             RuleKind::Op3,
-            many1(pair(tag(L::Mul | L::Div | L::Mod | L::BitAnd), term)),
+            separated(tag(L::Mul | L::Div | L::Mod | L::BitAnd), term),
         ),
         term,
     )(t)

@@ -268,14 +268,25 @@ pub fn separated(
     symbol: impl Fn(Tracker) -> IResult,
     next: impl Fn(Tracker) -> IResult,
 ) -> impl Fn(Tracker) -> IResult {
-    move |t| many0(pair(&symbol, &next))(next(t)?)
+    move |t| many1(pair(&symbol, &next))(next(t)?)
+}
+
+pub fn many2(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
+    move |t| {
+        let new_t = f(t.clone())?;
+        if new_t.offset == t.offset {
+            Err(())
+        } else {
+            many1(&f)(new_t)
+        }
+    }
 }
 
 pub fn many1(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
     move |t| {
         let new_t = f(t.clone())?;
         if new_t.offset == t.offset {
-            Ok(new_t)
+            Err(())
         } else {
             many0(&f)(new_t)
         }
