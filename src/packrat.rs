@@ -263,51 +263,44 @@ pub fn tag(kind: impl Into<usize> + Copy) -> impl Fn(Tracker) -> IResult {
 }
 
 pub fn rule(kind: RuleKind, f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
-    move |t: Tracker| {
-        t.pos
-            .with(|p| p.rules[kind as usize].upgrade())
-            .map_or_else(
-                || {
-                    let mut t = t.clone();
-                    let t2 = Tracker {
-                        offset: 0,
-                        pos: t.pos,
-                        children: &Cell::new(Vec::new()),
-                        length: &Cell::new(0),
-                    };
-                    let success = f(t2.clone()).ok().map(|t3| (t3.offset, t3.pos, kind));
-                    let rule = Rc::new(Cell::new(Rule {
-                        length: t2.length.get(),
-                        children: t2.children.replace(Vec::new()),
-                        success: success.clone(),
-                    }));
-                    t.pos = t2.pos;
-                    t.pos
-                        .with(|p| p.rules[kind as usize] = Rc::downgrade(&rule));
-                    t.add_child(Syntax::Rule(rule));
-                    t.update_length(t2.length.get());
-                    if let Some((offset, pos, _)) = success {
-                        t.offset += offset;
-                        t.pos = pos;
-                        Ok(t)
-                    } else {
-                        Err(())
-                    }
-                },
-                |rule| {
-                    rule.with(|r| t.update_length(r.length));
-                    let next = rule.with(|r| r.success.clone());
-                    t.add_child(Syntax::Rule(rule));
-                    if let Some(next) = next {
-                        let mut t = t.clone();
-                        t.offset += next.0;
-                        t.pos = next.1;
-                        Ok(t)
-                    } else {
-                        Err(())
-                    }
-                },
-            )
+    move |mut t: Tracker| {
+        if let Some(rule) = t.pos.with(|p| p.rules[kind as usize].upgrade()) {
+            rule.with(|r| t.update_length(r.length));
+            let success = rule.with(|r| r.success.clone());
+            t.add_child(Syntax::Rule(rule));
+            if let Some((offset, pos, _)) = success {
+                t.offset += offset;
+                t.pos = pos;
+                Ok(t)
+            } else {
+                Err(())
+            }
+        } else {
+            let t2 = Tracker {
+                offset: 0,
+                pos: t.pos,
+                children: &Cell::new(Vec::new()),
+                length: &Cell::new(0),
+            };
+            let success = f(t2.clone()).ok().map(|t3| (t3.offset, t3.pos, kind));
+            let rule = Rc::new(Cell::new(Rule {
+                length: t2.length.get(),
+                children: t2.children.replace(Vec::new()),
+                success: success.clone(),
+            }));
+            t.pos = t2.pos;
+            t.pos
+                .with(|p| p.rules[kind as usize] = Rc::downgrade(&rule));
+            t.add_child(Syntax::Rule(rule));
+            t.update_length(t2.length.get());
+            if let Some((offset, pos, _)) = success {
+                t.offset += offset;
+                t.pos = pos;
+                Ok(t)
+            } else {
+                Err(())
+            }
+        }
     }
 }
 

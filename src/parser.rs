@@ -1,6 +1,6 @@
 use crate::{
     lexer::Lexem as L,
-    packrat::{alt, many2, opt, pair, rule, separated, tag, IResult, RuleKind, Tracker},
+    packrat::{alt, many1, many2, opt, pair, rule, separated, tag, IResult, RuleKind, Tracker},
 };
 
 pub fn expr(t: Tracker) -> IResult {
@@ -26,10 +26,12 @@ fn ite(mut t: Tracker) -> IResult {
 
 fn stmt(t: Tracker) -> IResult {
     rule(RuleKind::Stmt, |mut t| {
-        t = alt(
-            pair(separated(tag(L::MultiAssign), app), opt(tag(L::NewLine))),
-            pair(app, tag(L::NewLine)),
-        )(t)?;
+        t = app(t)?;
+        t = if let Ok(t) = many1(pair(tag(L::MultiAssign), app))(t.clone()) {
+            opt(tag(L::NewLine))(t)?
+        } else {
+            tag(L::NewLine)(t)?
+        };
         expr(t)
     })(t)
 }
@@ -94,7 +96,7 @@ fn term(t: Tracker) -> IResult {
 
 fn block(mut t: Tracker) -> IResult {
     t = tag(L::LBrace)(t)?;
-    t = stmt(t)?;
+    t = expr(t)?;
     opt(tag(L::RBrace))(t)
 }
 
