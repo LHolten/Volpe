@@ -95,24 +95,22 @@ fn term(t: Tracker) -> IResult {
 fn block(mut t: Tracker) -> IResult {
     t = tag(L::LBrace)(t)?;
     t = stmt(t)?;
-    // t = many0(tag(L::RCurlyBrace))(t)?;
     opt(tag(L::RBrace))(t)
 }
 
 fn tuple(mut t: Tracker) -> IResult {
     t = tag(L::LCurlyBrace)(t)?;
     t = app(t)?;
-    // t = many0(tag(L::LBrace))(t)?;
     opt(tag(L::RCurlyBrace))(t)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::packrat::SharedPosition;
+    use crate::packrat::Syntax;
 
     macro_rules! test_expr {
         ($s:literal) => {
-            let pos = SharedPosition::default();
+            let pos = Syntax::default();
             pos.parse($s, 0, 0);
         };
     }

@@ -1,4 +1,4 @@
-use crate::packrat::SharedPosition;
+use crate::packrat::Syntax;
 
 extern crate logos;
 extern crate typed_arena;
@@ -13,8 +13,11 @@ mod state;
 mod tree;
 
 fn main() {
-    let pos = SharedPosition::default();
-    pos.parse("hello world", 0, 0);
-    pos.parse(" +", 5, 0);
-    dbg!(pos);
+    let pos = Syntax::default();
+    let pos = pos.parse("2 + 3", 0, 0);
+    dbg!(&pos);
+    dbg!(pos.text());
+    let pos = pos.parse("1 / ", 4, 0);
+    dbg!(&pos);
+    dbg!(pos.text());
 }

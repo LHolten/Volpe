@@ -1,59 +1,52 @@
-use std::{cell::Cell, fmt::Debug, mem::take, rc::Rc};
+use std::{
+    cell::Cell,
+    fmt::Debug,
+    mem::take,
+    rc::{Rc, Weak},
+};
 
 use crate::logos::Logos;
 use crate::{lexer::Lexem, parser::expr};
 
 pub type IResult<'t> = Result<Tracker<'t>, ()>;
 
-#[derive(Clone)]
-struct Rule {
+#[derive(Clone, Default)]
+pub struct Rule {
     length: usize,
-    children: Vec<RuleRef>,
-    next: Option<(usize, SharedPosition)>,
+    children: Vec<Syntax>,
+    success: Option<(usize, Rc<Cell<Position>>, RuleKind)>,
 }
 
-#[derive(Clone)]
-pub struct RuleRef(pub Option<RuleKind>, pub SharedPosition);
-
-impl RuleRef {
-    fn is_succes(&self) -> bool {
-        self.0.is_none()
-            || self
-                .1
-                .with_rule(self.0.unwrap(), |r| {
-                    r.next.is_some() && r.next.as_ref().unwrap().0 != 0
-                })
-                .unwrap()
-    }
+#[derive(Default, Clone)]
+pub struct Position {
+    lexem: String, // white space and unknown in front
+    kind: Lexem,
+    rules: [Weak<Cell<Rule>>; 9],
+    next: Weak<Cell<Position>>,
 }
 
-impl Debug for RuleRef {
+impl Debug for Position {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(kind) = self.0 {
-            f.write_str(&format!("{:?}", kind))?;
-            self.1
-                .clone_rule(kind)
-                .unwrap()
-                .children
-                .into_iter()
-                .filter(RuleRef::is_succes)
-                .collect::<Vec<RuleRef>>()
-                .fmt(f)
+        f.write_str(&self.lexem)?;
+        if let Some(next) = self.next.upgrade() {
+            next.with(|n| n.fmt(f))
         } else {
-            self.1.with_pos(|pos| pos.lexem.fmt(f))
+            Ok(())
         }
     }
 }
 
-#[derive(Default, Clone)]
-pub struct SharedPosition(Rc<Cell<Position>>);
+trait WithInternal<T> {
+    fn with<R>(&self, func: impl FnOnce(&mut T) -> R) -> R;
+}
 
-#[derive(Default, Clone)]
-struct Position {
-    lexem: String, // white space and unknown in front
-    kind: Lexem,
-    rules: [Option<Rule>; 9],
-    next: Option<SharedPosition>,
+impl<T: Default> WithInternal<T> for Cell<T> {
+    fn with<R>(&self, func: impl FnOnce(&mut T) -> R) -> R {
+        let mut temp = self.replace(T::default());
+        let res = func(&mut temp);
+        self.set(temp);
+        res
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -69,181 +62,182 @@ pub enum RuleKind {
     Op3,
 }
 
-impl From<usize> for RuleKind {
-    fn from(val: usize) -> Self {
-        match val {
-            v if v == RuleKind::Expr as usize => RuleKind::Expr,
-            v if v == RuleKind::Stmt as usize => RuleKind::Stmt,
-            v if v == RuleKind::App as usize => RuleKind::App,
-            v if v == RuleKind::Func as usize => RuleKind::Func,
-            v if v == RuleKind::Or as usize => RuleKind::Or,
-            v if v == RuleKind::And as usize => RuleKind::And,
-            v if v == RuleKind::Op1 as usize => RuleKind::Op1,
-            v if v == RuleKind::Op2 as usize => RuleKind::Op2,
-            v if v == RuleKind::Op3 as usize => RuleKind::Op3,
-            _ => unimplemented!(),
+#[derive(Clone)]
+pub enum Syntax {
+    Lexem(Rc<Cell<Position>>, bool),
+    Rule(Rc<Cell<Rule>>),
+}
+
+impl Debug for Syntax {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Syntax::Lexem(pos, _) => pos.with(|p| p.lexem.fmt(f)),
+            Syntax::Rule(rule) => {
+                let kind = rule.with(|r| r.success.as_ref().unwrap().2);
+                f.write_str(&format!("{:?}", kind))?;
+                let children = rule.with(|r| r.children.clone());
+                children
+                    .into_iter()
+                    .filter(Syntax::is_success)
+                    .collect::<Vec<Syntax>>()
+                    .fmt(f)
+            }
         }
     }
 }
 
-impl Debug for SharedPosition {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // self.with_pos(|pos| {
-        //     f.write_str(&pos.lexem).unwrap();
-        //     if let Some(next) = pos.next.as_ref() {
-        //         next.fmt(f)
-        //     } else {
-        //         Ok(())
-        //     }
-        // })
-        let kind = self.best_kind();
-        RuleRef(kind, self.clone()).fmt(f)
+impl Default for Syntax {
+    fn default() -> Self {
+        Self::Lexem(Default::default(), false)
     }
 }
 
-impl SharedPosition {
-    fn with_pos<R>(&self, f: impl FnOnce(&mut Position) -> R) -> R {
-        let mut pos = self.0.replace(Position::default());
-        let res = f(&mut pos);
-        self.0.set(pos);
-        res
+impl Syntax {
+    fn is_success(&self) -> bool {
+        match self {
+            Syntax::Lexem(_, success) => *success,
+            Syntax::Rule(rule) => rule.with(|r| r.success.is_some()),
+        }
     }
 
-    fn with_rule<R>(&self, kind: RuleKind, f: impl FnOnce(&Rule) -> R) -> Option<R> {
-        self.with_pos(|pos| pos.rules[kind as usize].as_ref().map(f))
+    fn len(&self) -> (usize, usize) {
+        match self {
+            Syntax::Lexem(pos, _) => pos.with(|p| (p.lexem.len(), p.lexem.len())),
+            Syntax::Rule(rule) => rule.with(|r| (r.success.as_ref().map_or(0, |v| v.0), r.length)),
+        }
     }
 
-    fn update(&self, kind: RuleKind, rule: Rule) {
-        self.with_pos(|pos| pos.rules[kind as usize] = Some(rule))
-    }
-
-    fn len(&self) -> usize {
-        self.with_pos(|pos| pos.lexem.len())
-    }
-
-    fn next(&self) -> Self {
-        self.with_pos(|pos| pos.next.as_ref().unwrap().clone())
-    }
-
-    fn kind(&self) -> Lexem {
-        self.with_pos(|pos| pos.kind)
-    }
-
-    fn clone_rule(&self, kind: RuleKind) -> Option<Rule> {
-        self.with_pos(|pos| pos.rules[kind as usize].clone())
-    }
-
-    fn best_kind(&self) -> Option<RuleKind> {
-        self.with_pos(|pos| {
-            (0..9)
-                .find(|k| {
-                    if let Some(rule) = pos.rules[*k].as_ref() {
-                        rule.next.is_some()
-                    } else {
-                        false
-                    }
-                })
-                .map(RuleKind::from)
-        })
+    fn get_pos(&self) -> Rc<Cell<Position>> {
+        match self {
+            Syntax::Lexem(pos, _) => pos.clone(),
+            Syntax::Rule(rule) => rule.with(|r| r.children[0].get_pos()),
+        }
     }
 
     fn patch_rule(
         &self,
-        kind: Option<RuleKind>,
+        safe: &mut Vec<Syntax>,
         string: &str,
         mut offset: usize,
-        length: usize,
-    ) -> Result<usize, ()> {
-        if let Some(k) = kind {
-            let len = self.with_rule(k, |r| r.length).unwrap();
-            if len > offset {
-                let rule = self.with_pos(|pos| pos.rules[k as usize].take().unwrap());
+        mut length: usize,
+        mut done: bool,
+    ) -> bool {
+        match self {
+            Syntax::Rule(rule) => rule.with(|rule| {
+                let mut child_iter = take(&mut rule.children).into_iter();
+                while let Some(child) = child_iter.next() {
+                    let (mut len, reach) = child.len();
 
-                for child in rule.children {
-                    offset = child.1.patch_rule(child.0, string, offset, length)?;
+                    if reach >= offset {
+                        done = child.patch_rule(safe, string, offset, length, done)
+                    } else {
+                        safe.push(child);
+                    }
+
+                    if len > offset {
+                        len -= offset;
+                        if len > length {
+                            break;
+                        } else {
+                            length -= len;
+                        }
+                        offset = 0;
+                    } else {
+                        offset -= len;
+                    }
                 }
-            }
-            offset -= self.with_rule(k, |r| (r.next.as_ref().unwrap().0)).unwrap()
-        } else {
-            let len = self.len();
-            if len >= offset {
+                safe.extend(child_iter);
+                done
+            }),
+            Syntax::Lexem(pos, _) if !done => {
+                let len = pos.with(|p| p.lexem.len());
                 let first_overlap = len - offset;
-                let mut last = self.clone();
+                let mut last = pos.clone();
                 let mut last_len = 0;
                 loop {
-                    last_len += last.len();
-                    if last_len > offset + length || last.kind() == Lexem::End {
+                    last_len += last.with(|p| p.lexem.len());
+                    let next = last.with(|p| p.next.upgrade());
+                    if last_len > offset + length || next.is_none() {
                         assert!(last_len >= offset + length);
                         break;
                     }
-                    last = last.next();
+                    last = next.unwrap();
                 }
                 let last_extra = last_len - offset - length;
-                let last_internal = last.with_pos(|pos| pos.clone());
 
                 let mut input = String::default();
-                self.with_pos(|pos| input.push_str(&pos.lexem[..pos.lexem.len() - first_overlap]));
+                pos.with(|p| input.push_str(&p.lexem[..p.lexem.len() - first_overlap]));
                 input.push_str(string);
-                last.with_pos(|pos| input.push_str(&pos.lexem[pos.lexem.len() - last_extra..]));
+                last.with(|p| input.push_str(&p.lexem[p.lexem.len() - last_extra..]));
+
+                let last_internal = last.replace(Position::default()); //keep this from being overwritten
 
                 let mut buffer = String::default();
                 let mut lex = Lexem::lexer(&input);
-                let mut current = self.clone();
+                let mut current = pos.clone();
+                safe.push(Syntax::Lexem(pos.clone(), false));
                 while let Some(val) = lex.next() {
                     buffer.push_str(lex.slice());
                     if val != Lexem::Error {
-                        let temp = SharedPosition::default();
-                        current.0.set(Position {
+                        let temp = Default::default();
+                        current.set(Position {
                             lexem: take(&mut buffer),
                             kind: val,
-                            next: Some(temp.clone()),
+                            next: Rc::downgrade(&temp),
                             rules: Default::default(),
                         });
+                        safe.push(Syntax::Lexem(temp.clone(), false));
                         current = temp;
                     }
                 }
-                if last_internal.kind == Lexem::End {
-                    current.0.set(Position {
+
+                if let Some(next) = last_internal.next.upgrade() {
+                    assert!(buffer.is_empty());
+                    current.swap(&next);
+                } else {
+                    current.set(Position {
                         lexem: buffer,
                         ..Default::default()
                     });
-                } else {
-                    assert!(buffer.is_empty());
-                    current.0.swap(&last_internal.next.unwrap().0);
                 }
-                return Err(());
+                true
             }
-            offset -= len;
+            _ => done,
         }
-        Ok(offset)
     }
 
-    pub fn parse(&self, string: &str, offset: usize, length: usize) {
-        let kind = self.best_kind();
-        self.patch_rule(kind, string, offset, length).unwrap_err();
-        expr(Tracker {
-            pos: self.clone(),
+    pub fn parse(self, string: &str, offset: usize, length: usize) -> Syntax {
+        let pos = self.get_pos();
+        let mut safe = Vec::new();
+        self.patch_rule(&mut safe, string, offset, length, false);
+        let tracker = Tracker {
+            pos,
             offset: 0,
             children: &Default::default(),
             length: &Default::default(),
-        })
-        .unwrap();
+        };
+        drop(self);
+        expr(tracker.clone()).unwrap();
+        drop(safe);
+        tracker.children.with(|c| c.pop()).unwrap()
+    }
+
+    pub fn text(&self) -> String {
+        self.get_pos().with(|p| format!("{:?}", p))
     }
 }
 
 #[derive(Clone)]
 pub struct Tracker<'t> {
-    pos: SharedPosition,
+    pos: Rc<Cell<Position>>,
     offset: usize,
-    children: &'t Cell<Vec<RuleRef>>,
+    children: &'t Cell<Vec<Syntax>>,
     length: &'t Cell<usize>,
 }
 
 impl<'t> Tracker<'t> {
-    pub fn add_child(&self, kind: Option<RuleKind>, pos: SharedPosition) {
-        let mut children = self.children.replace(Vec::new());
-        children.push(RuleRef(kind, pos));
-        self.children.set(children)
+    pub fn add_child(&self, child: Syntax) {
+        self.children.with(|children| children.push(child));
     }
 
     pub fn update_length(&self, length: usize) {
@@ -254,64 +248,66 @@ impl<'t> Tracker<'t> {
 
 pub fn tag(kind: impl Into<usize> + Copy) -> impl Fn(Tracker) -> IResult {
     move |mut t: Tracker| {
-        t.add_child(None, t.pos.clone());
-        t.update_length(t.pos.len());
-        if 1 << t.pos.kind() as usize & kind.into() != 0 {
-            t.offset += t.pos.len();
-            t.pos = t.pos.next();
+        let length = t.pos.with(|p| p.lexem.len());
+        t.update_length(length);
+        if 1 << t.pos.with(|p| p.kind) as usize & kind.into() != 0 {
+            t.add_child(Syntax::Lexem(t.pos.clone(), true));
+            t.offset += length;
+            t.pos = t.pos.with(|p| p.next.upgrade().unwrap());
             Ok(t)
         } else {
+            t.add_child(Syntax::Lexem(t.pos.clone(), false));
             Err(())
         }
     }
 }
 
 pub fn rule(kind: RuleKind, f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
-    move |mut t: Tracker| {
-        t.add_child(Some(kind), t.pos.clone());
-        if let Some(res) = t.pos.with_rule(kind, |r| {
-            if let Some(next) = r.next.clone() {
-                (r.length, Some(next))
-            } else {
-                (r.length, None)
-            }
-        }) {
-            t.update_length(res.0);
-            if let Some(next) = res.1 {
-                t.offset += next.0;
-                t.pos = next.1;
-                Ok(t)
-            } else {
-                Err(())
-            }
-        } else {
-            let t2 = Tracker {
-                offset: 0,
-                pos: t.pos,
-                children: &Cell::new(Vec::new()),
-                length: &Cell::new(0),
-            };
-            let next = if let Ok(t3) = f(t2.clone()) {
-                Some((t3.offset, t3.pos))
-            } else {
-                None
-            };
-            let rule = Rule {
-                length: t2.length.get(),
-                children: t2.children.replace(Vec::new()),
-                next: next.clone(),
-            };
-            t.pos = t2.pos;
-            t.pos.update(kind, rule);
-            t.update_length(t2.length.get());
-            if let Some((offset, pos)) = next {
-                t.offset += offset;
-                t.pos = pos;
-                Ok(t)
-            } else {
-                Err(())
-            }
-        }
+    move |t: Tracker| {
+        t.pos
+            .with(|p| p.rules[kind as usize].upgrade())
+            .map_or_else(
+                || {
+                    let mut t = t.clone();
+                    let t2 = Tracker {
+                        offset: 0,
+                        pos: t.pos,
+                        children: &Cell::new(Vec::new()),
+                        length: &Cell::new(0),
+                    };
+                    let success = f(t2.clone()).ok().map(|t3| (t3.offset, t3.pos, kind));
+                    let rule = Rc::new(Cell::new(Rule {
+                        length: t2.length.get(),
+                        children: t2.children.replace(Vec::new()),
+                        success: success.clone(),
+                    }));
+                    t.pos = t2.pos;
+                    t.pos
+                        .with(|p| p.rules[kind as usize] = Rc::downgrade(&rule));
+                    t.add_child(Syntax::Rule(rule));
+                    t.update_length(t2.length.get());
+                    if let Some((offset, pos, _)) = success {
+                        t.offset += offset;
+                        t.pos = pos;
+                        Ok(t)
+                    } else {
+                        Err(())
+                    }
+                },
+                |rule| {
+                    rule.with(|r| t.update_length(r.length));
+                    let next = rule.with(|r| r.success.clone());
+                    t.add_child(Syntax::Rule(rule));
+                    if let Some(next) = next {
+                        let mut t = t.clone();
+                        t.offset += next.0;
+                        t.pos = next.1;
+                        Ok(t)
+                    } else {
+                        Err(())
+                    }
+                },
+            )
     }
 }
 
