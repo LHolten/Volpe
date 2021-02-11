@@ -73,8 +73,12 @@ impl Debug for Syntax {
         match self {
             Syntax::Lexem(pos, _) => pos.with(|p| p.lexem.fmt(f)),
             Syntax::Rule(rule) => {
-                let kind = rule.with(|r| r.success.as_ref().unwrap().2);
-                f.write_str(&format!("{:?}", kind))?;
+                let kind = rule.with(|r| {
+                    r.success
+                        .as_ref()
+                        .map_or(String::new(), |v| format!("{:?}", v.2))
+                });
+                f.write_str(&kind)?;
                 let children = rule.with(|r| r.children.clone());
                 children
                     .into_iter()
@@ -117,19 +121,19 @@ impl Syntax {
     fn patch_rule(
         &self,
         safe: &mut Vec<Syntax>,
-        string: &str,
         mut offset: usize,
         mut length: usize,
-        mut done: bool,
-    ) -> bool {
+    ) -> Option<(Rc<Cell<Position>>, usize, usize)> {
         match self {
             Syntax::Rule(rule) => rule.with(|rule| {
                 let mut child_iter = take(&mut rule.children).into_iter();
+                let mut res = None;
                 while let Some(child) = child_iter.next() {
                     let (mut len, reach) = child.len();
 
                     if reach >= offset {
-                        done = child.patch_rule(safe, string, offset, length, done)
+                        let new_res = child.patch_rule(safe, offset, length);
+                        res = res.or(new_res);
                     } else {
                         safe.push(child);
                     }
@@ -147,69 +151,79 @@ impl Syntax {
                     }
                 }
                 safe.extend(child_iter);
-                done
+                res
             }),
-            Syntax::Lexem(pos, _) if !done => {
-                let len = pos.with(|p| p.lexem.len());
-                let first_overlap = len - offset;
-                let mut last = pos.clone();
-                let mut last_len = 0;
-                loop {
-                    last_len += last.with(|p| p.lexem.len());
-                    let next = last.with(|p| p.next.upgrade());
-                    if last_len > offset + length || next.is_none() {
-                        assert!(last_len >= offset + length);
-                        break;
-                    }
-                    last = next.unwrap();
-                }
-                let last_extra = last_len - offset - length;
-
-                let mut input = String::default();
-                pos.with(|p| input.push_str(&p.lexem[..p.lexem.len() - first_overlap]));
-                input.push_str(string);
-                last.with(|p| input.push_str(&p.lexem[p.lexem.len() - last_extra..]));
-
-                let last_internal = last.replace(Position::default()); //keep this from being overwritten
-
-                let mut buffer = String::default();
-                let mut lex = Lexem::lexer(&input);
-                let mut current = pos.clone();
-                safe.push(Syntax::Lexem(pos.clone(), false));
-                while let Some(val) = lex.next() {
-                    buffer.push_str(lex.slice());
-                    if val != Lexem::Error {
-                        let temp = Default::default();
-                        current.set(Position {
-                            lexem: take(&mut buffer),
-                            kind: val,
-                            next: Rc::downgrade(&temp),
-                            rules: Default::default(),
-                        });
-                        safe.push(Syntax::Lexem(temp.clone(), false));
-                        current = temp;
-                    }
-                }
-
-                if let Some(next) = last_internal.next.upgrade() {
-                    assert!(buffer.is_empty());
-                    current.swap(&next);
-                } else {
-                    current.set(Position {
-                        lexem: buffer,
-                        ..Default::default()
-                    });
-                }
-                true
+            Syntax::Lexem(pos, _) => {
+                safe.push(self.clone());
+                Some((pos.clone(), offset, length))
             }
-            _ => done,
+        }
+    }
+
+    fn patch_lexem(
+        first: Rc<Cell<Position>>,
+        offset: usize,
+        length: usize,
+        string: &str,
+        safe: &mut Vec<Syntax>,
+    ) {
+        let first_len = first.with(|p| p.lexem.len());
+        let first_overlap = first_len - offset;
+        let mut last = first.clone();
+        let mut last_len = 0;
+        loop {
+            last_len += last.with(|p| p.lexem.len());
+            let next = last.with(|p| p.next.upgrade());
+            if last_len > offset + length || next.is_none() {
+                assert!(last_len >= offset + length);
+                break;
+            }
+            last = next.unwrap();
+        }
+        let last_extra = last_len - offset - length;
+
+        let mut input = String::default();
+        first.with(|p| input.push_str(&p.lexem[..p.lexem.len() - first_overlap]));
+        input.push_str(string);
+        last.with(|p| input.push_str(&p.lexem[p.lexem.len() - last_extra..]));
+
+        let last_internal = last.replace(Position::default()); //keep this from being overwritten
+
+        let mut buffer = String::default();
+        let mut lex = Lexem::lexer(&input);
+        safe.push(Syntax::Lexem(first.clone(), false));
+        let mut current = first;
+        while let Some(val) = lex.next() {
+            buffer.push_str(lex.slice());
+            if val != Lexem::Error {
+                let temp = Default::default();
+                current.set(Position {
+                    lexem: take(&mut buffer),
+                    kind: val,
+                    next: Rc::downgrade(&temp),
+                    rules: Default::default(),
+                });
+                safe.push(Syntax::Lexem(temp.clone(), false));
+                current = temp;
+            }
+        }
+
+        if let Some(next) = last_internal.next.upgrade() {
+            assert!(buffer.is_empty());
+            current.swap(&next);
+        } else {
+            current.set(Position {
+                lexem: buffer,
+                ..Default::default()
+            });
         }
     }
 
     pub fn parse(self, string: &str, offset: usize, length: usize) -> Syntax {
         let pos = self.get_pos();
         let mut safe = Vec::new();
-        self.patch_rule(&mut safe, string, offset, length, false);
+        let res = self.patch_rule(&mut safe, offset, length).unwrap();
+        Self::patch_lexem(res.0, res.1, res.2, string, &mut safe);
         let tracker = Tracker {
             pos,
             offset: 0,
@@ -219,7 +233,11 @@ impl Syntax {
         drop(self);
         expr(tracker.clone()).unwrap();
         drop(safe);
-        tracker.children.with(|c| c.pop()).unwrap()
+        Syntax::Rule(Rc::new(Cell::new(Rule {
+            length: tracker.length.get(),
+            children: tracker.children.replace(Default::default()),
+            success: None,
+        })))
     }
 
     pub fn text(&self) -> String {
