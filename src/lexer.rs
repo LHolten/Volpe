@@ -82,8 +82,8 @@ pub enum Lexem {
     #[token("}")]
     RCurlyBrace,
 
-    #[regex(r"[;\n]")]
-    NewLine,
+    #[regex(r";")]
+    Semicolon,
 
     #[regex("[_a-zA-Z][_a-zA-Z0-9]*")]
     Ident,
@@ -92,7 +92,7 @@ pub enum Lexem {
     Num,
 
     #[error]
-    #[regex(r"[ \t]+")]
+    #[regex(r"[ \t\n]+")]
     Error,
 
     End,

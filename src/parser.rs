@@ -13,14 +13,14 @@ pub fn expr(t: Tracker) -> IResult {
 fn astmt(mut t: Tracker) -> IResult {
     t = tag(L::Assign)(t)?;
     t = app(t)?;
-    t = opt(tag(L::NewLine))(t)?;
+    t = opt(tag(L::Semicolon))(t)?;
     expr(t)
 }
 
 fn ite(mut t: Tracker) -> IResult {
     t = tag(L::Ite)(t)?;
     t = app(t)?;
-    t = opt(tag(L::NewLine))(t)?;
+    t = opt(tag(L::Semicolon))(t)?;
     expr(t)
 }
 
@@ -28,9 +28,9 @@ fn stmt(t: Tracker) -> IResult {
     rule(RuleKind::Stmt, |mut t| {
         t = app(t)?;
         t = if let Ok(t) = many1(pair(tag(L::MultiAssign), app))(t.clone()) {
-            opt(tag(L::NewLine))(t)?
+            opt(tag(L::Semicolon))(t)?
         } else {
-            tag(L::NewLine)(t)?
+            tag(L::Semicolon)(t)?
         };
         expr(t)
     })(t)
