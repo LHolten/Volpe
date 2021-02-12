@@ -92,7 +92,7 @@ pub enum Lexem {
     Num,
 
     #[error]
-    #[regex(r"[ \t\n]+")]
+    #[regex(r"[\n]")]
     Error,
 
     End,

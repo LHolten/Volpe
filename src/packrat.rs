@@ -1,25 +1,27 @@
 use std::{
     cell::Cell,
+    cmp::max,
     fmt::Debug,
     mem::take,
     rc::{Rc, Weak},
 };
 
-use crate::logos::Logos;
 use crate::{lexer::Lexem, parser::expr};
+use crate::{logos::Logos, offset::Offset};
 
 pub type IResult<'t> = Result<Tracker<'t>, ()>;
 
 #[derive(Clone, Default)]
 pub struct Rule {
-    length: usize,
+    length: Offset,
     children: Vec<Syntax>,
-    success: Option<(usize, Rc<Cell<Position>>, RuleKind)>,
+    success: Option<(Offset, Rc<Cell<Position>>, RuleKind)>,
 }
 
 #[derive(Default, Clone)]
 pub struct Position {
     lexem: String, // white space and unknown in front
+    length: Offset,
     kind: Lexem,
     rules: [Weak<Cell<Rule>>; 9],
     next: Weak<Cell<Position>>,
@@ -104,12 +106,24 @@ impl Syntax {
         }
     }
 
-    fn len(&self) -> (usize, usize) {
+    fn len(&self) -> (Offset, Offset) {
         match self {
-            Syntax::Lexem(pos, success) => {
-                pos.with(|p| (if *success { p.lexem.len() } else { 0 }, p.lexem.len()))
-            }
-            Syntax::Rule(rule) => rule.with(|r| (r.success.as_ref().map_or(0, |v| v.0), r.length)),
+            Syntax::Lexem(pos, success) => pos.with(|p| {
+                (
+                    if *success {
+                        p.length
+                    } else {
+                        Offset::default()
+                    },
+                    p.length,
+                )
+            }),
+            Syntax::Rule(rule) => rule.with(|r| {
+                (
+                    r.success.as_ref().map_or(Offset::default(), |v| v.0),
+                    r.length,
+                )
+            }),
         }
     }
 
@@ -123,9 +137,9 @@ impl Syntax {
     fn patch_rule(
         &self,
         safe: &mut Vec<Syntax>,
-        mut offset: usize,
-        mut length: usize,
-    ) -> Option<(Rc<Cell<Position>>, usize, usize)> {
+        mut offset: Offset,
+        mut length: Offset,
+    ) -> Option<(Rc<Cell<Position>>, Offset, Offset)> {
         match self {
             Syntax::Rule(rule) => rule.with(|rule| {
                 let mut child_iter = take(&mut rule.children).into_iter();
@@ -147,7 +161,7 @@ impl Syntax {
                         } else {
                             length -= len;
                         }
-                        offset = 0;
+                        offset = Offset::default();
                     } else {
                         offset -= len;
                     }
@@ -164,39 +178,72 @@ impl Syntax {
 
     fn patch_lexem(
         first: Rc<Cell<Position>>,
-        offset: usize,
-        length: usize,
+        mut offset: Offset,
+        mut length: Offset,
         string: &str,
         safe: &mut Vec<Syntax>,
     ) {
-        let first_len = first.with(|p| p.lexem.len());
-        let first_overlap = first_len - offset;
-        let mut last = first.clone();
-        let mut last_len = 0;
-        loop {
-            last_len += last.with(|p| p.lexem.len());
-            let next = last.with(|p| p.next.upgrade());
-            if last_len > offset + length || next.is_none() {
-                assert!(last_len >= offset + length);
-                break;
-            }
-            last = next.unwrap();
-        }
-        let last_extra = last_len - offset - length;
+        length = offset + length;
 
         let mut input = String::default();
-        first.with(|p| input.push_str(&p.lexem[..p.lexem.len() - first_overlap]));
+        let first_str = first.with(|p| p.lexem.clone());
+        if offset < Offset::line() {
+            input.push_str(&first_str[..offset.char]);
+        } else {
+            for (i, c) in first_str.char_indices() {
+                if c == '\n' {
+                    offset -= Offset::line();
+                    if offset < Offset::line() {
+                        input.push_str(&first_str[..1 + i + offset.char]);
+                        break;
+                    }
+                }
+            }
+        }
+
         input.push_str(string);
-        last.with(|p| input.push_str(&p.lexem[p.lexem.len() - last_extra..]));
+
+        let mut last = first.clone();
+        loop {
+            let len = last.with(|p| p.length);
+            let next = last.with(|p| p.next.upgrade());
+            if len > length || next.is_none() {
+                assert!(len >= length);
+                break;
+            }
+            length -= len;
+            last = next.unwrap();
+        }
+
+        let last_str = last.with(|p| p.lexem.clone());
+        if length < Offset::line() {
+            input.push_str(&last_str[length.char..])
+        } else {
+            for (i, c) in last_str.char_indices() {
+                if c == '\n' {
+                    length -= Offset::line();
+                    if length < Offset::line() {
+                        input.push_str(&last_str[1 + i + length.char..]);
+                        break;
+                    }
+                }
+            }
+        }
 
         let last_internal = last.replace(Position::default()); //keep this from being overwritten
 
         let mut buffer = String::default();
+        let mut buffer_length = Offset::default();
         let mut lex = Lexem::lexer(&input);
         safe.push(Syntax::Lexem(first.clone(), false));
         let mut current = first;
         while let Some(val) = lex.next() {
             buffer.push_str(lex.slice());
+            buffer_length += if lex.slice() == "\n" {
+                Offset::line()
+            } else {
+                Offset::char(lex.slice().len())
+            };
             if val != Lexem::Error {
                 let mut temp = Default::default();
                 if lex.remainder().is_empty() {
@@ -206,6 +253,7 @@ impl Syntax {
                 };
                 current.set(Position {
                     lexem: take(&mut buffer),
+                    length: take(&mut buffer_length),
                     kind: val,
                     next: Rc::downgrade(&temp),
                     rules: Default::default(),
@@ -218,19 +266,19 @@ impl Syntax {
         if !buffer.is_empty() {
             current.set(Position {
                 lexem: buffer,
-                ..Default::default()
+                ..Position::default()
             });
         }
     }
 
-    pub fn parse(self, string: &str, offset: usize, length: usize) -> Syntax {
+    pub fn parse(self, string: &str, offset: Offset, length: Offset) -> Syntax {
         let pos = self.get_pos();
         let mut safe = Vec::new();
         let res = self.patch_rule(&mut safe, offset, length).unwrap();
         Self::patch_lexem(res.0, res.1, res.2, string, &mut safe);
         let tracker = Tracker {
             pos,
-            offset: 0,
+            offset: Offset::default(),
             children: &Default::default(),
             length: &Default::default(),
         };
@@ -252,9 +300,9 @@ impl Syntax {
 #[derive(Clone)]
 pub struct Tracker<'t> {
     pos: Rc<Cell<Position>>,
-    offset: usize,
+    offset: Offset,
     children: &'t Cell<Vec<Syntax>>,
-    length: &'t Cell<usize>,
+    length: &'t Cell<Offset>,
 }
 
 impl<'t> Tracker<'t> {
@@ -262,15 +310,15 @@ impl<'t> Tracker<'t> {
         self.children.with(|children| children.push(child));
     }
 
-    pub fn update_length(&self, length: usize) {
+    pub fn update_length(&self, length: Offset) {
         self.length
-            .set((self.offset + length).max(self.length.get()));
+            .set(max(self.offset + length, self.length.get()));
     }
 }
 
 pub fn tag(kind: impl Into<usize> + Copy) -> impl Fn(Tracker) -> IResult {
     move |mut t: Tracker| {
-        let length = t.pos.with(|p| p.lexem.len());
+        let length = t.pos.with(|p| p.length);
         t.update_length(length);
         if 1 << t.pos.with(|p| p.kind) as usize & kind.into() != 0 {
             t.add_child(Syntax::Lexem(t.pos.clone(), true));
@@ -299,10 +347,10 @@ pub fn rule(kind: RuleKind, f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) 
             }
         } else {
             let t2 = Tracker {
-                offset: 0,
                 pos: t.pos,
-                children: &Cell::new(Vec::new()),
-                length: &Cell::new(0),
+                offset: Offset::default(),
+                children: &Default::default(),
+                length: &Default::default(),
             };
             let success = f(t2.clone()).ok().map(|t3| (t3.offset, t3.pos, kind));
             let rule = Rc::new(Cell::new(Rule {

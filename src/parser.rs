@@ -108,12 +108,12 @@ fn tuple(mut t: Tracker) -> IResult {
 
 #[cfg(test)]
 mod tests {
-    use crate::packrat::Syntax;
+    use crate::{offset::Offset, packrat::Syntax};
 
     macro_rules! test_expr {
         ($s:literal) => {
             let pos = Syntax::default();
-            pos.parse($s, 0, 0);
+            pos.parse($s, Offset::default(), Offset::default());
         };
     }
 
