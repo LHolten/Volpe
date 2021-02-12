@@ -198,7 +198,12 @@ impl Syntax {
         while let Some(val) = lex.next() {
             buffer.push_str(lex.slice());
             if val != Lexem::Error {
-                let temp = Default::default();
+                let mut temp = Default::default();
+                if lex.remainder().is_empty() {
+                    if let Some(next) = last_internal.next.upgrade() {
+                        temp = next
+                    }
+                };
                 current.set(Position {
                     lexem: take(&mut buffer),
                     kind: val,
@@ -210,10 +215,7 @@ impl Syntax {
             }
         }
 
-        if let Some(next) = last_internal.next.upgrade() {
-            assert!(buffer.is_empty());
-            current.swap(&next);
-        } else {
+        if !buffer.is_empty() {
             current.set(Position {
                 lexem: buffer,
                 ..Default::default()
