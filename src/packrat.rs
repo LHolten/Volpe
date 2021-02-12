@@ -106,7 +106,9 @@ impl Syntax {
 
     fn len(&self) -> (usize, usize) {
         match self {
-            Syntax::Lexem(pos, _) => pos.with(|p| (p.lexem.len(), p.lexem.len())),
+            Syntax::Lexem(pos, success) => {
+                pos.with(|p| (if *success { p.lexem.len() } else { 0 }, p.lexem.len()))
+            }
             Syntax::Rule(rule) => rule.with(|r| (r.success.as_ref().map_or(0, |v| v.0), r.length)),
         }
     }
