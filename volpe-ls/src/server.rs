@@ -1,37 +1,86 @@
+use std::collections::HashMap;
+
 // use crossbeam::channel::{Receiver, Sender};
 use lsp_server::{Connection, Message, Notification, Request, Response};
-use lsp_types::{self, MessageType, ShowMessageParams, notification::ShowMessage};
+use lsp_types::{self, notification::ShowMessage, MessageType, ShowMessageParams};
+
+use crate::handler::NotificationHandler;
+
+struct Document {
+    version: i32,
+}
 
 pub struct Server {
     connection: Connection,
+    documents: HashMap<String, Document>,
 }
 
 // https://github.com/rust-analyzer/rust-analyzer/blob/master/crates/rust-analyzer/src/global_state.rs
 impl Server {
     pub fn new(connection: Connection) -> Server {
-        Server { connection }
+        Server {
+            connection,
+            documents: HashMap::new(),
+        }
     }
 
     pub fn run(&mut self) {
         self.show_info_message("Started :)".to_string());
-        
+
         while let Ok(message) = self.connection.receiver.recv() {
             self.show_info_message(format!("{:?}", message));
             match message {
                 Message::Request(request) => {
-                    self.show_info_message(format!("received a request! (id: {})", request.id));
-                    if self.connection.handle_shutdown(&request).unwrap() { break };
-                },
+                    self.show_info_message(format!(
+                        "received a request! method: {} (id: {})",
+                        request.method, request.id
+                    ));
+                    if self.connection.handle_shutdown(&request).unwrap() {
+                        break;
+                    };
+                }
                 Message::Response(response) => {
                     self.show_info_message(format!("received a response! (id: {})", response.id));
-                },
+                }
                 Message::Notification(notificaiton) => {
-                    self.show_info_message("received a notification!".to_string());
+                    self.show_info_message(format!(
+                        "received a notification! method: {}",
+                        notificaiton.method
+                    ));
+                    self.handle_notification(notificaiton);
                 }
             }
         }
     }
 
+    fn handle_notification(&mut self, notification: Notification) {
+        NotificationHandler {
+            notification: Some(notification),
+            server: self,
+        }
+        .on::<lsp_types::notification::DidOpenTextDocument>(|this, params| {
+            this.documents.insert(
+                params.text_document.uri.to_string(),
+                Document {
+                    version: params.text_document.version,
+                },
+            );
+        })
+        .on::<lsp_types::notification::DidChangeTextDocument>(|this, params| {
+            this.documents.insert(
+                params.text_document.uri.to_string(),
+                Document {
+                    version: params.text_document.version,
+                },
+            );
+        })
+        .on::<lsp_types::notification::DidSaveTextDocument>(|_this, _params| {})
+        .on::<lsp_types::notification::DidCloseTextDocument>(|_this, _params| {})
+        .finish();
+    }
+}
+
+impl Server {
     pub fn send_notification<N: lsp_types::notification::Notification>(
         &mut self,
         params: N::Params,
@@ -69,7 +118,7 @@ impl Server {
 
 impl Server {
     pub fn show_message(&mut self, typ: MessageType, message: String) {
-        self.send_notification::<ShowMessage>(ShowMessageParams {typ, message})
+        self.send_notification::<ShowMessage>(ShowMessageParams { typ, message })
     }
 
     pub fn show_error_message(&mut self, message: String) {

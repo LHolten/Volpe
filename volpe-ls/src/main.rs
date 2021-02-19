@@ -1,8 +1,9 @@
-use capabilities::server_capabilities;
 use lsp_server::Connection;
 use serde_json;
 
 mod capabilities;
+mod handler;
+mod lsp_utils;
 mod server;
 use server::Server;
 
