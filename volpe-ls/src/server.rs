@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{self, notification::ShowMessage, MessageType, ShowMessageParams};
 
-use crate::handler::NotificationHandler;
+use crate::handler::{NotificationHandler, RequestHandler};
 
 struct Document {
     version: i32,
@@ -38,6 +38,7 @@ impl Server {
                     if self.connection.handle_shutdown(&request).unwrap() {
                         break;
                     };
+                    self.handle_request(request);
                 }
                 Message::Response(response) => {
                     self.show_info_message(format!("received a response! (id: {})", response.id));
@@ -78,6 +79,23 @@ impl Server {
         .on::<lsp_types::notification::DidCloseTextDocument>(|_this, _params| {})
         .finish();
     }
+
+    fn handle_request(&mut self, request: Request) {
+        RequestHandler {
+            request: Some(request),
+            server: self,
+        }
+        .on::<lsp_types::request::HoverRequest>(|_this, _params| {
+            Some(lsp_types::Hover {
+                contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {
+                    kind: lsp_types::MarkupKind::PlainText,
+                    value: "hello world!".to_string(),
+                }),
+                range: None,
+            })
+        })
+        .finish();
+    }
 }
 
 impl Server {
@@ -99,19 +117,7 @@ impl Server {
     //     self.send(req.into())
     // }
 
-    // pub fn send_response<O, E>(
-    //     &mut self,
-    //     result: Result<O, E>,
-    //     id: lsp_server::RequestId
-    // ) {
-    //     let req = match result {
-    //         Ok(ok) => Response::new_ok(id, serde_json::Value::Null),
-    //         Err(err) => Response::new_err(id, ???, String::from(err))
-    //     };
-    //     self.send(req.into())
-    // }
-
-    fn send(&mut self, message: Message) {
+    pub fn send(&mut self, message: Message) {
         self.connection.sender.send(message).unwrap()
     }
 }
