@@ -28,7 +28,7 @@ impl Server {
         self.show_info_message("Started :)".to_string());
 
         while let Ok(message) = self.connection.receiver.recv() {
-            self.show_info_message(format!("{:?}", message));
+            // self.show_info_message(format!("{:?}", message));
             match message {
                 Message::Request(request) => {
                     self.show_info_message(format!(
@@ -41,6 +41,7 @@ impl Server {
                     self.handle_request(request);
                 }
                 Message::Response(response) => {
+                    // TODO Once we start sending requests we should handle the response here.
                     self.show_info_message(format!("received a response! (id: {})", response.id));
                 }
                 Message::Notification(notificaiton) => {
@@ -85,14 +86,19 @@ impl Server {
             request: Some(request),
             server: self,
         }
-        .on::<lsp_types::request::HoverRequest>(|_this, _params| {
-            Some(lsp_types::Hover {
-                contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {
-                    kind: lsp_types::MarkupKind::PlainText,
-                    value: "hello world!".to_string(),
+        .on::<lsp_types::request::HoverRequest>(|this, params| {
+            let potential_doc = this.documents.get(&params.text_document_position_params.text_document.uri.to_string());
+            match potential_doc {
+                Some(doc) => Some(lsp_types::Hover {
+                    contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {
+                        kind: lsp_types::MarkupKind::PlainText,
+                        value: format!("Document version: {}", doc.version),
+                    }),
+                    range: None,
                 }),
-                range: None,
-            })
+                None => None
+            }
+            
         })
         .finish();
     }
