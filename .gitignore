@@ -1,7 +1,6 @@
 target
 Cargo.lock
 !/Cargo.lock
-volpe-parser/src/parser.rs
 
 # IDE files
 .vscode
