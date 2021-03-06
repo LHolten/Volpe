@@ -10,3 +10,4 @@ edition = "2018"
 lsp-server = "0.5.0"
 lsp-types = { version = "0.88.0", features = ["proposed"] }
 serde_json = "1.0.59"
+volpe-parser = { path = "../volpe-parser" }

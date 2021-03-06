@@ -4,11 +4,8 @@ use std::collections::HashMap;
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{self, notification::ShowMessage, MessageType, ShowMessageParams};
 
+use crate::document::Document;
 use crate::handler::{NotificationHandler, RequestHandler};
-
-struct Document {
-    version: i32,
-}
 
 pub struct Server {
     connection: Connection,
@@ -61,20 +58,15 @@ impl Server {
             server: self,
         }
         .on::<lsp_types::notification::DidOpenTextDocument>(|this, params| {
-            this.documents.insert(
-                params.text_document.uri.to_string(),
-                Document {
-                    version: params.text_document.version,
-                },
-            );
+            this.documents
+                .insert(params.text_document.uri.to_string(), Document::new(&params));
         })
         .on::<lsp_types::notification::DidChangeTextDocument>(|this, params| {
-            this.documents.insert(
-                params.text_document.uri.to_string(),
-                Document {
-                    version: params.text_document.version,
-                },
-            );
+            let uri = params.text_document.uri.to_string();
+            match this.documents.get_mut(&uri) {
+                Some(doc) => doc.update(&params),
+                None => this.show_error_message(format!("{} was not found in documents", uri)),
+            }
         })
         .on::<lsp_types::notification::DidSaveTextDocument>(|_this, _params| {})
         .on::<lsp_types::notification::DidCloseTextDocument>(|_this, _params| {})
@@ -87,18 +79,23 @@ impl Server {
             server: self,
         }
         .on::<lsp_types::request::HoverRequest>(|this, params| {
-            let potential_doc = this.documents.get(&params.text_document_position_params.text_document.uri.to_string());
+            let potential_doc = this.documents.get(
+                &params
+                    .text_document_position_params
+                    .text_document
+                    .uri
+                    .to_string(),
+            );
             match potential_doc {
                 Some(doc) => Some(lsp_types::Hover {
                     contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {
                         kind: lsp_types::MarkupKind::PlainText,
-                        value: format!("Document version: {}", doc.version),
+                        value: doc.get_info(),
                     }),
                     range: None,
                 }),
-                None => None
+                None => None,
             }
-            
         })
         .finish();
     }
