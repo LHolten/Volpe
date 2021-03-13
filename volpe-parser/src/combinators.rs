@@ -2,9 +2,9 @@ use std::{cell::Cell, rc::Rc};
 
 use crate::{
     offset::Offset,
-    position::{Rule, RuleKind, Syntax},
+    syntax::{Rule, RuleKind, Syntax},
     tracker::{IResult, Tracker},
-    with_cell::WithInternal,
+    with_internal::WithInternal,
 };
 
 pub fn tag(kind: impl Into<usize> + Copy) -> impl Fn(Tracker) -> IResult {

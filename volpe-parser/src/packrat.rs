@@ -1,13 +1,17 @@
 use std::{cell::Cell, fmt::Debug, mem::take, rc::Rc};
 
 use crate::{
-    lexer::Lexem,
+    lexem_kind::LexemKind,
     parser::expr,
-    position::{Position, Rule, Syntax},
+    syntax::{Lexem, Rule, Syntax},
     tracker::Tracker,
-    with_cell::WithInternal,
+    with_internal::WithInternal,
 };
 use crate::{logos::Logos, offset::Offset};
+
+pub struct Packrat {
+    syntax: Option<Syntax>,
+}
 
 impl Debug for Syntax {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -66,7 +70,7 @@ impl Syntax {
         }
     }
 
-    fn get_pos(&self) -> Rc<Cell<Position>> {
+    fn get_pos(&self) -> Rc<Cell<Lexem>> {
         match self {
             Syntax::Lexem(pos, _) => pos.clone(),
             Syntax::Rule(rule) => rule.with(|r| r.children[0].get_pos()),
@@ -78,7 +82,7 @@ impl Syntax {
         safe: &mut Vec<Syntax>,
         mut offset: Offset,
         mut length: Offset,
-    ) -> Option<(Rc<Cell<Position>>, Offset, Offset)> {
+    ) -> Option<(Rc<Cell<Lexem>>, Offset, Offset)> {
         match self {
             Syntax::Rule(rule) => rule.with(|rule| {
                 let mut child_iter = take(&mut rule.children).into_iter();
@@ -116,7 +120,7 @@ impl Syntax {
     }
 
     fn patch_lexem(
-        first: Rc<Cell<Position>>,
+        first: Rc<Cell<Lexem>>,
         mut offset: Offset,
         mut length: Offset,
         string: &str,
@@ -169,11 +173,11 @@ impl Syntax {
             }
         }
 
-        let last_internal = last.replace(Position::default()); //keep this from being overwritten
+        let last_internal = last.replace(Lexem::default()); //keep this from being overwritten
 
         let mut buffer = String::default();
         let mut buffer_length = Offset::default();
-        let mut lex = Lexem::lexer(&input);
+        let mut lex = LexemKind::lexer(&input);
         safe.push(Syntax::Lexem(first.clone(), false));
         let mut current = first;
         while let Some(val) = lex.next() {
@@ -183,14 +187,14 @@ impl Syntax {
             } else {
                 Offset::char(lex.slice().len())
             };
-            if val != Lexem::Error {
+            if val != LexemKind::Error {
                 let mut temp = Default::default();
                 if lex.remainder().is_empty() {
                     if let Some(next) = last_internal.next.upgrade() {
                         temp = next
                     }
                 };
-                current.set(Position {
+                current.set(Lexem {
                     lexem: take(&mut buffer),
                     length: take(&mut buffer_length),
                     kind: val,
@@ -203,9 +207,9 @@ impl Syntax {
         }
 
         if !buffer.is_empty() {
-            current.set(Position {
+            current.set(Lexem {
                 lexem: buffer,
-                ..Position::default()
+                ..Lexem::default()
             });
         }
     }

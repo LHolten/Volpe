@@ -3,22 +3,22 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::{lexer::Lexem, offset::Offset};
+use crate::{lexem_kind::LexemKind, offset::Offset};
 
 #[derive(Clone)]
 pub enum Syntax {
-    Lexem(Rc<Cell<Position>>, bool),
+    Lexem(Rc<Cell<Lexem>>, bool),
     Rule(Rc<Cell<Rule>>),
 }
 
 #[derive(Default, Clone)]
 // there is one of these structs for every lexem, and it keeps track of rules
-pub struct Position {
+pub struct Lexem {
     pub lexem: String, // white space and unknown in front
     pub length: Offset,
-    pub kind: Lexem,
+    pub kind: LexemKind,
     pub rules: [Weak<Cell<Rule>>; 9],
-    pub next: Weak<Cell<Position>>,
+    pub next: Weak<Cell<Lexem>>,
 }
 
 // impl Debug for Position {
@@ -36,7 +36,7 @@ pub struct Position {
 pub struct Rule {
     pub length: Offset,
     pub children: Vec<Syntax>,
-    pub success: Option<(Offset, Rc<Cell<Position>>, RuleKind)>,
+    pub success: Option<(Offset, Rc<Cell<Lexem>>, RuleKind)>,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]

@@ -2,15 +2,15 @@ use std::{cell::Cell, cmp::max, rc::Rc};
 
 use crate::{
     offset::Offset,
-    position::{Position, Syntax},
-    with_cell::WithInternal,
+    syntax::{Lexem, Syntax},
+    with_internal::WithInternal,
 };
 
 pub type IResult<'t> = Result<Tracker<'t>, ()>;
 
 #[derive(Clone)]
 pub struct Tracker<'t> {
-    pub pos: Rc<Cell<Position>>,
+    pub pos: Rc<Cell<Lexem>>,
     pub offset: Offset,
     pub children: &'t Cell<Vec<Syntax>>,
     pub length: &'t Cell<Offset>,

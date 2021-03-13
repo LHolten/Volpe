@@ -2,19 +2,19 @@ extern crate logos;
 
 pub mod ast;
 mod combinators;
-mod lexer;
+mod lexem_kind;
 mod offset;
 pub mod packrat;
 mod parser;
-mod position;
+mod syntax;
 mod tracker;
-mod with_cell;
+mod with_internal;
 
 #[cfg(test)]
 mod test {
 
     use crate::offset::Offset;
-    use crate::position::Syntax;
+    use crate::syntax::Syntax;
 
     #[test]
     fn bug() {

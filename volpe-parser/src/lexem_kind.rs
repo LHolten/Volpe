@@ -3,7 +3,7 @@ use std::ops::BitOr;
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq, Clone, Copy)]
-pub enum Lexem {
+pub enum LexemKind {
     #[token("=")]
     Assign,
 
@@ -98,30 +98,30 @@ pub enum Lexem {
     End,
 }
 
-impl BitOr<Lexem> for Lexem {
+impl BitOr<LexemKind> for LexemKind {
     type Output = usize;
 
-    fn bitor(self, rhs: Lexem) -> Self::Output {
+    fn bitor(self, rhs: LexemKind) -> Self::Output {
         usize::from(self) | rhs
     }
 }
 
-impl BitOr<Lexem> for usize {
+impl BitOr<LexemKind> for usize {
     type Output = usize;
 
-    fn bitor(self, rhs: Lexem) -> Self::Output {
+    fn bitor(self, rhs: LexemKind) -> Self::Output {
         self | usize::from(rhs)
     }
 }
 
-impl From<Lexem> for usize {
-    fn from(val: Lexem) -> Self {
+impl From<LexemKind> for usize {
+    fn from(val: LexemKind) -> Self {
         1 << val as usize
     }
 }
 
-impl Default for Lexem {
+impl Default for LexemKind {
     fn default() -> Self {
-        Lexem::End
+        LexemKind::End
     }
 }

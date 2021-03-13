@@ -1,7 +1,7 @@
 use crate::{
     combinators::{alt, many1, many2, opt, pair, rule, separated, tag},
-    lexer::Lexem as L,
-    position::RuleKind,
+    lexem_kind::LexemKind as L,
+    syntax::RuleKind,
     tracker::{IResult, Tracker},
 };
 
@@ -110,7 +110,7 @@ fn tuple(mut t: Tracker) -> IResult {
 
 #[cfg(test)]
 mod tests {
-    use crate::{offset::Offset, position::Syntax};
+    use crate::{offset::Offset, syntax::Syntax};
 
     macro_rules! test_expr {
         ($s:literal) => {
