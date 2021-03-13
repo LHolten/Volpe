@@ -9,10 +9,6 @@ use crate::{
 };
 use crate::{logos::Logos, offset::Offset};
 
-pub struct Packrat {
-    syntax: Option<Syntax>,
-}
-
 impl Debug for Syntax {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

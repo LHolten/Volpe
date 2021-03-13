@@ -6,7 +6,7 @@ pub trait WithInternal<T> {
 
 impl<T: Default> WithInternal<T> for Cell<T> {
     fn with<R>(&self, func: impl FnOnce(&mut T) -> R) -> R {
-        let mut temp = self.replace(T::default());
+        let mut temp = self.take();
         let res = func(&mut temp);
         self.set(temp);
         res

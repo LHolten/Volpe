@@ -1,12 +1,11 @@
 extern crate logos;
 
-pub mod ast;
 mod combinators;
 mod lexem_kind;
-mod offset;
-pub mod packrat;
+pub mod offset;
+mod packrat;
 mod parser;
-mod syntax;
+pub mod syntax;
 mod tracker;
 mod with_internal;
 
