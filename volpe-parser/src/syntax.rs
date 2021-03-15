@@ -4,7 +4,9 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::{internal::UpgradeInternal, lexeme_kind::LexemeKind, offset::Offset};
+use crate::{
+    internal::UpgradeInternal, lexeme_kind::LexemeKind, offset::Offset, packrat::first_lexeme,
+};
 
 #[derive(Clone)]
 pub enum Syntax {
@@ -59,14 +61,7 @@ impl Syntax {
     pub fn first_lexeme(&self) -> Rc<Lexeme> {
         match self {
             Syntax::Lexeme(lexeme) => lexeme.clone(),
-            Syntax::Rule(rule) => {
-                for child in &rule.children {
-                    if child.len().0 != Offset::default() {
-                        return child.first_lexeme();
-                    }
-                }
-                unreachable!()
-            }
+            Syntax::Rule(rule) => first_lexeme(&rule.children),
         }
     }
 
@@ -114,6 +109,7 @@ pub enum RuleKind {
     Op1,
     Op2,
     Op3,
+    File,
 }
 
 impl From<usize> for RuleKind {

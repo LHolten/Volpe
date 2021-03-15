@@ -43,6 +43,7 @@ impl TFunc for StmtInner {
     }
 }
 
+// matches a single value right now
 type App = Alt<RuleP<Separated<Func, Id>, { RuleKind::App as usize }>, Func>;
 
 type Func = Alt<RuleP<Separated<Or, LexemeP<{ L::Func.mask() }>>, { RuleKind::Func as usize }>, Or>;
@@ -92,7 +93,7 @@ mod tests {
 
     macro_rules! test_expr {
         ($s:literal) => {
-            let mut pos = Vec::new_parser();
+            let mut pos = Packrat::default();
             pos.parse($s, Offset::default(), Offset::default());
         };
     }

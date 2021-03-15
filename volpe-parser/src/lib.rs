@@ -17,9 +17,10 @@ mod test {
 
     #[test]
     fn bug() {
-        let mut p = Vec::new_parser();
+        let mut p = Packrat::default();
         p.parse("a + b + c", Offset::new(0, 0), Offset::new(0, 0));
-        // p.parse("", Offset::new(0, 0), Offset::new(0, 9));
+        p.parse("", Offset::new(0, 0), Offset::new(0, 9));
+        p.parse("test", Offset::new(0, 0), Offset::new(0, 0));
         println!("{:#?}", p);
     }
 }

@@ -1,4 +1,9 @@
-use std::{cell::Cell, mem::take, rc::Rc};
+use std::{
+    cell::Cell,
+    fmt::{Debug, Formatter},
+    mem::take,
+    rc::Rc,
+};
 
 use crate::{
     internal::UpgradeInternal,
@@ -9,26 +14,23 @@ use crate::{
 };
 use crate::{logos::Logos, offset::Offset};
 
-pub trait Packrat {
-    fn parse(&mut self, string: &str, offset: Offset, length: Offset);
-    fn new_parser() -> Self;
-}
+pub struct Packrat(pub Vec<Syntax>);
 
-impl Packrat for Vec<Syntax> {
-    fn parse(&mut self, string: &str, offset: Offset, length: Offset) {
+impl Packrat {
+    pub fn parse(&mut self, string: &str, offset: Offset, length: Offset) {
         let mut safe = Vec::new();
-        save_subtrees(self, &mut safe, offset, length);
-        let (prev, offset) = prev_lexeme(self, offset);
+        save_subtrees(&self.0, &mut safe, offset, length);
+        let (prev, offset) = prev_lexeme(&self.0, offset);
         let is_first = prev.is_none();
         let prev = prev.unwrap_or(Rc::new(Lexeme {
-            next: Cell::new(Rc::downgrade(&first_lexeme(self))),
+            next: Cell::new(Rc::downgrade(&first_lexeme(&self.0))),
             ..Lexeme::default()
         }));
         patch_lexeme(prev.clone(), &mut safe, offset, length, string);
         let first = if is_first {
             prev.next.upgrade().unwrap()
         } else {
-            first_lexeme(self)
+            first_lexeme(&self.0)
         };
         let input = TInput {
             lexeme: first,
@@ -36,18 +38,30 @@ impl Packrat for Vec<Syntax> {
             tracker: Tracker::default(),
         };
         take(self);
-        dbg!(&input.lexeme);
-        dbg!(&safe);
+        // dbg!(&input.lexeme);
+        // dbg!(&safe);
         let result = FileP::parse(input);
         let tracker = Tracker::from(result);
-        dbg!(&tracker.children);
+        // dbg!(&tracker.children);
         drop(safe);
-        dbg!(&tracker.children);
-        *self = tracker.children
+        // dbg!(&tracker.children);
+        *self = Self(tracker.children)
     }
+}
 
-    fn new_parser() -> Self {
-        vec![Syntax::default()]
+impl Default for Packrat {
+    fn default() -> Self {
+        Self(vec![Syntax::default()])
+    }
+}
+
+impl Debug for Packrat {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        self.0
+            .iter()
+            .filter(|s| Syntax::is_success(*s))
+            .collect::<Vec<&Syntax>>()
+            .fmt(f)
     }
 }
 
