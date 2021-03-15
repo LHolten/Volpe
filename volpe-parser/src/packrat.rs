@@ -1,237 +1,185 @@
-use std::{cell::Cell, fmt::Debug, mem::take, rc::Rc};
+use std::{mem::take, rc::Rc};
 
 use crate::{
-    lexem_kind::LexemKind,
-    parser::expr,
-    syntax::{Lexem, Rule, Syntax},
-    tracker::Tracker,
-    with_internal::WithInternal,
+    internal::UpgradeInternal,
+    lexeme_kind::LexemeKind,
+    parser::FileP,
+    syntax::{Lexeme, Syntax},
+    tracker::{TFunc, TInput, Tracker},
 };
 use crate::{logos::Logos, offset::Offset};
 
-impl Debug for Syntax {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Syntax::Lexem(pos, _) => pos.with(|p| p.lexem.fmt(f)),
-            Syntax::Rule(rule) => {
-                let kind = rule.with(|r| {
-                    r.success
-                        .as_ref()
-                        .map_or(String::new(), |v| format!("{:?}", v.2))
-                });
-                f.write_str(&kind)?;
-                let children = rule.with(|r| r.children.clone());
-                children
-                    .into_iter()
-                    .filter(Syntax::is_success)
-                    .collect::<Vec<Syntax>>()
-                    .fmt(f)
-            }
-        }
-    }
+pub trait Packrat {
+    fn parse(&mut self, string: &str, offset: Offset, length: Offset);
 }
 
-impl Default for Syntax {
-    fn default() -> Self {
-        Self::Lexem(Default::default(), false)
-    }
-}
-
-impl Syntax {
-    fn is_success(&self) -> bool {
-        match self {
-            Syntax::Lexem(_, success) => *success,
-            Syntax::Rule(rule) => rule.with(|r| r.success.is_some()),
-        }
-    }
-
-    fn len(&self) -> (Offset, Offset) {
-        match self {
-            Syntax::Lexem(pos, success) => pos.with(|p| {
-                (
-                    if *success {
-                        p.length
-                    } else {
-                        Offset::default()
-                    },
-                    p.length,
-                )
-            }),
-            Syntax::Rule(rule) => rule.with(|r| {
-                (
-                    r.success.as_ref().map_or(Offset::default(), |v| v.0),
-                    r.length,
-                )
-            }),
-        }
-    }
-
-    fn get_pos(&self) -> Rc<Cell<Lexem>> {
-        match self {
-            Syntax::Lexem(pos, _) => pos.clone(),
-            Syntax::Rule(rule) => rule.with(|r| r.children[0].get_pos()),
-        }
-    }
-
-    fn patch_rule(
-        &self,
-        safe: &mut Vec<Syntax>,
-        mut offset: Offset,
-        mut length: Offset,
-    ) -> Option<(Rc<Cell<Lexem>>, Offset, Offset)> {
-        match self {
-            Syntax::Rule(rule) => rule.with(|rule| {
-                let mut child_iter = take(&mut rule.children).into_iter();
-                let mut res = None;
-                while let Some(child) = child_iter.next() {
-                    let (mut len, reach) = child.len();
-
-                    if reach >= offset {
-                        let new_res = child.patch_rule(safe, offset, length);
-                        res = res.or(new_res);
-                    } else {
-                        safe.push(child);
-                    }
-
-                    if len > offset {
-                        len -= offset;
-                        if len > length {
-                            break;
-                        } else {
-                            length -= len;
-                        }
-                        offset = Offset::default();
-                    } else {
-                        offset -= len;
-                    }
-                }
-                safe.extend(child_iter);
-                res
-            }),
-            Syntax::Lexem(pos, _) => {
-                safe.push(self.clone());
-                Some((pos.clone(), offset, length))
-            }
-        }
-    }
-
-    fn patch_lexem(
-        first: Rc<Cell<Lexem>>,
-        mut offset: Offset,
-        mut length: Offset,
-        string: &str,
-        safe: &mut Vec<Syntax>,
-    ) {
-        length = offset + length;
-
-        let mut input = String::default();
-        let first_str = first.with(|p| p.lexem.clone());
-        if offset < Offset::line() {
-            input.push_str(&first_str[..offset.char]);
-        } else {
-            for (i, c) in first_str.char_indices() {
-                if c == '\n' {
-                    offset -= Offset::line();
-                    if offset < Offset::line() {
-                        input.push_str(&first_str[..1 + i + offset.char]);
-                        break;
-                    }
-                }
-            }
-        }
-
-        input.push_str(string);
-
-        let mut last = first.clone();
-        loop {
-            let len = last.with(|p| p.length);
-            let next = last.with(|p| p.next.upgrade());
-            if len > length || next.is_none() {
-                assert!(len >= length);
-                break;
-            }
-            length -= len;
-            last = next.unwrap();
-        }
-
-        let last_str = last.with(|p| p.lexem.clone());
-        if length < Offset::line() {
-            input.push_str(&last_str[length.char..])
-        } else {
-            for (i, c) in last_str.char_indices() {
-                if c == '\n' {
-                    length -= Offset::line();
-                    if length < Offset::line() {
-                        input.push_str(&last_str[1 + i + length.char..]);
-                        break;
-                    }
-                }
-            }
-        }
-
-        let last_internal = last.replace(Lexem::default()); //keep this from being overwritten
-
-        let mut buffer = String::default();
-        let mut buffer_length = Offset::default();
-        let mut lex = LexemKind::lexer(&input);
-        safe.push(Syntax::Lexem(first.clone(), false));
-        let mut current = first;
-        while let Some(val) = lex.next() {
-            buffer.push_str(lex.slice());
-            buffer_length += if lex.slice() == "\n" {
-                Offset::line()
-            } else {
-                Offset::char(lex.slice().len())
-            };
-            if val != LexemKind::Error {
-                let mut temp = Default::default();
-                if lex.remainder().is_empty() {
-                    if let Some(next) = last_internal.next.upgrade() {
-                        temp = next
-                    }
-                };
-                current.set(Lexem {
-                    lexem: take(&mut buffer),
-                    length: take(&mut buffer_length),
-                    kind: val,
-                    next: Rc::downgrade(&temp),
-                    rules: Default::default(),
-                });
-                safe.push(Syntax::Lexem(temp.clone(), false));
-                current = temp;
-            }
-        }
-
-        if !buffer.is_empty() {
-            current.set(Lexem {
-                lexem: buffer,
-                ..Lexem::default()
-            });
-        }
-    }
-
-    pub fn parse(self, string: &str, offset: Offset, length: Offset) -> Syntax {
-        let pos = self.get_pos();
+impl Packrat for Vec<Syntax> {
+    fn parse(&mut self, string: &str, offset: Offset, length: Offset) {
         let mut safe = Vec::new();
-        let res = self.patch_rule(&mut safe, offset, length).unwrap();
-        Self::patch_lexem(res.0, res.1, res.2, string, &mut safe);
-        let tracker = Tracker {
-            pos,
-            offset: Offset::default(),
-            children: &Default::default(),
-            length: &Default::default(),
+        save_subtrees(self, &mut safe, offset, length);
+        let (prev, offset) = prev_lexeme(self, offset);
+        let is_first = prev.is_none();
+        let prev = prev.unwrap_or_default();
+        patch_lexeme(prev.clone(), &mut safe, offset, length, string);
+
+        let first = if is_first {
+            prev.next.upgrade().unwrap()
+        } else {
+            safe[0].first_lexeme() // not good
         };
-        drop(self);
-        expr(tracker.clone()).unwrap();
+        take(self);
+        let input = TInput {
+            lexeme: first,
+            offset: Offset::default(),
+            tracker: Tracker::default(),
+        };
+        dbg!(&input.lexeme);
+        let result = FileP::parse(input);
+        let tracker = Tracker::from(result);
+        dbg!(&tracker.children);
         drop(safe);
-        Syntax::Rule(Rc::new(Cell::new(Rule {
-            length: tracker.length.get(),
-            children: tracker.children.take(),
-            success: None,
-        })))
+        dbg!(&tracker.children);
+        *self = tracker.children
+    }
+}
+
+fn save_subtrees(
+    children: &Vec<Syntax>,
+    safe: &mut Vec<Syntax>,
+    mut offset: Offset,
+    mut length: Offset,
+) {
+    let mut child_iter = children.iter();
+    while let Some(child) = child_iter.next() {
+        let (mut len, reach) = child.len();
+        if reach >= offset {
+            if let Syntax::Rule(rule) = child {
+                save_subtrees(&rule.children, safe, offset, length);
+            }
+        } else {
+            safe.push(child.clone());
+        }
+
+        if len > offset {
+            len -= offset;
+            if len > length {
+                break;
+            } else {
+                length -= len;
+            }
+            offset = Offset::default();
+        } else {
+            offset -= len;
+        }
+    }
+}
+
+pub fn prev_lexeme(children: &Vec<Syntax>, mut offset: Offset) -> (Option<Rc<Lexeme>>, Offset) {
+    for child in children {
+        let len = child.len().0;
+        let next_len = child.next_lexeme().length;
+        if len != Offset::default() && len + next_len >= offset {
+            return match child {
+                Syntax::Lexeme(lexeme) => {
+                    if lexeme.length >= offset {
+                        (None, offset)
+                    } else {
+                        (Some(lexeme.clone()), offset - lexeme.length)
+                    }
+                }
+                Syntax::Rule(rule) => prev_lexeme(&rule.children, offset),
+            };
+        }
+        offset -= len;
+    }
+    unreachable!()
+}
+
+fn patch_lexeme(
+    mut prev: Rc<Lexeme>,
+    safe: &mut Vec<Syntax>,
+    mut offset: Offset,
+    length: Offset,
+    string: &str,
+) {
+    let first = prev.next.upgrade().unwrap();
+    let mut length = offset + length;
+
+    let mut input = String::default();
+    if offset < Offset::line() {
+        input.push_str(&first.string[..offset.char]);
+    } else {
+        for (i, c) in first.string.char_indices() {
+            if c == '\n' {
+                offset -= Offset::line();
+                if offset < Offset::line() {
+                    input.push_str(&first.string[..1 + i + offset.char]);
+                    break;
+                }
+            }
+        }
     }
 
-    // pub fn text(&self) -> String {
-    //     self.get_pos().with(|p| format!("{:?}", p))
-    // }
+    input.push_str(string);
+
+    let mut last = first;
+    loop {
+        let len = last.length;
+        let next = last.next.upgrade();
+        if len > length || next.is_none() {
+            assert!(len >= length);
+            break;
+        }
+        length -= len;
+        last = next.unwrap();
+    }
+
+    if length < Offset::line() {
+        input.push_str(&last.string[length.char..])
+    } else {
+        for (i, c) in last.string.char_indices() {
+            if c == '\n' {
+                length -= Offset::line();
+                if length < Offset::line() {
+                    input.push_str(&last.string[1 + i + length.char..]);
+                    break;
+                }
+            }
+        }
+    }
+
+    let next = last.next.take();
+    let mut buffer = String::default();
+    let mut buffer_length = Offset::default();
+    let mut lex = LexemeKind::lexer(&input);
+
+    while let Some(val) = lex.next() {
+        buffer.push_str(lex.slice());
+        buffer_length += if lex.slice() == "\n" {
+            Offset::line()
+        } else {
+            Offset::char(lex.slice().len())
+        };
+        if val != LexemeKind::Error {
+            let temp = Rc::new(Lexeme {
+                string: take(&mut buffer),
+                length: take(&mut buffer_length),
+                kind: val,
+                ..Lexeme::default()
+            });
+            prev.next.set(Rc::downgrade(&temp));
+            safe.push(Syntax::Lexeme(temp.clone()));
+            prev = temp
+        }
+    }
+    if !buffer.is_empty() || next.upgrade().is_none() {
+        let temp = Rc::new(Lexeme {
+            string: buffer,
+            ..Lexeme::default()
+        });
+        prev.next.set(Rc::downgrade(&temp));
+        safe.push(Syntax::Lexeme(temp));
+    } else {
+        prev.next.set(next);
+    }
 }

@@ -1,45 +1,109 @@
 use std::{
     cell::Cell,
+    fmt::Debug,
     rc::{Rc, Weak},
 };
 
-use crate::{lexem_kind::LexemKind, offset::Offset};
+use crate::{internal::UpgradeInternal, lexeme_kind::LexemeKind, offset::Offset};
 
 #[derive(Clone)]
 pub enum Syntax {
-    Lexem(Rc<Cell<Lexem>>, bool),
-    Rule(Rc<Cell<Rule>>),
+    Lexeme(Rc<Lexeme>),
+    Rule(Rc<Rule>),
 }
 
-#[derive(Default, Clone)]
-// there is one of these structs for every lexem, and it keeps track of rules
-pub struct Lexem {
-    pub lexem: String, // white space and unknown in front
+impl Default for Syntax {
+    fn default() -> Self {
+        Self::Lexeme(Default::default())
+    }
+}
+
+impl Debug for Syntax {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Syntax::Lexeme(pos) => pos.string.fmt(f),
+            Syntax::Rule(rule) => {
+                rule.kind.fmt(f)?;
+                rule.children
+                    .iter()
+                    .filter(|s| Syntax::is_success(*s))
+                    .collect::<Vec<&Syntax>>()
+                    .fmt(f)
+            }
+        }
+    }
+}
+
+impl Syntax {
+    pub fn is_success(&self) -> bool {
+        match self {
+            Syntax::Lexeme(_) => true,
+            Syntax::Rule(rule) => rule.next.upgrade().is_some(),
+        }
+    }
+
+    pub fn len(&self) -> (Offset, Offset) {
+        match self {
+            Syntax::Lexeme(lexeme) => (lexeme.length, lexeme.length),
+            Syntax::Rule(rule) => (rule.offset, rule.length),
+        }
+    }
+
+    pub fn next_lexeme(&self) -> Rc<Lexeme> {
+        match self {
+            Syntax::Lexeme(lexeme) => lexeme.next.upgrade().unwrap(),
+            Syntax::Rule(rule) => rule.next.upgrade().unwrap(),
+        }
+    }
+
+    pub fn first_lexeme(&self) -> Rc<Lexeme> {
+        match self {
+            Syntax::Lexeme(lexeme) => lexeme.clone(),
+            Syntax::Rule(rule) => {
+                for child in &rule.children {
+                    if child.len().0 != Offset::default() {
+                        return child.first_lexeme();
+                    }
+                }
+                unreachable!()
+            }
+        }
+    }
+
+    pub fn text(&self) -> String {
+        format!("{:?}", self.first_lexeme())
+    }
+}
+
+#[derive(Default)]
+pub struct Lexeme {
+    pub string: String, // white space and unknown in front
     pub length: Offset,
-    pub kind: LexemKind,
-    pub rules: [Weak<Cell<Rule>>; 9],
-    pub next: Weak<Cell<Lexem>>,
+    pub kind: LexemeKind,
+    pub rules: [Cell<Weak<Rule>>; 9],
+    pub next: Cell<Weak<Lexeme>>,
 }
 
-// impl Debug for Position {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         f.write_str(&self.lexem)?;
-//         if let Some(next) = self.next.upgrade() {
-//             next.with(|n| n.fmt(f))
-//         } else {
-//             Ok(())
-//         }
-//     }
-// }
+impl Debug for Lexeme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.string)?;
+        if let Some(next) = self.next.upgrade() {
+            next.fmt(f)
+        } else {
+            Ok(())
+        }
+    }
+}
 
-#[derive(Clone, Default)]
 pub struct Rule {
-    pub length: Offset,
     pub children: Vec<Syntax>,
-    pub success: Option<(Offset, Rc<Cell<Lexem>>, RuleKind)>,
+    pub length: Offset, // total length including failed rules/lexems
+    pub kind: RuleKind,
+    pub offset: Offset,     // offset of next
+    pub next: Weak<Lexeme>, // is Some when rule succeeded
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RuleKind {
     Expr,
     Stmt,
@@ -50,4 +114,21 @@ pub enum RuleKind {
     Op1,
     Op2,
     Op3,
+}
+
+impl From<usize> for RuleKind {
+    fn from(val: usize) -> Self {
+        match val {
+            v if v == Self::Expr as usize => Self::Expr,
+            v if v == Self::Stmt as usize => Self::Stmt,
+            v if v == Self::App as usize => Self::App,
+            v if v == Self::Func as usize => Self::Func,
+            v if v == Self::Or as usize => Self::Or,
+            v if v == Self::And as usize => Self::And,
+            v if v == Self::Op1 as usize => Self::Op1,
+            v if v == Self::Op2 as usize => Self::Op2,
+            v if v == Self::Op3 as usize => Self::Op3,
+            _ => unreachable!(),
+        }
+    }
 }

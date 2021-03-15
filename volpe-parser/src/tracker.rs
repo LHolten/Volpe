@@ -1,28 +1,32 @@
-use std::{cell::Cell, cmp::max, rc::Rc};
+use std::rc::Rc;
 
 use crate::{
     offset::Offset,
-    syntax::{Lexem, Syntax},
-    with_internal::WithInternal,
+    syntax::{Lexeme, Syntax},
 };
 
-pub type IResult<'t> = Result<Tracker<'t>, ()>;
+pub trait TFunc {
+    fn parse(t: TInput) -> TResult;
+}
+pub type TResult = Result<TInput, Tracker>;
 
-#[derive(Clone)]
-pub struct Tracker<'t> {
-    pub pos: Rc<Cell<Lexem>>,
-    pub offset: Offset,
-    pub children: &'t Cell<Vec<Syntax>>,
-    pub length: &'t Cell<Offset>,
+#[derive(Default)]
+pub struct Tracker {
+    pub children: Vec<Syntax>,
+    pub length: Offset,
 }
 
-impl<'t> Tracker<'t> {
-    pub fn add_child(&self, child: Syntax) {
-        self.children.with(|children| children.push(child));
-    }
+pub struct TInput {
+    pub lexeme: Rc<Lexeme>,
+    pub offset: Offset,
+    pub tracker: Tracker,
+}
 
-    pub fn update_length(&self, length: Offset) {
-        self.length
-            .set(max(self.offset + length, self.length.get()));
+impl From<TResult> for Tracker {
+    fn from(result: TResult) -> Self {
+        match result {
+            Ok(input) => input.tracker,
+            Err(tracker) => tracker,
+        }
     }
 }

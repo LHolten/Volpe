@@ -1,25 +1,25 @@
 extern crate logos;
 
 mod combinators;
-mod lexem_kind;
+pub mod internal;
+pub mod lexeme_kind;
 pub mod offset;
-mod packrat;
+pub mod packrat;
 mod parser;
 pub mod syntax;
 mod tracker;
-mod with_internal;
 
 #[cfg(test)]
 mod test {
 
     use crate::offset::Offset;
-    use crate::syntax::Syntax;
+    use crate::packrat::Packrat;
 
     #[test]
     fn bug() {
-        let mut p = Syntax::default();
-        p = p.parse("a + b + c", Offset::new(0, 0), Offset::new(0, 0));
-        p = p.parse("", Offset::new(0, 0), Offset::new(0, 9));
+        let mut p = Vec::new();
+        p.parse("a + b + c", Offset::new(0, 0), Offset::new(0, 0));
+        // p.parse("", Offset::new(0, 0), Offset::new(0, 9));
         println!("{:#?}", p);
     }
 }

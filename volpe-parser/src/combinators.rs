@@ -1,137 +1,144 @@
-use std::{cell::Cell, rc::Rc};
-
-use crate::{
-    offset::Offset,
-    syntax::{Rule, RuleKind, Syntax},
-    tracker::{IResult, Tracker},
-    with_internal::WithInternal,
+use std::{
+    cmp::max,
+    marker::PhantomData,
+    rc::{Rc, Weak},
 };
 
-pub fn tag(kind: impl Into<usize> + Copy) -> impl Fn(Tracker) -> IResult {
-    move |mut t: Tracker| {
-        let length = t.pos.with(|p| p.length);
-        t.update_length(length);
-        if 1 << t.pos.with(|p| p.kind) as usize & kind.into() != 0 {
-            t.add_child(Syntax::Lexem(t.pos.clone(), true));
-            t.offset += length;
-            t.pos = t.pos.with(|p| p.next.upgrade().unwrap());
+use crate::{
+    internal::{UpgradeInternal, WithInternal},
+    offset::Offset,
+    syntax::{Rule, RuleKind, Syntax},
+    tracker::{TFunc, TInput, TResult, Tracker},
+};
+
+pub struct LexemeP<const L: usize>;
+
+impl<const L: usize> TFunc for LexemeP<L> {
+    fn parse(mut t: TInput) -> TResult {
+        t.tracker.length = max(t.tracker.length, t.offset + t.lexeme.length);
+        if t.lexeme.kind.mask() & L != 0 {
+            t.tracker.children.push(Syntax::Lexeme(t.lexeme.clone()));
+            t.offset += t.lexeme.length;
+            t.lexeme = t.lexeme.next.upgrade().unwrap();
             Ok(t)
         } else {
-            t.add_child(Syntax::Lexem(t.pos.clone(), false));
-            Err(())
+            Err(t.tracker)
         }
     }
 }
 
-pub fn rule(kind: RuleKind, f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
-    move |mut t: Tracker| {
-        if let Some(rule) = t.pos.with(|p| p.rules[kind as usize].upgrade()) {
-            rule.with(|r| t.update_length(r.length));
-            let success = rule.with(|r| r.success.clone());
-            t.add_child(Syntax::Rule(rule));
-            if let Some((offset, pos, _)) = success {
-                t.offset += offset;
-                t.pos = pos;
-                Ok(t)
-            } else {
-                Err(())
-            }
-        } else {
-            let t2 = Tracker {
-                pos: t.pos,
+pub struct RuleP<F, const R: usize> {
+    f: PhantomData<F>,
+}
+
+impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
+    fn parse(mut t: TInput) -> TResult {
+        let rule = t.lexeme.rules[R].upgrade().unwrap_or_else(|| {
+            let result = F::parse(TInput {
+                lexeme: t.lexeme.clone(),
                 offset: Offset::default(),
-                children: &Default::default(),
-                length: &Default::default(),
+                tracker: Tracker::default(),
+            });
+            let rule = match result {
+                Ok(input) => Rule {
+                    children: input.tracker.children,
+                    length: input.tracker.length,
+                    kind: RuleKind::from(R),
+                    offset: input.offset,
+                    next: Rc::downgrade(&input.lexeme),
+                },
+                Err(tracker) => Rule {
+                    children: tracker.children,
+                    length: tracker.length,
+                    kind: RuleKind::from(R),
+                    offset: Offset::default(),
+                    next: Weak::default(),
+                },
             };
-            let success = f(t2.clone()).ok().map(|t3| (t3.offset, t3.pos, kind));
-            let rule = Rc::new(Cell::new(Rule {
-                length: t2.length.get(),
-                children: t2.children.replace(Vec::new()),
-                success: success.clone(),
-            }));
-            t.pos = t2.pos;
-            t.pos
-                .with(|p| p.rules[kind as usize] = Rc::downgrade(&rule));
-            t.add_child(Syntax::Rule(rule));
-            t.update_length(t2.length.get());
-            if let Some((offset, pos, _)) = success {
-                t.offset += offset;
-                t.pos = pos;
-                Ok(t)
-            } else {
-                Err(())
-            }
-        }
-    }
-}
+            let rule = Rc::new(rule);
+            t.lexeme.rules[R].with(|r| *r = Rc::downgrade(&rule));
+            rule
+        });
 
-pub fn separated(
-    symbol: impl Fn(Tracker) -> IResult,
-    next: impl Fn(Tracker) -> IResult,
-) -> impl Fn(Tracker) -> IResult {
-    move |t| many1(pair(&symbol, &next))(next(t)?)
-}
-
-pub fn many2(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
-    move |t| {
-        let new_t = f(t.clone())?;
-        if new_t.offset == t.offset {
-            Err(())
+        t.tracker.length = max(t.tracker.length, t.offset + rule.length);
+        t.tracker.children.push(Syntax::Rule(rule.clone()));
+        if let Some(lexeme) = rule.next.upgrade() {
+            t.offset += rule.offset;
+            t.lexeme = lexeme;
+            Ok(t)
         } else {
-            many1(&f)(new_t)
+            Err(t.tracker)
         }
     }
 }
 
-pub fn many1(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
-    move |t| {
-        let new_t = f(t.clone())?;
-        if new_t.offset == t.offset {
-            Err(())
-        } else {
-            many0(&f)(new_t)
+pub type Separated<F, S> = Pair<F, Many1<Pair<S, F>>>;
+
+pub type Many1<F> = Pair<F, Many0<F>>;
+
+pub type Opt<F> = Alt<F, Id>;
+
+pub struct Many0<F> {
+    f: PhantomData<F>,
+}
+
+impl<F: TFunc> TFunc for Many0<F> {
+    fn parse(t: TInput) -> TResult {
+        let pos = t.lexeme.clone();
+        let offset = t.offset;
+        F::parse(t)
+            .and_then(|t| {
+                if t.offset == offset {
+                    Err(t.tracker)
+                } else {
+                    Self::parse(t)
+                }
+            })
+            .or_else(|tracker| {
+                Ok(TInput {
+                    lexeme: pos,
+                    offset,
+                    tracker,
+                })
+            })
+    }
+}
+
+pub struct Pair<F, G> {
+    f: PhantomData<F>,
+    g: PhantomData<G>,
+}
+
+impl<F: TFunc, G: TFunc> TFunc for Pair<F, G> {
+    fn parse(t: TInput) -> TResult {
+        G::parse(F::parse(t)?)
+    }
+}
+
+pub struct Alt<F, G> {
+    f: PhantomData<F>,
+    g: PhantomData<G>,
+}
+
+impl<F: TFunc, G: TFunc> TFunc for Alt<F, G> {
+    fn parse(t: TInput) -> TResult {
+        let pos = t.lexeme.clone();
+        let offset = t.offset;
+        match F::parse(t) {
+            result @ Ok(_) => result,
+            Err(tracker) => G::parse(TInput {
+                lexeme: pos,
+                offset,
+                tracker,
+            }),
         }
     }
 }
 
-pub fn many0(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
-    move |mut t| {
-        while let Ok(new_t) = f(t.clone()) {
-            if t.offset == new_t.offset {
-                return Ok(new_t);
-            }
-            t = new_t
-        }
+pub struct Id;
+
+impl TFunc for Id {
+    fn parse(t: TInput) -> TResult {
         Ok(t)
-    }
-}
-
-pub fn pair(
-    f: impl Fn(Tracker) -> IResult,
-    g: impl Fn(Tracker) -> IResult,
-) -> impl Fn(Tracker) -> IResult {
-    move |t| g(f(t)?)
-}
-
-pub fn alt(
-    f: impl Fn(Tracker) -> IResult,
-    g: impl Fn(Tracker) -> IResult,
-) -> impl Fn(Tracker) -> IResult {
-    move |t| {
-        if let Ok(t) = f(t.clone()) {
-            Ok(t)
-        } else {
-            g(t)
-        }
-    }
-}
-
-pub fn opt(f: impl Fn(Tracker) -> IResult) -> impl Fn(Tracker) -> IResult {
-    move |t| {
-        if let Ok(t) = f(t.clone()) {
-            Ok(t)
-        } else {
-            Ok(t)
-        }
     }
 }

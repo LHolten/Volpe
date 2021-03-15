@@ -1,120 +1,98 @@
 use crate::{
-    combinators::{alt, many1, many2, opt, pair, rule, separated, tag},
-    lexem_kind::LexemKind as L,
+    combinators::{Alt, Id, LexemeP, Many1, Many0, Opt, Pair, RuleP, Separated},
+    lexeme_kind::LexemeKind as L,
     syntax::RuleKind,
-    tracker::{IResult, Tracker},
+    tracker::{TFunc, TInput, TResult},
 };
 
-pub fn expr(t: Tracker) -> IResult {
-    alt(
-        rule(RuleKind::Expr, pair(app, alt(ite, astmt))),
-        alt(stmt, app),
-    )(t)
+pub struct FileP;
+
+impl TFunc for FileP {
+    fn parse(mut t: TInput) -> TResult {
+        t = Expr::parse(t)?;
+        t = Many0::<Pair<LexemeP<{ L::RBrace.mask() | L::RCurlyBrace.mask() }>, Expr>>::parse(t)?;
+        LexemeP::<{ L::End.mask() }>::parse(t)
+    }
 }
 
-fn astmt(mut t: Tracker) -> IResult {
-    t = tag(L::Assign)(t)?;
-    t = app(t)?;
-    t = opt(tag(L::Semicolon))(t)?;
-    expr(t)
+type Expr = Alt<RuleP<ExprInner, { RuleKind::Expr as usize }>, Alt<Stmt, App>>;
+type Semi = LexemeP<{ L::Semicolon.mask() }>;
+
+pub struct ExprInner;
+
+impl TFunc for ExprInner {
+    fn parse(mut t: TInput) -> TResult {
+        t = App::parse(t)?;
+        t = LexemeP::<{ L::Assign.mask() | L::Ite.mask() }>::parse(t)?;
+        t = App::parse(t)?;
+        t = Opt::<Semi>::parse(t)?;
+        Expr::parse(t)
+    }
 }
 
-fn ite(mut t: Tracker) -> IResult {
-    t = tag(L::Ite)(t)?;
-    t = app(t)?;
-    t = opt(tag(L::Semicolon))(t)?;
-    expr(t)
+type Stmt = RuleP<StmtInner, { RuleKind::Stmt as usize }>;
+type MultiAssign = Many1<Pair<LexemeP<{ L::MultiAssign as usize }>, App>>;
+
+pub struct StmtInner;
+
+impl TFunc for StmtInner {
+    fn parse(mut t: TInput) -> TResult {
+        t = App::parse(t)?;
+        t = Alt::<Pair<MultiAssign, Opt<Semi>>, Semi>::parse(t)?;
+        Expr::parse(t)
+    }
 }
 
-fn stmt(t: Tracker) -> IResult {
-    rule(RuleKind::Stmt, |mut t| {
-        t = app(t)?;
-        t = if let Ok(t) = many1(pair(tag(L::MultiAssign), app))(t.clone()) {
-            opt(tag(L::Semicolon))(t)?
-        } else {
-            tag(L::Semicolon)(t)?
-        };
-        expr(t)
-    })(t)
-}
+type App = Alt<RuleP<Separated<Func, Id>, { RuleKind::App as usize }>, Func>;
 
-fn app(t: Tracker) -> IResult {
-    alt(rule(RuleKind::App, many2(func)), func)(t)
-}
+type Func = Alt<RuleP<Separated<Or, LexemeP<{ L::Func.mask() }>>, { RuleKind::Func as usize }>, Or>;
 
-fn func(t: Tracker) -> IResult {
-    alt(rule(RuleKind::Func, separated(tag(L::Func), or)), or)(t)
-}
+type Or = Alt<RuleP<Separated<And, LexemeP<{ L::Or.mask() }>>, { RuleKind::Or as usize }>, And>;
 
-fn or(t: Tracker) -> IResult {
-    alt(rule(RuleKind::Or, separated(tag(L::Or), and)), and)(t)
-}
+type And = Alt<RuleP<Separated<Op1, LexemeP<{ L::And.mask() }>>, { RuleKind::And as usize }>, Op1>;
 
-fn and(t: Tracker) -> IResult {
-    alt(rule(RuleKind::And, separated(tag(L::And), op1)), op1)(t)
-}
+const TAG1: usize = L::Equals.mask()
+    | L::UnEquals.mask()
+    | L::Less.mask()
+    | L::Greater.mask()
+    | L::GreaterEqual.mask()
+    | L::LessEqual.mask();
+type Op1 = Alt<RuleP<Separated<Op2, LexemeP<{ TAG1 }>>, { RuleKind::Op1 as usize }>, Op2>;
 
-fn op1(t: Tracker) -> IResult {
-    alt(
-        rule(
-            RuleKind::Op1,
-            separated(
-                tag(L::Equals | L::UnEquals | L::Less | L::Greater | {
-                    L::GreaterEqual | L::LessEqual
-                }),
-                op2,
-            ),
-        ),
-        op2,
-    )(t)
-}
+const TAG2: usize =
+    L::Plus.mask() | L::Minus.mask() | L::BitOr.mask() | L::BitShl.mask() | L::BitShr.mask();
+type Op2 = Alt<RuleP<Separated<Op3, LexemeP<{ TAG2 }>>, { RuleKind::Op2 as usize }>, Op3>;
 
-fn op2(t: Tracker) -> IResult {
-    alt(
-        rule(
-            RuleKind::Op2,
-            separated(
-                tag(L::Plus | L::Minus | L::BitOr | L::BitShl | L::BitShr),
-                op3,
-            ),
-        ),
-        op3,
-    )(t)
-}
+const TAG3: usize = L::Mul.mask() | L::Div.mask() | L::Mod.mask() | L::BitAnd.mask();
+type Op3 = Alt<RuleP<Separated<Term, LexemeP<{ TAG3 }>>, { RuleKind::Op3 as usize }>, Term>;
 
-fn op3(t: Tracker) -> IResult {
-    alt(
-        rule(
-            RuleKind::Op3,
-            separated(tag(L::Mul | L::Div | L::Mod | L::BitAnd), term),
-        ),
-        term,
-    )(t)
-}
+type Term = Opt<Alt<LexemeP<{ L::Num.mask() | L::Ident.mask() }>, Alt<Block, Tuple>>>;
 
-fn term(t: Tracker) -> IResult {
-    opt(alt(tag(L::Num | L::Ident), alt(block, tuple)))(t)
+pub struct Block;
+impl TFunc for Block {
+    fn parse(mut t: TInput) -> TResult {
+        t = LexemeP::<{ L::LBrace.mask() }>::parse(t)?;
+        t = Expr::parse(t)?;
+        Opt::<LexemeP<{ L::RBrace.mask() }>>::parse(t)
+    }
 }
-
-fn block(mut t: Tracker) -> IResult {
-    t = tag(L::LBrace)(t)?;
-    t = expr(t)?;
-    opt(tag(L::RBrace))(t)
-}
-
-fn tuple(mut t: Tracker) -> IResult {
-    t = tag(L::LCurlyBrace)(t)?;
-    t = app(t)?;
-    opt(tag(L::RCurlyBrace))(t)
+pub struct Tuple;
+impl TFunc for Tuple {
+    fn parse(mut t: TInput) -> TResult {
+        t = LexemeP::<{ L::LCurlyBrace.mask() }>::parse(t)?;
+        t = App::parse(t)?;
+        Opt::<LexemeP<{ L::RCurlyBrace.mask() }>>::parse(t)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{offset::Offset, syntax::Syntax};
+    use crate::{offset::Offset};
+    use crate::packrat::Packrat;
 
     macro_rules! test_expr {
         ($s:literal) => {
-            let pos = Syntax::default();
+            let mut pos = Vec::new();
             pos.parse($s, Offset::default(), Offset::default());
         };
     }
