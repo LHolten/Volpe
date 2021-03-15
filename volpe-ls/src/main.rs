@@ -1,6 +1,4 @@
 use lsp_server::Connection;
-use lsp_types;
-use serde_json;
 
 extern crate volpe_parser;
 
@@ -8,6 +6,7 @@ mod capabilities;
 mod document;
 mod handler;
 mod lsp_utils;
+mod semantic_tokens;
 mod server;
 use server::Server;
 

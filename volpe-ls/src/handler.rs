@@ -1,5 +1,4 @@
 use lsp_server::{Notification, Request};
-use lsp_types;
 
 use crate::server::Server;
 
