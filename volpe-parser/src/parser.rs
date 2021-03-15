@@ -1,5 +1,5 @@
 use crate::{
-    combinators::{Alt, Id, LexemeP, Many1, Many0, Opt, Pair, RuleP, Separated},
+    combinators::{Alt, Id, LexemeP, Many0, Many1, Opt, Pair, RuleP, Separated},
     lexeme_kind::LexemeKind as L,
     syntax::RuleKind,
     tracker::{TFunc, TInput, TResult},
@@ -87,12 +87,12 @@ impl TFunc for Tuple {
 
 #[cfg(test)]
 mod tests {
-    use crate::{offset::Offset};
+    use crate::offset::Offset;
     use crate::packrat::Packrat;
 
     macro_rules! test_expr {
         ($s:literal) => {
-            let mut pos = Vec::new();
+            let mut pos = Vec::new_parser();
             pos.parse($s, Offset::default(), Offset::default());
         };
     }

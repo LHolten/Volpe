@@ -49,10 +49,10 @@ impl Syntax {
         }
     }
 
-    pub fn next_lexeme(&self) -> Rc<Lexeme> {
+    pub fn next_lexeme(&self) -> Option<Rc<Lexeme>> {
         match self {
-            Syntax::Lexeme(lexeme) => lexeme.next.upgrade().unwrap(),
-            Syntax::Rule(rule) => rule.next.upgrade().unwrap(),
+            Syntax::Lexeme(lexeme) => lexeme.next.upgrade(),
+            Syntax::Rule(rule) => rule.next.upgrade(),
         }
     }
 

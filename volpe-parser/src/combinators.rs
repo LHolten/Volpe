@@ -19,7 +19,7 @@ impl<const L: usize> TFunc for LexemeP<L> {
         if t.lexeme.kind.mask() & L != 0 {
             t.tracker.children.push(Syntax::Lexeme(t.lexeme.clone()));
             t.offset += t.lexeme.length;
-            t.lexeme = t.lexeme.next.upgrade().unwrap();
+            t.lexeme = t.lexeme.next.upgrade().unwrap_or_default();
             Ok(t)
         } else {
             Err(t.tracker)

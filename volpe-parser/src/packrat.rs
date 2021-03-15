@@ -1,4 +1,4 @@
-use std::{mem::take, rc::Rc};
+use std::{cell::Cell, mem::take, rc::Rc};
 
 use crate::{
     internal::UpgradeInternal,
@@ -11,6 +11,7 @@ use crate::{logos::Logos, offset::Offset};
 
 pub trait Packrat {
     fn parse(&mut self, string: &str, offset: Offset, length: Offset);
+    fn new_parser() -> Self;
 }
 
 impl Packrat for Vec<Syntax> {
@@ -19,27 +20,34 @@ impl Packrat for Vec<Syntax> {
         save_subtrees(self, &mut safe, offset, length);
         let (prev, offset) = prev_lexeme(self, offset);
         let is_first = prev.is_none();
-        let prev = prev.unwrap_or_default();
+        let prev = prev.unwrap_or(Rc::new(Lexeme {
+            next: Cell::new(Rc::downgrade(&first_lexeme(self))),
+            ..Lexeme::default()
+        }));
         patch_lexeme(prev.clone(), &mut safe, offset, length, string);
-
         let first = if is_first {
             prev.next.upgrade().unwrap()
         } else {
-            safe[0].first_lexeme() // not good
+            first_lexeme(self)
         };
-        take(self);
         let input = TInput {
             lexeme: first,
             offset: Offset::default(),
             tracker: Tracker::default(),
         };
+        take(self);
         dbg!(&input.lexeme);
+        dbg!(&safe);
         let result = FileP::parse(input);
         let tracker = Tracker::from(result);
         dbg!(&tracker.children);
         drop(safe);
         dbg!(&tracker.children);
         *self = tracker.children
+    }
+
+    fn new_parser() -> Self {
+        vec![Syntax::default()]
     }
 }
 
@@ -72,25 +80,36 @@ fn save_subtrees(
             offset -= len;
         }
     }
+    safe.extend(child_iter.cloned())
 }
 
 pub fn prev_lexeme(children: &Vec<Syntax>, mut offset: Offset) -> (Option<Rc<Lexeme>>, Offset) {
+    let mut prev = None;
     for child in children {
         let len = child.len().0;
-        let next_len = child.next_lexeme().length;
-        if len != Offset::default() && len + next_len >= offset {
-            return match child {
-                Syntax::Lexeme(lexeme) => {
-                    if lexeme.length >= offset {
-                        (None, offset)
-                    } else {
-                        (Some(lexeme.clone()), offset - lexeme.length)
-                    }
-                }
-                Syntax::Rule(rule) => prev_lexeme(&rule.children, offset),
+        if len >= offset {
+            return match prev {
+                Some(Syntax::Lexeme(lexeme)) => (Some(lexeme), offset),
+                Some(Syntax::Rule(rule)) => prev_lexeme(&rule.children, offset),
+                None => (None, offset),
             };
         }
         offset -= len;
+        prev = Some(child.clone());
+    }
+    unreachable!()
+}
+
+pub fn first_lexeme(children: &Vec<Syntax>) -> Rc<Lexeme> {
+    for child in children {
+        match child {
+            Syntax::Lexeme(lexeme) => return lexeme.clone(),
+            Syntax::Rule(rule) => {
+                if rule.length != Offset::default() {
+                    return first_lexeme(&rule.children);
+                }
+            }
+        }
     }
     unreachable!()
 }
