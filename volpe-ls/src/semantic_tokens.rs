@@ -2,7 +2,7 @@
 // https://github.com/rust-analyzer/rust-analyzer/blob/master/crates/rust-analyzer/src/semantic_tokens.rs
 
 use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens};
-use volpe_parser::{lexem_kind::LexemKind, offset::Offset, syntax::Lexem};
+use volpe_parser::{lexeme_kind::LexemeKind, offset::Offset};
 
 pub const SUPPORTED_TYPES: &[SemanticTokenType] = &[
     SemanticTokenType::PARAMETER,
@@ -66,32 +66,32 @@ impl SemanticTokensBuilder {
     }
 }
 
-pub fn lexeme_to_type(lexeme: &mut Lexem) -> Option<SemanticTokenType> {
-    match lexeme.kind {
-        LexemKind::Assign
-        | LexemKind::MultiAssign
-        | LexemKind::Ite
-        | LexemKind::Func
-        | LexemKind::Or
-        | LexemKind::And
-        | LexemKind::Equals
-        | LexemKind::UnEquals
-        | LexemKind::Less
-        | LexemKind::Greater
-        | LexemKind::LessEqual
-        | LexemKind::GreaterEqual
-        | LexemKind::BitOr
-        | LexemKind::BitAnd
-        | LexemKind::BitXor
-        | LexemKind::BitShl
-        | LexemKind::BitShr
-        | LexemKind::Plus
-        | LexemKind::Minus
-        | LexemKind::Mul
-        | LexemKind::Div
-        | LexemKind::Mod => Some(SemanticTokenType::OPERATOR),
-        LexemKind::Ident => Some(SemanticTokenType::VARIABLE),
-        LexemKind::Num => Some(SemanticTokenType::NUMBER),
+pub fn lexeme_to_type(kind: &LexemeKind) -> Option<SemanticTokenType> {
+    match kind {
+        LexemeKind::Assign
+        | LexemeKind::MultiAssign
+        | LexemeKind::Ite
+        | LexemeKind::Func
+        | LexemeKind::Or
+        | LexemeKind::And
+        | LexemeKind::Equals
+        | LexemeKind::UnEquals
+        | LexemeKind::Less
+        | LexemeKind::Greater
+        | LexemeKind::LessEqual
+        | LexemeKind::GreaterEqual
+        | LexemeKind::BitOr
+        | LexemeKind::BitAnd
+        | LexemeKind::BitXor
+        | LexemeKind::BitShl
+        | LexemeKind::BitShr
+        | LexemeKind::Plus
+        | LexemeKind::Minus
+        | LexemeKind::Mul
+        | LexemeKind::Div
+        | LexemeKind::Mod => Some(SemanticTokenType::OPERATOR),
+        LexemeKind::Ident => Some(SemanticTokenType::VARIABLE),
+        LexemeKind::Num => Some(SemanticTokenType::NUMBER),
         _ => None,
     }
 }
