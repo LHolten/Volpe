@@ -100,7 +100,7 @@ impl Server {
         .on::<lsp_types::request::SemanticTokensFullRequest>(|this, params| {
             let potential_doc = this
                 .documents
-                .get_mut(&params.text_document.uri.to_string());
+                .get(&params.text_document.uri.to_string());
             match potential_doc {
                 Some(doc) => {
                     let tokens = doc.get_semantic_tokens();
