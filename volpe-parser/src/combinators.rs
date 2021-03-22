@@ -1,28 +1,26 @@
-use std::{
-    cmp::max,
-    marker::PhantomData,
-    rc::{Rc, Weak},
-};
+use std::{cmp::max, marker::PhantomData};
 
 use crate::{
-    internal::{UpgradeInternal, WithInternal},
     offset::Offset,
-    syntax::{Rule, RuleKind, Syntax},
-    tracker::{TFunc, TInput, TResult, Tracker},
+    syntax::Rule,
+    tracker::{TError, TFunc, TInput, TResult},
 };
 
 pub struct LexemeP<const L: usize>;
 
 impl<const L: usize> TFunc for LexemeP<L> {
     fn parse(mut t: TInput) -> TResult {
-        t.tracker.length = max(t.tracker.length, t.offset + t.lexeme.length);
-        if t.lexeme.kind.mask() & L != 0 {
-            t.tracker.children.push(Syntax::Lexeme(t.lexeme.clone()));
-            t.offset += t.lexeme.length;
-            t.lexeme = t.lexeme.next.upgrade().unwrap_or_default();
+        let lexeme = t.lexeme.as_mut().unwrap();
+        t.error.sensitive_length = max(t.error.sensitive_length, t.length + lexeme.length);
+        if lexeme.kind.mask() & L != 0 {
+            t.length += lexeme.length;
+            if lexeme.next.is_none() {
+                lexeme.next = Some(t.error.remaining.pop().unwrap());
+            }
+            t.lexeme = &mut lexeme.next;
             Ok(t)
         } else {
-            Err(t.tracker)
+            Err(t.error)
         }
     }
 }
@@ -33,41 +31,49 @@ pub struct RuleP<F, const R: usize> {
 
 impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
     fn parse(mut t: TInput) -> TResult {
-        let rule = t.lexeme.rules[R].upgrade().unwrap_or_else(|| {
-            let result = F::parse(TInput {
-                lexeme: t.lexeme.clone(),
-                offset: Offset::default(),
-                tracker: Tracker::default(),
-            });
-            let rule = match result {
-                Ok(input) => Rule {
-                    children: input.tracker.children,
-                    length: input.tracker.length,
-                    kind: RuleKind::from(R),
-                    offset: input.offset,
-                    next: Rc::downgrade(&input.lexeme),
-                },
-                Err(tracker) => Rule {
-                    children: tracker.children,
-                    length: tracker.length,
-                    kind: RuleKind::from(R),
-                    offset: Offset::default(),
-                    next: Weak::default(),
-                },
-            };
-            let rule = Rc::new(rule);
-            t.lexeme.rules[R].with(|r| *r = Rc::downgrade(&rule));
-            rule
-        });
+        let rule_ptr = &mut t.lexeme.as_mut().unwrap().rules[R] as *mut Rule;
+        let rule_ptr = unsafe { &mut *rule_ptr };
 
-        t.tracker.length = max(t.tracker.length, t.offset + rule.length);
-        t.tracker.children.push(Syntax::Rule(rule.clone()));
-        if let Some(lexeme) = rule.next.upgrade() {
-            t.offset += rule.offset;
-            t.lexeme = lexeme;
+        if rule_ptr.sensitive_length == Offset::default() {
+            let result = F::parse(TInput {
+                lexeme: t.lexeme,
+                length: Offset::default(),
+                error: TError {
+                    sensitive_length: Offset::default(),
+                    remaining: t.error.remaining,
+                },
+            });
+            let (remaining, rule) = match result {
+                Ok(input) => (
+                    input.error.remaining,
+                    Rule {
+                        sensitive_length: input.error.sensitive_length,
+                        length: input.length,
+                        next: input.lexeme.take(),
+                    },
+                ),
+                Err(error) => (
+                    error.remaining,
+                    Rule {
+                        sensitive_length: error.sensitive_length,
+                        length: Offset::default(),
+                        next: None,
+                    },
+                ),
+            };
+            *rule_ptr = rule;
+            t.error.remaining = remaining;
+        };
+        let lexeme = t.lexeme.as_mut().unwrap();
+        let rule = &mut lexeme.rules[R];
+
+        t.error.sensitive_length = max(t.error.sensitive_length, t.length + rule.sensitive_length);
+        if rule.length != Offset::default() {
+            t.length += rule.length;
+            t.lexeme = &mut rule.next;
             Ok(t)
         } else {
-            Err(t.tracker)
+            Err(t.error)
         }
     }
 }
@@ -84,23 +90,7 @@ pub struct Many0<F> {
 
 impl<F: TFunc> TFunc for Many0<F> {
     fn parse(t: TInput) -> TResult {
-        let pos = t.lexeme.clone();
-        let offset = t.offset;
-        F::parse(t)
-            .and_then(|t| {
-                if t.offset == offset {
-                    Err(t.tracker)
-                } else {
-                    Self::parse(t)
-                }
-            })
-            .or_else(|tracker| {
-                Ok(TInput {
-                    lexeme: pos,
-                    offset,
-                    tracker,
-                })
-            })
+        Alt::<Many0<F>, Id>::parse(t)
     }
 }
 
@@ -122,16 +112,23 @@ pub struct Alt<F, G> {
 
 impl<F: TFunc, G: TFunc> TFunc for Alt<F, G> {
     fn parse(t: TInput) -> TResult {
-        let pos = t.lexeme.clone();
-        let offset = t.offset;
-        match F::parse(t) {
-            result @ Ok(_) => result,
-            Err(tracker) => G::parse(TInput {
-                lexeme: pos,
-                offset,
-                tracker,
-            }),
-        }
+        let lexeme = t.lexeme as *mut _;
+        let length = t.length;
+        F::parse(t)
+            .and_then(|t| {
+                if t.length == length {
+                    Err(t.error)
+                } else {
+                    Ok(t)
+                }
+            })
+            .or_else(|error| {
+                G::parse(TInput {
+                    lexeme: unsafe { &mut *lexeme },
+                    length,
+                    error,
+                })
+            })
     }
 }
 

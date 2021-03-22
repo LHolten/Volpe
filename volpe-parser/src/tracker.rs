@@ -1,32 +1,18 @@
-use std::rc::Rc;
-
-use crate::{
-    offset::Offset,
-    syntax::{Lexeme, Syntax},
-};
+use crate::{offset::Offset, syntax::Lexeme};
 
 pub trait TFunc {
-    fn parse(t: TInput) -> TResult;
-}
-pub type TResult = Result<TInput, Tracker>;
-
-#[derive(Default)]
-pub struct Tracker {
-    pub children: Vec<Syntax>,
-    pub length: Offset,
+    fn parse(t: TInput) -> Result<TInput, TError>;
 }
 
-pub struct TInput {
-    pub lexeme: Rc<Lexeme>,
-    pub offset: Offset,
-    pub tracker: Tracker,
+pub type TResult<'a> = Result<TInput<'a>, TError>;
+
+pub struct TInput<'a> {
+    pub lexeme: &'a mut Option<Box<Lexeme>>,
+    pub length: Offset, // the length of the text consumed by the current rule
+    pub error: TError,
 }
 
-impl From<TResult> for Tracker {
-    fn from(result: TResult) -> Self {
-        match result {
-            Ok(input) => input.tracker,
-            Err(tracker) => tracker,
-        }
-    }
+pub struct TError {
+    pub remaining: Vec<Box<Lexeme>>,
+    pub sensitive_length: Offset, // the length of text that triggers reparse if changed
 }

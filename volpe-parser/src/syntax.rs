@@ -1,88 +1,20 @@
-use std::{
-    cell::Cell,
-    fmt::Debug,
-    rc::{Rc, Weak},
-};
+use std::fmt::Debug;
 
-use crate::{
-    internal::UpgradeInternal, lexeme_kind::LexemeKind, offset::Offset, packrat::first_lexeme,
-};
-
-#[derive(Clone)]
-pub enum Syntax {
-    Lexeme(Rc<Lexeme>),
-    Rule(Rc<Rule>),
-}
-
-impl Default for Syntax {
-    fn default() -> Self {
-        Self::Lexeme(Default::default())
-    }
-}
-
-impl Debug for Syntax {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Syntax::Lexeme(pos) => pos.string.fmt(f),
-            Syntax::Rule(rule) => {
-                rule.kind.fmt(f)?;
-                rule.children
-                    .iter()
-                    .filter(|s| Syntax::is_success(*s))
-                    .collect::<Vec<&Syntax>>()
-                    .fmt(f)
-            }
-        }
-    }
-}
-
-impl Syntax {
-    pub fn is_success(&self) -> bool {
-        match self {
-            Syntax::Lexeme(_) => true,
-            Syntax::Rule(rule) => rule.next.upgrade().is_some(),
-        }
-    }
-
-    pub fn len(&self) -> (Offset, Offset) {
-        match self {
-            Syntax::Lexeme(lexeme) => (lexeme.length, lexeme.length),
-            Syntax::Rule(rule) => (rule.offset, rule.length),
-        }
-    }
-
-    pub fn next_lexeme(&self) -> Option<Rc<Lexeme>> {
-        match self {
-            Syntax::Lexeme(lexeme) => lexeme.next.upgrade(),
-            Syntax::Rule(rule) => rule.next.upgrade(),
-        }
-    }
-
-    pub fn first_lexeme(&self) -> Rc<Lexeme> {
-        match self {
-            Syntax::Lexeme(lexeme) => lexeme.clone(),
-            Syntax::Rule(rule) => first_lexeme(&rule.children),
-        }
-    }
-
-    pub fn text(&self) -> String {
-        format!("{:?}", self.first_lexeme())
-    }
-}
+use crate::{lexeme_kind::LexemeKind, offset::Offset};
 
 #[derive(Default)]
 pub struct Lexeme {
     pub string: String, // white space and unknown in front
     pub length: Offset,
     pub kind: LexemeKind,
-    pub rules: [Cell<Weak<Rule>>; 9],
-    pub next: Cell<Weak<Lexeme>>,
+    pub rules: [Rule; 9],
+    pub next: Option<Box<Lexeme>>,
 }
 
 impl Debug for Lexeme {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.string)?;
-        if let Some(next) = self.next.upgrade() {
+        if let Some(next) = &self.next {
             next.fmt(f)
         } else {
             Ok(())
@@ -90,12 +22,11 @@ impl Debug for Lexeme {
     }
 }
 
+#[derive(Default)]
 pub struct Rule {
-    pub children: Vec<Syntax>,
-    pub length: Offset, // total length including failed rules/lexems
-    pub kind: RuleKind,
-    pub offset: Offset,     // offset of next
-    pub next: Weak<Lexeme>, // is Some when rule succeeded
+    pub sensitive_length: Offset, // total length including failed rules/lexems (zero means unevaluated)
+    pub length: Offset,           // offset of next (zero means failed)
+    pub next: Option<Box<Lexeme>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

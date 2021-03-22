@@ -89,11 +89,11 @@ impl TFunc for Tuple {
 #[cfg(test)]
 mod tests {
     use crate::offset::Offset;
-    use crate::packrat::Packrat;
+    use crate::packrat::Parser;
 
     macro_rules! test_expr {
         ($s:literal) => {
-            let mut pos = Packrat::default();
+            let mut pos = Parser::default();
             pos.parse($s, Offset::default(), Offset::default());
         };
     }
