@@ -17,8 +17,8 @@ mod test {
     #[test]
     fn bug() {
         let mut p = Parser::default();
-        p.parse("a + b + c", Offset::new(0, 0), Offset::new(0, 0));
-        p.parse("", Offset::new(0, 0), Offset::new(0, 9));
-        p.parse("test", Offset::new(0, 0), Offset::new(0, 0));
+        p.parse("a", Offset::new(0, 0), Offset::new(0, 0));
+        // p.padrse("", Offset::new(0, 0), Offset::new(0, 9));
+        // p.parse("test", Offset::new(0, 0), Offset::new(0, 0));
     }
 }

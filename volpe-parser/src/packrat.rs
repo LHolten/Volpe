@@ -8,8 +8,13 @@ use crate::{
 };
 use crate::{logos::Logos, offset::Offset};
 
-#[derive(Default)]
 pub struct Parser(Option<Box<Lexeme>>);
+
+impl Default for Parser {
+    fn default() -> Self {
+        Self(Some(Default::default()))
+    }
+}
 
 impl Parser {
     // you can only use offsets that are within the text
@@ -73,7 +78,7 @@ impl Parser {
             }
         }
 
-        if !buffer.is_empty() || last.next.is_none() {
+        if !buffer.is_empty() || last.length == Offset::default() {
             *next = Some(Box::new(Lexeme {
                 string: take(&mut buffer),
                 length: take(&mut buffer_length),
@@ -127,7 +132,7 @@ pub fn fix_last(
     mut lexeme: Box<Lexeme>,
     length: Offset,
 ) -> (Box<Lexeme>, Offset) {
-    if lexeme.length > length {
+    if lexeme.length > length || lexeme.length == Offset::default() {
         return (lexeme, length);
     }
     let mut furthest = (lexeme.length, &mut lexeme.next);

@@ -10,6 +10,11 @@ pub struct LexemeP<const L: usize>;
 
 impl<const L: usize> TFunc for LexemeP<L> {
     fn parse(mut t: TInput) -> TResult {
+        for rule in &mut t.lexeme.as_mut().unwrap().rules {
+            if rule.next.is_some() {
+                t.error.remaining.push(rule.next.take().unwrap())
+            }
+        }
         let lexeme = t.lexeme.as_mut().unwrap();
         t.error.sensitive_length = max(t.error.sensitive_length, t.length + lexeme.length);
         if lexeme.kind.mask() & L != 0 {
@@ -31,10 +36,13 @@ pub struct RuleP<F, const R: usize> {
 
 impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
     fn parse(mut t: TInput) -> TResult {
-        let rule_ptr = &mut t.lexeme.as_mut().unwrap().rules[R] as *mut Rule;
-        let rule_ptr = unsafe { &mut *rule_ptr };
-
-        if rule_ptr.sensitive_length == Offset::default() {
+        for rule in &mut t.lexeme.as_mut().unwrap().rules {
+            if rule.next.is_some() {
+                t.error.remaining.push(rule.next.take().unwrap())
+            }
+        }
+        let rule = &mut t.lexeme.as_mut().unwrap().rules[R] as *mut Rule;
+        if t.lexeme.as_mut().unwrap().rules[R].sensitive_length == Offset::default() {
             let result = F::parse(TInput {
                 lexeme: t.lexeme,
                 length: Offset::default(),
@@ -43,33 +51,32 @@ impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
                     remaining: t.error.remaining,
                 },
             });
-            let (remaining, rule) = match result {
-                Ok(input) => (
-                    input.error.remaining,
-                    Rule {
-                        sensitive_length: input.error.sensitive_length,
-                        length: input.length,
-                        next: input.lexeme.take(),
-                    },
-                ),
-                Err(error) => (
-                    error.remaining,
-                    Rule {
-                        sensitive_length: error.sensitive_length,
-                        length: Offset::default(),
-                        next: None,
-                    },
-                ),
+            let mut empty = None;
+            let tracker = match result {
+                Ok(input) => input,
+                Err(error) => TInput {
+                    lexeme: &mut empty,
+                    length: Offset::default(),
+                    error,
+                },
             };
-            *rule_ptr = rule;
-            t.error.remaining = remaining;
+            let rule = unsafe { &mut *rule };
+            assert!(rule.next.is_none());
+            *rule = Rule {
+                sensitive_length: tracker.error.sensitive_length,
+                length: tracker.length,
+                next: tracker.lexeme.take(),
+            };
+            t.error.remaining = tracker.error.remaining;
         };
-        let lexeme = t.lexeme.as_mut().unwrap();
-        let rule = &mut lexeme.rules[R];
+        let rule = unsafe { &mut *rule };
 
         t.error.sensitive_length = max(t.error.sensitive_length, t.length + rule.sensitive_length);
         if rule.length != Offset::default() {
             t.length += rule.length;
+            if rule.next.is_none() {
+                rule.next = Some(t.error.remaining.pop().unwrap());
+            }
             t.lexeme = &mut rule.next;
             Ok(t)
         } else {
@@ -90,7 +97,24 @@ pub struct Many0<F> {
 
 impl<F: TFunc> TFunc for Many0<F> {
     fn parse(t: TInput) -> TResult {
-        Alt::<Many0<F>, Id>::parse(t)
+        Opt::<Pair<NotOpt<F>, Many0<F>>>::parse(t)
+    }
+}
+
+pub struct NotOpt<F> {
+    f: PhantomData<F>,
+}
+
+impl<F: TFunc> TFunc for NotOpt<F> {
+    fn parse(t: TInput) -> Result<TInput, TError> {
+        let length = t.length;
+        F::parse(t).and_then(|t| {
+            if t.length == length {
+                Err(t.error)
+            } else {
+                Ok(t)
+            }
+        })
     }
 }
 
@@ -114,21 +138,13 @@ impl<F: TFunc, G: TFunc> TFunc for Alt<F, G> {
     fn parse(t: TInput) -> TResult {
         let lexeme = t.lexeme as *mut _;
         let length = t.length;
-        F::parse(t)
-            .and_then(|t| {
-                if t.length == length {
-                    Err(t.error)
-                } else {
-                    Ok(t)
-                }
+        F::parse(t).or_else(|error| {
+            G::parse(TInput {
+                lexeme: unsafe { &mut *lexeme },
+                length,
+                error,
             })
-            .or_else(|error| {
-                G::parse(TInput {
-                    lexeme: unsafe { &mut *lexeme },
-                    length,
-                    error,
-                })
-            })
+        })
     }
 }
 
