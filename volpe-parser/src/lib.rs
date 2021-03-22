@@ -14,11 +14,22 @@ mod test {
     use crate::offset::Offset;
     use crate::packrat::Parser;
 
-    #[test]
-    fn bug() {
-        let mut p = Parser::default();
-        p.parse("a", Offset::new(0, 0), Offset::new(0, 0));
-        // p.padrse("", Offset::new(0, 0), Offset::new(0, 9));
-        // p.parse("test", Offset::new(0, 0), Offset::new(0, 0));
+    macro_rules! test_expr {
+        ($s:literal) => {
+            let mut parser = Parser::default();
+            parser.parse($s, Offset::default(), Offset::default());
+        };
     }
+
+    #[test]
+    fn thing() {
+        test_expr!("=");
+        test_expr!("=>");
+        test_expr!("(");
+        test_expr!(")");
+        test_expr!("()");
+        test_expr!("");
+        test_expr!("=>");
+    }
+
 }

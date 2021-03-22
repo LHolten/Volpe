@@ -43,6 +43,7 @@ impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
         }
         let rule = &mut t.lexeme.as_mut().unwrap().rules[R] as *mut Rule;
         if t.lexeme.as_mut().unwrap().rules[R].sensitive_length == Offset::default() {
+            // current rule is not tried yet
             let result = F::parse(TInput {
                 lexeme: t.lexeme,
                 length: Offset::default(),
@@ -55,7 +56,7 @@ impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
             let tracker = match result {
                 Ok(input) => input,
                 Err(error) => TInput {
-                    lexeme: &mut empty,
+                    lexeme: &mut empty, // this will become None in the rule
                     length: Offset::default(),
                     error,
                 },

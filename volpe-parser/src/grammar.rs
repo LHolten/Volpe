@@ -1,5 +1,5 @@
 use crate::{
-    combinators::{Alt, Id, LexemeP, Many0, Many1, Opt, Pair, RuleP, Separated},
+    combinators::{Alt, Id, LexemeP, Many0, Many1, NotOpt, Opt, Pair, RuleP, Separated},
     lexeme_kind::LexemeKind as L,
     syntax::RuleKind,
     tracker::{TFunc, TInput, TResult},
@@ -43,7 +43,7 @@ impl TFunc for StmtInner {
 }
 
 // matches a single value right now
-type App = Alt<RuleP<Separated<Func, Id>, { RuleKind::App as usize }>, Func>;
+type App = Alt<RuleP<Separated<NotOpt<Func>, Id>, { RuleKind::App as usize }>, Func>;
 
 type Func = Alt<RuleP<Separated<Or, LexemeP<{ L::Func.mask() }>>, { RuleKind::Func as usize }>, Or>;
 
