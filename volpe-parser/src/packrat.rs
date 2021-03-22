@@ -1,8 +1,8 @@
 use std::mem::take;
 
 use crate::{
+    grammar::FileP,
     lexeme_kind::LexemeKind,
-    parser::FileP,
     syntax::Lexeme,
     tracker::{TError, TFunc, TInput},
 };

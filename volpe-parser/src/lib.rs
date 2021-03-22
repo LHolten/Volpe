@@ -1,10 +1,10 @@
 extern crate logos;
 
 mod combinators;
+mod grammar;
 pub mod lexeme_kind;
 pub mod offset;
 pub mod packrat;
-mod parser;
 pub mod syntax;
 mod tracker;
 
