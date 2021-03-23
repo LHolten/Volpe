@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt;
 use std::mem::take;
 
 use crate::{
@@ -11,12 +11,12 @@ use crate::{logos::Logos, offset::Offset};
 
 pub struct Parser(Option<Box<Lexeme>>);
 
-impl Debug for Parser {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Parser {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(lexeme) = &self.0 {
             lexeme.fmt(f)
         } else {
-            f.write_str("Nothing yet")
+            f.write_str("Empty Parser")
         }
     }
 }

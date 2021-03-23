@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt;
 
 use crate::{lexeme_kind::LexemeKind, offset::Offset};
 
@@ -13,8 +13,8 @@ pub struct Lexeme {
 
 const INDENT: &'static str = "  ";
 
-impl Debug for Lexeme {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Lexeme {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut indent = 0;
         let mut next_lexemes = vec![self];
 

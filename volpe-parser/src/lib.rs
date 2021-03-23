@@ -21,6 +21,15 @@ mod test {
         };
     }
 
+    macro_rules! examine_parser {
+        ( $i:ident, $( $e:expr )* ) => {
+            $(
+                $e;
+                println!("{}", $i);
+            )*
+        }
+    }
+
     #[test]
     fn thing() {
         test_expr!("=");
@@ -34,9 +43,11 @@ mod test {
     #[test]
     fn more_things() {
         let mut parser = Parser::default();
-        parser.parse("(a + b) * c", Offset::default(), Offset::default());
-        println!("{:?}", parser);
-        parser.parse("", Offset::default(), Offset::char(1));
-        println!("{:?}", parser);
+        examine_parser!(
+            parser,
+            parser.parse("(a + b) * c", Offset::default(), Offset::default())
+            parser.parse("", Offset::default(), Offset::char(1))
+            parser.parse("(", Offset::default(), Offset::default())
+        );
     }
 }
