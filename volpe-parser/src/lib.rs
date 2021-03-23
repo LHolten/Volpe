@@ -29,7 +29,13 @@ mod test {
         test_expr!(")");
         test_expr!("()");
         test_expr!("");
-        test_expr!("=>");
     }
 
+    #[test]
+    fn more_things() {
+        let mut parser = Parser::default();
+        parser.parse("(a + b) * c", Offset::default(), Offset::default());
+        println!("{}", parser.text());
+        println!("{:?}", parser);
+    }
 }
