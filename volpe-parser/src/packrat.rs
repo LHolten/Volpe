@@ -110,16 +110,6 @@ impl Parser {
         .ok()
         .unwrap();
     }
-
-    pub fn text(&self) -> String {
-        let mut buffer = String::new();
-        let mut next = &self.0;
-        while let Some(lexeme) = next {
-            buffer.push_str(&lexeme.string);
-            next = &lexeme.next;
-        }
-        buffer
-    }
 }
 
 pub fn fix_first<'a>(
@@ -153,9 +143,6 @@ pub fn fix_last(
     mut lexeme: Box<Lexeme>,
     length: Offset,
 ) -> (Box<Lexeme>, Offset) {
-    if lexeme.length > length || lexeme.length == Offset::default() {
-        return (lexeme, length);
-    }
     let mut furthest = (lexeme.length, &mut lexeme.next);
     for rule in &mut lexeme.rules {
         if rule.length >= length {
@@ -166,6 +153,9 @@ pub fn fix_last(
         } else if rule.length > furthest.0 {
             furthest = (rule.length, &mut rule.next);
         }
+    }
+    if lexeme.length > length || lexeme.length == Offset::default() {
+        return (lexeme, length);
     }
     if furthest.1.is_none() {
         *furthest.1 = Some(remaining.pop().unwrap());

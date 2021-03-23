@@ -35,7 +35,8 @@ mod test {
     fn more_things() {
         let mut parser = Parser::default();
         parser.parse("(a + b) * c", Offset::default(), Offset::default());
-        println!("{}", parser.text());
+        println!("{:?}", parser);
+        parser.parse("", Offset::default(), Offset::char(1));
         println!("{:?}", parser);
     }
 }

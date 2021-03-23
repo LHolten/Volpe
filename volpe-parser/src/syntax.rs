@@ -15,31 +15,33 @@ const INDENT: &'static str = "  ";
 
 impl Debug for Lexeme {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut output = String::new();
         let mut indent = 0;
         let mut next_lexemes = vec![self];
 
         while let Some(lexeme) = next_lexemes.pop() {
             for (i, rule) in lexeme.rules.iter().enumerate() {
                 if rule.length > Offset::default() {
-                    for _ in 0..indent { output.push_str(INDENT) }
-                    output.push_str(&format!("{:?}\n", RuleKind::from(i)));
+                    for _ in 0..indent {
+                        f.write_str(INDENT)?;
+                    }
+                    write!(f, "{:?}\n", RuleKind::from(i))?;
                     if let Some(next) = &rule.next {
                         next_lexemes.push(next)
                     }
                     indent += 1;
                 }
             }
-            for _ in 0..indent { output.push_str(INDENT) }
-            output.push_str(&format!("{:?}\n", lexeme.string));
+            for _ in 0..indent {
+                f.write_str(INDENT)?;
+            }
+            write!(f, "{:?}\n", lexeme.string)?;
             if let Some(next) = &lexeme.next {
                 next_lexemes.push(next)
             } else {
                 indent -= 1;
             }
         }
-        
-        f.write_str(&output)
+        Ok(())
     }
 }
 
@@ -61,7 +63,6 @@ pub enum RuleKind {
     Op1,
     Op2,
     Op3,
-    File,
 }
 
 impl From<usize> for RuleKind {
