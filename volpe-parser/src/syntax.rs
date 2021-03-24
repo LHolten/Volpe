@@ -11,53 +11,63 @@ pub struct Lexeme {
     pub next: Option<Box<Lexeme>>,
 }
 
-const INDENT: &'static str = "  ";
+fn write_with_indent<D: fmt::Debug>(
+    f: &mut fmt::Formatter<'_>,
+    thing: D,
+    indent: u32,
+) -> fmt::Result {
+    for _ in 0..indent {
+        f.write_str("  ")?;
+    }
+    write!(f, "{:?}\n", thing)
+}
+
+fn recursive_fmt(this: &Lexeme, f: &mut fmt::Formatter<'_>, mut indent: u32) -> fmt::Result {
+    // Rules are sorted so that the largest ones are first.
+    // This means we can use next_lexemes like a stack where
+    // the last value corresponds to the `.next` of the smallest rule.
+    // These are used when we reach the end of a lexeme chain.
+    let mut next_lexemes = Vec::new();
+
+    // Iterate over all rules that start at this lexeme.
+    for (i, rule) in this.rules.iter().enumerate() {
+        // Skip unsuccessful rules.
+        if rule.length <= Offset::default() {
+            continue;
+        }
+        // Write name of rule.
+        write_with_indent(f, RuleKind::from(i), indent)?;
+        indent += 1;
+        // Remember which lexeme is next after this rule.
+        if let Some(next) = &rule.next {
+            next_lexemes.push(next)
+        }
+    }
+    // Write the current lexeme.
+    write_with_indent(f, &this.string, indent)?;
+    // Repeat whole process for the next lexeme in the chain.
+    if let Some(next) = &this.next {
+        recursive_fmt(next, f, indent)?;
+    }
+    // We reached the end of the chain.
+    // Now we have to use the remembered `next` lexemes.
+    while let Some(lexeme) = next_lexemes.pop() {
+        indent -= 1;
+        recursive_fmt(lexeme, f, indent)?;
+    }
+    Ok(())
+}
 
 impl fmt::Display for Lexeme {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut indent = 0;
-        // we treat next_lexemes as a stack of remembered lexemes
-        let mut next_lexemes = vec![self];
-
-        while let Some(lexeme) = next_lexemes.pop() {
-            // for each rule we check if it is valid by looking at length
-            // if valid, we write the rule and remember the next lexeme
-            // once we finish a lexeme chain we use these remembered lexemes to continue
-            for (i, rule) in lexeme.rules.iter().enumerate() {
-                if rule.length > Offset::default() {
-                    // write the rule
-                    for _ in 0..indent {
-                        f.write_str(INDENT)?;
-                    }
-                    write!(f, "{:?}\n", RuleKind::from(i))?;
-                    // remember the next lexeme for later
-                    if let Some(next) = &rule.next {
-                        next_lexemes.push(next)
-                    }
-                    indent += 1;
-                }
-            }
-            // write the lexeme
-            for _ in 0..indent {
-                f.write_str(INDENT)?;
-            }
-            write!(f, "{:?}\n", lexeme.string)?;
-            // this is where we follow a lexeme chain
-            if let Some(next) = &lexeme.next {
-                next_lexemes.push(next)
-            } else {
-                // we reached the end of a chain, i.e. end of a rule
-                indent -= 1;
-            }
-        }
-        Ok(())
+        recursive_fmt(self, f, 0)
     }
 }
 
 #[derive(Default)]
 pub struct Rule {
-    pub sensitive_length: Offset, // total length including failed rules/lexemes (zero means unevaluated)
-    pub length: Offset,           // offset of next (zero means failed)
+    pub sensitive_length: Offset, // Total length including failed rules/lexemes (zero means unevaluated)
+    pub length: Offset,           // Offset of next (zero means failed)
     pub next: Option<Box<Lexeme>>,
 }
 
