@@ -1,23 +1,23 @@
 use crate::semantic_tokens::{lexeme_to_type, type_index, SemanticTokensBuilder};
 use lsp_types;
-use volpe_parser::{internal::UpgradeInternal, offset::Offset, packrat::{Packrat, first_lexeme}};
+use volpe_parser::{packrat::Parser, offset::Offset};
 
 pub struct Document {
     version: i32,
-    packrat: Packrat,
+    parser: Parser,
 }
 
 impl Document {
     pub fn new(params: &lsp_types::DidOpenTextDocumentParams) -> Document {
-        let mut packrat = Packrat::default();
-        packrat.parse(
+        let mut parser = Parser::default();
+        parser.parse(
             &params.text_document.text,
-            Offset::new(0, 0),
-            Offset::new(0, 0),
+            Offset::default(),
+            Offset::default(),
         );
         Document {
             version: params.text_document.version,
-            packrat,
+            parser,
         }
     }
 
@@ -27,21 +27,40 @@ impl Document {
         for event in params.content_changes.iter() {
             if let Some(range) = event.range {
                 // TODO fix utf-8 and utf-16 mismatch
-                let start = Offset::new(range.start.line as usize, range.start.character as usize);
-                let end = Offset::new(range.end.line as usize, range.end.character as usize);
-                self.packrat.parse(&event.text, start, end - start);
+                let start = Offset::new(range.start.line, range.start.character);
+                let end = Offset::new(range.end.line, range.end.character);
+                self.parser.parse(&event.text, start, end - start);
             }
         }
     }
 
     pub fn get_info(&self) -> String {
-        format!("version: {}\nsyntax: {:#?}", self.version, self.packrat)
+        format!("version: {}\n{}", self.version, self.parser)
     }
 
     pub fn get_semantic_tokens(&self) -> lsp_types::SemanticTokens {
         let mut builder = SemanticTokensBuilder::new();
-        let mut potential_lexeme = Some(first_lexeme(&self.packrat.0));
-        while let Some(lexeme) = potential_lexeme {
+
+        if self.parser.0.is_none() {
+            return builder.build();
+        };
+
+        let mut next_lexemes = vec![self.parser.0.as_ref().unwrap().as_ref()];
+        while let Some(lexeme) = next_lexemes.pop() {
+            // Follow the tree lexeme by lexeme.
+            for rule in &lexeme.rules {
+                if rule.length == Offset::default() {
+                    continue;
+                }
+                if let Some(next) = &rule.next {
+                    next_lexemes.push(next.as_ref())
+                }
+            }
+            if let Some(next) = &lexeme.next {
+                next_lexemes.push(next.as_ref())
+            }
+
+            // Convert lexeme to semantic token.
             if let Some(token_type) = lexeme_to_type(&lexeme.kind) {
                 let mut whitespace = Offset::new(0, 0);
                 for c in lexeme.string.chars() {
@@ -61,8 +80,8 @@ impl Document {
             } else {
                 builder.skip(lexeme.length)
             }
-            potential_lexeme = lexeme.next.upgrade();
         }
+
         builder.build()
     }
 }

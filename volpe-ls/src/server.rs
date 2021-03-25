@@ -28,10 +28,10 @@ impl Server {
             // self.show_info_message(format!("{:?}", message));
             match message {
                 Message::Request(request) => {
-                    self.show_info_message(format!(
-                        "received a request! method: {} (id: {})",
-                        request.method, request.id
-                    ));
+                    // self.show_info_message(format!(
+                    //     "received a request! method: {} (id: {})",
+                    //     request.method, request.id
+                    // ));
                     if self.connection.handle_shutdown(&request).unwrap() {
                         break;
                     };
@@ -42,10 +42,10 @@ impl Server {
                     self.show_info_message(format!("received a response! (id: {})", response.id));
                 }
                 Message::Notification(notificaiton) => {
-                    self.show_info_message(format!(
-                        "received a notification! method: {}",
-                        notificaiton.method
-                    ));
+                    // self.show_info_message(format!(
+                    //     "received a notification! method: {}",
+                    //     notificaiton.method
+                    // ));
                     self.handle_notification(notificaiton);
                 }
             }
