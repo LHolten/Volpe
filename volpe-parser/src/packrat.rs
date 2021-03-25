@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{logos::Logos, offset::Offset};
 
-pub struct Parser(Option<Box<Lexeme>>);
+pub struct Parser(pub Option<Box<Lexeme>>);
 
 impl fmt::Display for Parser {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -89,7 +89,7 @@ impl Parser {
             }
         }
 
-        if !buffer.is_empty() || last.length == Offset::default() {
+        if !buffer.is_empty() || last.next.is_none() && remaining.is_empty() {
             *next = Some(Box::new(Lexeme {
                 string: take(&mut buffer),
                 length: take(&mut buffer_length),
@@ -154,7 +154,7 @@ pub fn fix_last(
             furthest = (rule.length, &mut rule.next);
         }
     }
-    if lexeme.length > length || lexeme.length == Offset::default() {
+    if lexeme.length > length || furthest.1.is_none() && remaining.is_empty() {
         return (lexeme, length);
     }
     if furthest.1.is_none() {
