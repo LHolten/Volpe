@@ -36,7 +36,8 @@ pub struct RuleP<F, const R: usize> {
 
 impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
     fn parse(mut t: TInput) -> TResult {
-        for rule in &mut t.lexeme.as_mut().unwrap().rules {
+        for i in 0..R {
+            let rule = &mut t.lexeme.as_mut().unwrap().rules[i];
             if rule.next.is_some() {
                 t.error.remaining.push(rule.next.take().unwrap())
             }

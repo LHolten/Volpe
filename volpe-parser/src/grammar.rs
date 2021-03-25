@@ -42,7 +42,6 @@ impl TFunc for StmtInner {
     }
 }
 
-// matches a single value right now
 type App = Alt<RuleP<Separated<NotOpt<Func>, Id>, { RuleKind::App as usize }>, Func>;
 
 type Func = Alt<RuleP<Separated<Or, LexemeP<{ L::Func.mask() }>>, { RuleKind::Func as usize }>, Or>;
