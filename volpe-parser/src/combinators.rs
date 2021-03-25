@@ -1,4 +1,4 @@
-use std::{cmp::max, marker::PhantomData};
+use std::{cmp::max, marker::PhantomData, mem::take};
 
 use crate::{
     offset::Offset,
@@ -10,14 +10,16 @@ pub struct LexemeP<const L: usize>;
 
 impl<const L: usize> TFunc for LexemeP<L> {
     fn parse(mut t: TInput) -> TResult {
-        for rule in &mut t.lexeme.as_mut().unwrap().rules {
-            if rule.next.is_some() {
-                t.error.remaining.push(rule.next.take().unwrap())
-            }
-        }
         let lexeme = t.lexeme.as_mut().unwrap();
         t.error.sensitive_length = max(t.error.sensitive_length, t.length + lexeme.length);
         if lexeme.kind.mask() & L != 0 {
+            for rule in &mut lexeme.rules {
+                // could possibly also ignore failed rules
+                let rule = take(rule);
+                if let Some(next) = rule.next {
+                    t.error.remaining.push(next)
+                }
+            }
             t.length += lexeme.length;
             if lexeme.next.is_none() {
                 lexeme.next = Some(t.error.remaining.pop().unwrap());
@@ -36,13 +38,8 @@ pub struct RuleP<F, const R: usize> {
 
 impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
     fn parse(mut t: TInput) -> TResult {
-        for i in 0..R {
-            let rule = &mut t.lexeme.as_mut().unwrap().rules[i];
-            if rule.next.is_some() {
-                t.error.remaining.push(rule.next.take().unwrap())
-            }
-        }
-        let rule = &mut t.lexeme.as_mut().unwrap().rules[R] as *mut Rule;
+        let rules = &mut t.lexeme.as_mut().unwrap().rules as *mut [Rule; 9];
+        let rules = unsafe { &mut *rules };
         if t.lexeme.as_mut().unwrap().rules[R].sensitive_length == Offset::default() {
             // current rule is not tried yet
             let result = F::parse(TInput {
@@ -62,24 +59,31 @@ impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
                     error,
                 },
             };
-            let rule = unsafe { &mut *rule };
-            assert!(rule.next.is_none());
-            *rule = Rule {
+            assert!(rules[R].next.is_none());
+            rules[R] = Rule {
                 sensitive_length: tracker.error.sensitive_length,
                 length: tracker.length,
                 next: tracker.lexeme.take(),
             };
             t.error.remaining = tracker.error.remaining;
         };
-        let rule = unsafe { &mut *rule };
 
-        t.error.sensitive_length = max(t.error.sensitive_length, t.length + rule.sensitive_length);
-        if rule.length != Offset::default() {
-            t.length += rule.length;
-            if rule.next.is_none() {
-                rule.next = Some(t.error.remaining.pop().unwrap());
+        t.error.sensitive_length = max(
+            t.error.sensitive_length,
+            t.length + rules[R].sensitive_length,
+        );
+        if rules[R].length != Offset::default() {
+            for i in 0..R {
+                let rule = take(&mut rules[i]);
+                if let Some(next) = rule.next {
+                    t.error.remaining.push(next)
+                }
             }
-            t.lexeme = &mut rule.next;
+            t.length += rules[R].length;
+            if rules[R].next.is_none() {
+                rules[R].next = Some(t.error.remaining.pop().unwrap());
+            }
+            t.lexeme = &mut rules[R].next;
             Ok(t)
         } else {
             Err(t.error)
