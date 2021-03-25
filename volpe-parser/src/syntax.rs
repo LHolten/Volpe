@@ -22,45 +22,43 @@ fn write_with_indent<D: fmt::Debug>(
     write!(f, "{:?}\n", thing)
 }
 
-fn recursive_fmt(this: &Lexeme, f: &mut fmt::Formatter<'_>, mut indent: u32) -> fmt::Result {
-    // Rules are sorted so that the largest ones are first.
-    // This means we can use next_lexemes like a stack where
-    // the last value corresponds to the `.next` of the smallest rule.
-    // These are used when we reach the end of a lexeme chain.
-    let mut next_lexemes = Vec::new();
-
-    // Iterate over all rules that start at this lexeme.
-    for (i, rule) in this.rules.iter().enumerate() {
+fn recursive_fmt(
+    lexeme: &Lexeme,
+    f: &mut fmt::Formatter<'_>,
+    indent: u32,
+    index: usize,
+) -> fmt::Result {
+    // Find the largest rule starting from index.
+    for i in index..9 {
+        let rule = &lexeme.rules[i];
         // Skip unsuccessful rules.
-        if rule.length <= Offset::default() {
+        if rule.length == Offset::default() {
             continue;
         }
         // Write name of rule.
         write_with_indent(f, RuleKind::from(i), indent)?;
-        indent += 1;
-        // Remember which lexeme is next after this rule.
-        if let Some(next) = &rule.next {
-            next_lexemes.push(next)
-        }
+        // Recursively print the children with a higher indent.
+        recursive_fmt(lexeme, f, indent + 1, i + 1)?;
+        // Tailcall to the next sibling rule with the same indentation.
+        return if let Some(next) = &rule.next {
+            recursive_fmt(next, f, indent, 0)
+        } else {
+            Ok(())
+        };
     }
     // Write the current lexeme.
-    write_with_indent(f, &this.string, indent)?;
-    // Repeat whole process for the next lexeme in the chain.
-    if let Some(next) = &this.next {
-        recursive_fmt(next, f, indent)?;
+    write_with_indent(f, &lexeme.string, indent)?;
+    // Tailcall to the next sibling lexeme with the same indentation.
+    if let Some(next) = &lexeme.next {
+        recursive_fmt(next, f, indent, 0)
+    } else {
+        Ok(())
     }
-    // We reached the end of the chain.
-    // Now we have to use the remembered `next` lexemes.
-    while let Some(lexeme) = next_lexemes.pop() {
-        indent -= 1;
-        recursive_fmt(lexeme, f, indent)?;
-    }
-    Ok(())
 }
 
 impl fmt::Display for Lexeme {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        recursive_fmt(self, f, 0)
+        recursive_fmt(self, f, 0, 0)
     }
 }
 
