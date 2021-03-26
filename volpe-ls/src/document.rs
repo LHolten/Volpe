@@ -1,6 +1,9 @@
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
+
 use crate::semantic_tokens::{lexeme_to_type, type_index, SemanticTokensBuilder};
-use lsp_types;
-use volpe_parser::{packrat::Parser, offset::Offset};
+use volpe_parser::{offset::Offset, packrat::Parser};
 
 pub struct Document {
     version: i32,
@@ -36,6 +39,18 @@ impl Document {
 
     pub fn get_info(&self) -> String {
         format!("version: {}\n{}", self.version, self.parser)
+    }
+
+    pub fn write_tree_to_file(&self, path: &Path) -> Result<(), String> {
+        let maybe_file = File::create(path);
+        if let Err(why) = maybe_file {
+            return Err(format!("couldn't open file: {}", why));
+        };
+        let mut file = maybe_file.unwrap();
+        if let Err(why) = file.write_all(self.get_info().as_bytes()) {
+            return Err(format!("couldn't write to file: {}", why));
+        }
+        Ok(())
     }
 
     pub fn get_semantic_tokens(&self) -> lsp_types::SemanticTokens {

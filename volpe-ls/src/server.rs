@@ -41,12 +41,12 @@ impl Server {
                     // TODO Once we start sending requests we should handle the response here.
                     self.show_info_message(format!("received a response! (id: {})", response.id));
                 }
-                Message::Notification(notificaiton) => {
+                Message::Notification(notification) => {
                     // self.show_info_message(format!(
                     //     "received a notification! method: {}",
-                    //     notificaiton.method
+                    //     notification.method
                     // ));
-                    self.handle_notification(notificaiton);
+                    self.handle_notification(notification);
                 }
             }
         }
@@ -58,15 +58,40 @@ impl Server {
             server: self,
         }
         .on::<lsp_types::notification::DidOpenTextDocument>(|this, params| {
+            let doc = Document::new(&params);
+            let path_buf = params
+                .text_document
+                .uri
+                .to_file_path()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join("volpe_parse_tree.txt");
+            if let Err(err_msg) = doc.write_tree_to_file(path_buf.as_path()) {
+                this.show_error_message(err_msg)
+            };
             this.documents
-                .insert(params.text_document.uri.to_string(), Document::new(&params));
+                .insert(params.text_document.uri.to_string(), doc);
         })
         .on::<lsp_types::notification::DidChangeTextDocument>(|this, params| {
             let uri = params.text_document.uri.to_string();
             match this.documents.get_mut(&uri) {
-                Some(doc) => doc.update(&params),
+                Some(doc) => {
+                    doc.update(&params);
+                    let path_buf = params
+                        .text_document
+                        .uri
+                        .to_file_path()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .join("volpe_parse_tree.txt");
+                    if let Err(err_msg) = doc.write_tree_to_file(path_buf.as_path()) {
+                        this.show_error_message(err_msg)
+                    }
+                }
                 None => this.show_error_message(format!("{} was not found in documents", uri)),
-            }
+            };
         })
         .on::<lsp_types::notification::DidSaveTextDocument>(|_this, _params| {})
         .on::<lsp_types::notification::DidCloseTextDocument>(|_this, _params| {})
@@ -79,28 +104,24 @@ impl Server {
             server: self,
         }
         .on::<lsp_types::request::HoverRequest>(|this, params| {
-            let potential_doc = this.documents.get(
-                &params
-                    .text_document_position_params
-                    .text_document
-                    .uri
-                    .to_string(),
-            );
-            match potential_doc {
-                Some(doc) => Some(lsp_types::Hover {
+            this.documents
+                .get(
+                    &params
+                        .text_document_position_params
+                        .text_document
+                        .uri
+                        .to_string(),
+                )
+                .map(|doc| lsp_types::Hover {
                     contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {
                         kind: lsp_types::MarkupKind::PlainText,
                         value: doc.get_info(),
                     }),
                     range: None,
-                }),
-                None => None,
-            }
+                })
         })
         .on::<lsp_types::request::SemanticTokensFullRequest>(|this, params| {
-            let potential_doc = this
-                .documents
-                .get(&params.text_document.uri.to_string());
+            let potential_doc = this.documents.get(&params.text_document.uri.to_string());
             match potential_doc {
                 Some(doc) => {
                     let tokens = doc.get_semantic_tokens();
