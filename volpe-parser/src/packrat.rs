@@ -117,9 +117,7 @@ pub fn fix_first<'a>(
     lexeme: &'a mut Option<Box<Lexeme>>,
     offset: Offset,
 ) -> (&'a mut Option<Box<Lexeme>>, Offset) {
-    if lexeme.as_mut().unwrap().length >= offset {
-        return (lexeme, offset);
-    }
+    let ptr = lexeme as *mut _;
     let lexeme = lexeme.as_mut().unwrap();
     let mut furthest = (lexeme.length, &mut lexeme.next);
     for rule in &mut lexeme.rules {
@@ -131,6 +129,9 @@ pub fn fix_first<'a>(
         } else if rule.length > furthest.0 {
             furthest = (rule.length, &mut rule.next);
         }
+    }
+    if lexeme.length >= offset {
+        return (unsafe { &mut *(ptr) }, offset);
     }
     if furthest.1.is_none() {
         *furthest.1 = Some(remaining.pop().unwrap());
@@ -150,8 +151,9 @@ pub fn fix_last(
             if let Some(next) = rule.next {
                 remaining.push(next);
             }
-        } else if rule.length > furthest.0 {
+        } else if rule.length != Offset::default() {
             furthest = (rule.length, &mut rule.next);
+            break;
         }
     }
     if lexeme.length > length || furthest.1.is_none() && remaining.is_empty() {
