@@ -24,6 +24,7 @@ impl Parser {
         let mut remaining = Vec::new();
         let (mut lexeme, mut offset) = fix_first(&mut remaining, &mut self.0, offset);
         let first = take(lexeme);
+        let length = offset + length;
 
         let mut input = String::default();
         if offset < Offset::line() {
@@ -42,7 +43,7 @@ impl Parser {
 
         input.push_str(string);
 
-        let (mut last, mut length) = fix_last(&mut remaining, first, offset + length);
+        let (mut last, mut length) = fix_last(&mut remaining, first, length);
 
         if length < Offset::line() {
             input.push_str(&last.string[length.char as usize..])
