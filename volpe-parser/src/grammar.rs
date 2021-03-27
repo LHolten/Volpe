@@ -11,7 +11,7 @@ impl TFunc for FileP {
     fn parse(mut t: TInput) -> TResult {
         t = Opt::<LexemeP<{ L::Start.mask() }>>::parse(t)?;
         t = Expr::parse(t)?;
-        Many0::<Pair<LexemeP<{ L::RBrace.mask() | L::RCurlyBrace.mask() }>, Expr>>::parse(t)
+        Many0::<Pair<LexemeP<{ L::RBrace.mask() | L::RCurlyBrace.mask() | L::Comma.mask() }>, Expr>>::parse(t)
     }
 }
 
@@ -76,14 +76,19 @@ impl TFunc for Block {
         Opt::<LexemeP<{ L::RBrace.mask() }>>::parse(t)
     }
 }
-pub struct Tuple;
-impl TFunc for Tuple {
+
+type Tuple = RuleP<TupleInner, { RuleKind::Tuple as usize }>;
+
+pub struct TupleInner;
+impl TFunc for TupleInner {
     fn parse(mut t: TInput) -> TResult {
         t = LexemeP::<{ L::LCurlyBrace.mask() }>::parse(t)?;
-        t = App::parse(t)?;
+        t = Separated::<TupleLine, Opt<LexemeP<{ L::Comma.mask() }>>>::parse(t)?;
         Opt::<LexemeP<{ L::RCurlyBrace.mask() }>>::parse(t)
     }
 }
+
+type TupleLine = Pair<App, Opt<Pair<LexemeP<{ L::Colon.mask() }>, App>>>;
 
 #[cfg(test)]
 mod tests {

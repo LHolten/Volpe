@@ -8,7 +8,7 @@ pub struct Lexeme {
     pub token_length: Offset,
     pub length: Offset,
     pub kind: LexemeKind,
-    pub rules: [Rule; 9],
+    pub rules: [Rule; 10],
     pub next: Option<Box<Lexeme>>,
 }
 
@@ -78,6 +78,7 @@ pub struct Rule {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RuleKind {
+    Tuple,
     Expr,
     Stmt,
     App,
@@ -92,6 +93,7 @@ pub enum RuleKind {
 impl From<usize> for RuleKind {
     fn from(val: usize) -> Self {
         match val {
+            v if v == Self::Tuple as usize => Self::Tuple,
             v if v == Self::Expr as usize => Self::Expr,
             v if v == Self::Stmt as usize => Self::Stmt,
             v if v == Self::App as usize => Self::App,

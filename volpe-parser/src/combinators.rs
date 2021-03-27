@@ -41,7 +41,7 @@ impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
         if t.lexeme.or_remaining(&mut t.error.remaining).is_none() {
             return Err(t.error);
         }
-        let rules = &mut t.lexeme.as_mut().unwrap().rules as *mut [Rule; 9];
+        let rules = &mut t.lexeme.as_mut().unwrap().rules as *mut [Rule; 10];
         let rules = unsafe { &mut *rules };
         if t.lexeme.as_mut().unwrap().rules[R].sensitive_length == Offset::default() {
             // current rule is not tried yet
