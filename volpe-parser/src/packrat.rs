@@ -142,7 +142,7 @@ fn fix_first<'a>(
             if let Some(next) = rule.next {
                 remaining.push(next);
             }
-        } else if rule.length > furthest.0 {
+        } else if rule.length > furthest.0 || rule.length == furthest.0 && furthest.1.is_none() {
             furthest = (rule.length, &mut rule.next);
         }
     }
@@ -165,7 +165,7 @@ fn fix_last(
             if let Some(next) = rule.next {
                 remaining.push(next);
             }
-        } else if rule.length > furthest.0 {
+        } else if rule.length > furthest.0 || rule.length == furthest.0 && furthest.1.is_none() {
             furthest = (rule.length, &mut rule.next);
         }
     }
