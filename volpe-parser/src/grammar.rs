@@ -9,6 +9,7 @@ pub struct FileP;
 
 impl TFunc for FileP {
     fn parse(mut t: TInput) -> TResult {
+        t = Opt::<LexemeP<{ L::Start.mask() }>>::parse(t)?;
         t = Expr::parse(t)?;
         Many0::<Pair<LexemeP<{ L::RBrace.mask() | L::RCurlyBrace.mask() }>, Expr>>::parse(t)
     }

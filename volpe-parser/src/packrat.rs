@@ -58,6 +58,7 @@ impl Parser {
             }
         }
 
+        // when input is empty this will produce an unnecessary Start Lexeme
         let mut lex = LexemeKind::lexer(&input);
         while let Some(mut kind) = lex.next() {
             if lex.remainder().is_empty()
@@ -83,9 +84,6 @@ impl Parser {
                         if let Some(next) = rule.next {
                             remaining.push(next);
                         }
-                    }
-                    if last.next.is_none() {
-                        last.next = Some(remaining.pop().unwrap())
                     }
                 }
             }
@@ -166,9 +164,8 @@ fn fix_last(
             if let Some(next) = rule.next {
                 remaining.push(next);
             }
-        } else if rule.length != Offset::default() {
+        } else if rule.length > furthest.0 {
             furthest = (rule.length, &mut rule.next);
-            break;
         }
     }
     if lexeme.length >= length {

@@ -63,6 +63,12 @@ impl fmt::Display for Lexeme {
     }
 }
 
+impl fmt::Debug for Lexeme {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        recursive_fmt(self, f, 0, 0)
+    }
+}
+
 #[derive(Default)]
 pub struct Rule {
     pub sensitive_length: Offset, // Total length including failed rules/lexemes (zero means unevaluated)
