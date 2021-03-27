@@ -23,51 +23,37 @@ fn write_with_indent<D: fmt::Debug>(
     write!(f, "{:?}\n", thing)
 }
 
-fn recursive_fmt(
-    lexeme: &Lexeme,
-    f: &mut fmt::Formatter<'_>,
-    indent: u32,
-    index: usize,
-) -> fmt::Result {
-    // Find the largest rule starting from index.
-    for i in index..9 {
-        let rule = &lexeme.rules[i];
-        // Skip unsuccessful rules.
-        if rule.length == Offset::default() {
-            continue;
+impl fmt::Display for Lexeme {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Use next_lexemes as a stack for lexemes and indentation.
+        let mut next_lexemes = vec![(self, 0)];
+        while let Some((lexeme, mut indent)) = next_lexemes.pop() {
+            for (i, rule) in lexeme.rules.iter().enumerate() {
+                // Skip unsuccessful rules.
+                if rule.length == Offset::default() {
+                    continue;
+                }
+                // Write name of rule.
+                write_with_indent(f, RuleKind::from(i), indent)?;
+                // Save the next lexeme and indentation level.
+                if let Some(next) = &rule.next {
+                    next_lexemes.push((next, indent));
+                }
+                // Increase the indentation for this scope.
+                indent += 1;
+            }
+            // Write the current lexeme.
+            write_with_indent(f, (lexeme.kind, &lexeme.string), indent)?;
+            // Add the next lexeme so the whole process can be repeated for it.
+            if let Some(next) = &lexeme.next {
+                next_lexemes.push((next, indent));
+            }
         }
-        // Write name of rule.
-        write_with_indent(f, RuleKind::from(i), indent)?;
-        // Recursively print the children with a higher indent.
-        recursive_fmt(lexeme, f, indent + 1, i + 1)?;
-        // Tailcall to the next sibling rule with the same indentation.
-        return if let Some(next) = &rule.next {
-            recursive_fmt(next, f, indent, 0)
-        } else {
-            Ok(())
-        };
-    }
-    // Write the current lexeme.
-    write_with_indent(f, (lexeme.kind, &lexeme.string), indent)?;
-    // Tailcall to the next sibling lexeme with the same indentation.
-    if let Some(next) = &lexeme.next {
-        recursive_fmt(next, f, indent, 0)
-    } else {
         Ok(())
     }
 }
 
-impl fmt::Display for Lexeme {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        recursive_fmt(self, f, 0, 0)
-    }
-}
-
-impl fmt::Debug for Lexeme {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        recursive_fmt(self, f, 0, 0)
-    }
-}
+// TODO Implement fmt::Debug for Lexeme that shows unsuccessful rules too.
 
 #[derive(Default)]
 pub struct Rule {
