@@ -5,6 +5,7 @@ use crate::{lexeme_kind::LexemeKind, offset::Offset};
 #[derive(Default)]
 pub struct Lexeme {
     pub string: String, // white space and unknown in front
+    pub token_length: Offset,
     pub length: Offset,
     pub kind: LexemeKind,
     pub rules: [Rule; 9],
@@ -96,5 +97,18 @@ impl From<usize> for RuleKind {
             v if v == Self::Op3 as usize => Self::Op3,
             _ => unreachable!(),
         }
+    }
+}
+
+pub trait OrRemaining {
+    fn or_remaining(&mut self, remaining: &mut Vec<Box<Lexeme>>) -> &mut Self;
+}
+
+impl OrRemaining for Option<Box<Lexeme>> {
+    fn or_remaining(&mut self, remaining: &mut Vec<Box<Lexeme>>) -> &mut Self {
+        if self.is_none() {
+            *self = remaining.pop()
+        }
+        self
     }
 }

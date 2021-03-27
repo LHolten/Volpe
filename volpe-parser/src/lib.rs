@@ -45,9 +45,9 @@ mod test {
         let mut parser = Parser::default();
         examine_parser!(
             parser,
-            parser.parse("(a + b) * c", Offset::default(), Offset::default())
-            parser.parse("", Offset::default(), Offset::char(1))
-            parser.parse("(", Offset::default(), Offset::default())
+            parser.parse("a", Offset::default(), Offset::default())
+            parser.parse(" ", Offset::char(1), Offset::char(0))
+            parser.parse("<", Offset::char(2), Offset::char(0))
         );
     }
 }

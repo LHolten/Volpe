@@ -2,7 +2,7 @@ use std::{cmp::max, marker::PhantomData, mem::take};
 
 use crate::{
     offset::Offset,
-    syntax::Rule,
+    syntax::{OrRemaining, Rule},
     tracker::{TError, TFunc, TInput, TResult},
 };
 
@@ -10,6 +10,9 @@ pub struct LexemeP<const L: usize>;
 
 impl<const L: usize> TFunc for LexemeP<L> {
     fn parse(mut t: TInput) -> TResult {
+        if t.lexeme.or_remaining(&mut t.error.remaining).is_none() {
+            return Err(t.error);
+        }
         let lexeme = t.lexeme.as_mut().unwrap();
         t.error.sensitive_length = max(t.error.sensitive_length, t.length + lexeme.length);
         if lexeme.kind.mask() & L != 0 {
@@ -21,9 +24,6 @@ impl<const L: usize> TFunc for LexemeP<L> {
                 }
             }
             t.length += lexeme.length;
-            if lexeme.next.is_none() {
-                lexeme.next = Some(t.error.remaining.pop().unwrap());
-            }
             t.lexeme = &mut lexeme.next;
             Ok(t)
         } else {
@@ -38,6 +38,9 @@ pub struct RuleP<F, const R: usize> {
 
 impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
     fn parse(mut t: TInput) -> TResult {
+        if t.lexeme.or_remaining(&mut t.error.remaining).is_none() {
+            return Err(t.error);
+        }
         let rules = &mut t.lexeme.as_mut().unwrap().rules as *mut [Rule; 9];
         let rules = unsafe { &mut *rules };
         if t.lexeme.as_mut().unwrap().rules[R].sensitive_length == Offset::default() {
@@ -80,9 +83,6 @@ impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
                 }
             }
             t.length += rules[R].length;
-            if rules[R].next.is_none() {
-                rules[R].next = Some(t.error.remaining.pop().unwrap());
-            }
             t.lexeme = &mut rules[R].next;
             Ok(t)
         } else {

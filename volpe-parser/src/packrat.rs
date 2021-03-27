@@ -4,26 +4,17 @@ use std::mem::take;
 use crate::{
     grammar::FileP,
     lexeme_kind::LexemeKind,
-    syntax::Lexeme,
+    syntax::{Lexeme, OrRemaining},
     tracker::{TError, TFunc, TInput},
 };
 use crate::{logos::Logos, offset::Offset};
 
-pub struct Parser(pub Option<Box<Lexeme>>);
+#[derive(Default)]
+pub struct Parser(pub Box<Lexeme>);
 
 impl fmt::Display for Parser {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(lexeme) = &self.0 {
-            lexeme.fmt(f)
-        } else {
-            f.write_str("Empty Parser")
-        }
-    }
-}
-
-impl Default for Parser {
-    fn default() -> Self {
-        Self(Some(Default::default()))
+        self.0.fmt(f)
     }
 }
 
@@ -31,8 +22,8 @@ impl Parser {
     // you can only use offsets that are within the text
     pub fn parse(&mut self, string: &str, offset: Offset, length: Offset) {
         let mut remaining = Vec::new();
-        let (mut next, mut offset) = fix_first(&mut remaining, &mut self.0, offset);
-        let first = take(next).unwrap();
+        let (mut lexeme, mut offset) = fix_first(&mut remaining, &mut self.0, offset);
+        let first = take(lexeme);
 
         let mut input = String::default();
         if offset < Offset::line() {
@@ -67,17 +58,26 @@ impl Parser {
             }
         }
 
-        let mut buffer = String::default();
-        let mut buffer_length = Offset::default();
         let mut lex = LexemeKind::lexer(&input);
-
-        while let Some(val) = lex.next() {
-            if lex.remainder().is_empty() {
+        while let Some(mut kind) = lex.next() {
+            if lex.remainder().is_empty()
+                && kind != LexemeKind::Error
+                && last.next.or_remaining(&mut remaining).is_some()
+            {
+                let next = last.next.as_mut().unwrap();
+                // Create a new lexer with more input to see if it is the same
                 let mut new_input = lex.slice().to_string();
-                new_input.push_str(next_str(&mut remaining, &last));
+                new_input.push_str(&next.string);
                 let mut new_lex = LexemeKind::lexer(&new_input);
-                new_lex.next();
+                new_lex.next().unwrap();
+
                 if new_lex.slice().len() != lex.slice().len() {
+                    // The new lexer consumed a bigger token, time to replace the old lexer
+                    input = new_input;
+                    lex = LexemeKind::lexer(&input);
+                    kind = lex.next().unwrap();
+
+                    last = take(next);
                     for rule in &mut last.rules {
                         let rule = take(rule);
                         if let Some(next) = rule.next {
@@ -87,42 +87,37 @@ impl Parser {
                     if last.next.is_none() {
                         last.next = Some(remaining.pop().unwrap())
                     }
-                    last = last.next.unwrap();
-                    input = new_input;
-                    lex = LexemeKind::lexer(&input);
-                    lex.next();
                 }
             }
 
-            buffer.push_str(lex.slice());
-            buffer_length += if lex.slice() == "\n" {
+            let new_length = if lex.slice() == "\n" {
                 Offset::line()
             } else {
                 Offset::char(lex.slice().len() as u32)
             };
-            if val != LexemeKind::Error {
-                *next = Some(Box::new(Lexeme {
-                    string: take(&mut buffer),
-                    length: take(&mut buffer_length),
-                    kind: val,
+
+            if kind != LexemeKind::Error {
+                if lexeme.length != Offset::default() {
+                    lexeme.next = Some(Default::default());
+                    lexeme = lexeme.next.as_mut().unwrap();
+                }
+                *lexeme = Box::new(Lexeme {
+                    string: lex.slice().to_string(),
+                    token_length: new_length,
+                    length: new_length,
+                    kind,
                     ..Lexeme::default()
-                }));
-                next = &mut next.as_mut().unwrap().next;
+                });
+            } else {
+                lexeme.string.push_str(lex.slice());
+                lexeme.length += new_length;
             }
         }
+        lexeme.next = last.next;
 
-        if last.next.is_none() && remaining.is_empty() {
-            *next = Some(Box::new(Lexeme {
-                string: take(&mut buffer),
-                length: take(&mut buffer_length),
-                ..Lexeme::default()
-            }))
-        } else {
-            *next = last.next;
-        }
-
+        let mut lexeme_option = Some(take(&mut self.0));
         FileP::parse(TInput {
-            lexeme: &mut self.0,
+            lexeme: &mut lexeme_option,
             length: Offset::default(),
             error: TError {
                 remaining,
@@ -131,16 +126,16 @@ impl Parser {
         })
         .ok()
         .unwrap();
+        self.0 = lexeme_option.unwrap();
     }
 }
 
 fn fix_first<'a>(
     remaining: &mut Vec<Box<Lexeme>>,
-    lexeme: &'a mut Option<Box<Lexeme>>,
+    lexeme: &'a mut Box<Lexeme>,
     offset: Offset,
-) -> (&'a mut Option<Box<Lexeme>>, Offset) {
+) -> (&'a mut Box<Lexeme>, Offset) {
     let ptr = lexeme as *mut _;
-    let lexeme = lexeme.as_mut().unwrap();
     let mut furthest = (lexeme.length, &mut lexeme.next);
     for rule in &mut lexeme.rules {
         if rule.sensitive_length >= offset {
@@ -155,10 +150,8 @@ fn fix_first<'a>(
     if lexeme.length >= offset {
         return (unsafe { &mut *(ptr) }, offset);
     }
-    if furthest.1.is_none() {
-        *furthest.1 = Some(remaining.pop().unwrap());
-    }
-    fix_first(remaining, furthest.1, offset - furthest.0)
+    let next = furthest.1.or_remaining(remaining).as_mut().unwrap();
+    fix_first(remaining, next, offset - furthest.0)
 }
 
 fn fix_last(
@@ -168,7 +161,7 @@ fn fix_last(
 ) -> (Box<Lexeme>, Offset) {
     let mut furthest = (lexeme.length, &mut lexeme.next);
     for rule in &mut lexeme.rules {
-        if rule.length > length {
+        if rule.length >= length {
             let rule = take(rule);
             if let Some(next) = rule.next {
                 remaining.push(next);
@@ -181,22 +174,6 @@ fn fix_last(
     if lexeme.length >= length {
         return (lexeme, length);
     }
-    if furthest.1.is_none() {
-        *furthest.1 = Some(remaining.pop().unwrap());
-    }
-    fix_last(
-        remaining,
-        take(&mut lexeme.next).unwrap(),
-        length - lexeme.length,
-    )
-}
-
-fn next_str<'a>(remaining: &'a mut Vec<Box<Lexeme>>, lexeme: &'a Box<Lexeme>) -> &'a str {
-    if let Some(next) = &lexeme.next {
-        &next.string
-    } else if let Some(next) = remaining.last() {
-        &next.string
-    } else {
-        ""
-    }
+    let next = furthest.1.or_remaining(remaining).as_mut().unwrap();
+    fix_last(remaining, take(next), length - furthest.0)
 }

@@ -93,7 +93,7 @@ pub enum LexemeKind {
     #[regex(r"[\n]")]
     Error,
 
-    End,
+    Start,
 }
 
 impl LexemeKind {
@@ -104,6 +104,6 @@ impl LexemeKind {
 
 impl Default for LexemeKind {
     fn default() -> Self {
-        LexemeKind::End
+        LexemeKind::Start
     }
 }
