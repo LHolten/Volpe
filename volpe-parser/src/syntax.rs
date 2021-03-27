@@ -48,7 +48,7 @@ fn recursive_fmt(
         };
     }
     // Write the current lexeme.
-    write_with_indent(f, &lexeme.string, indent)?;
+    write_with_indent(f, (lexeme.kind, &lexeme.string), indent)?;
     // Tailcall to the next sibling lexeme with the same indentation.
     if let Some(next) = &lexeme.next {
         recursive_fmt(next, f, indent, 0)
