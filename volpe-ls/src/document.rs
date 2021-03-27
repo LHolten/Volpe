@@ -56,11 +56,7 @@ impl Document {
     pub fn get_semantic_tokens(&self) -> lsp_types::SemanticTokens {
         let mut builder = SemanticTokensBuilder::new();
 
-        if self.parser.0.is_none() {
-            return builder.build();
-        };
-
-        let mut next_lexemes = vec![self.parser.0.as_ref().unwrap().as_ref()];
+        let mut next_lexemes = vec![self.parser.0.as_ref()];
         while let Some(lexeme) = next_lexemes.pop() {
             // Follow the tree lexeme by lexeme.
             for rule in &lexeme.rules {
@@ -68,30 +64,17 @@ impl Document {
                     continue;
                 }
                 if let Some(next) = &rule.next {
-                    next_lexemes.push(next.as_ref())
+                    next_lexemes.push(next)
                 }
             }
             if let Some(next) = &lexeme.next {
-                next_lexemes.push(next.as_ref())
+                next_lexemes.push(next)
             }
 
             // Convert lexeme to semantic token.
             if let Some(token_type) = lexeme_to_type(&lexeme.kind) {
-                let mut whitespace = Offset::new(0, 0);
-                for c in lexeme.string.chars() {
-                    // TODO This does not correctly account for comments
-                    if !c.is_ascii_whitespace() {
-                        break;
-                    }
-                    if c == '\n' {
-                        whitespace.line += 1;
-                        whitespace.char = 0;
-                    } else {
-                        whitespace.char += 1;
-                    }
-                }
-                builder.skip(whitespace);
-                builder.push(lexeme.length - whitespace, type_index(token_type), 0);
+                builder.push(lexeme.token_length, type_index(token_type), 0);
+                builder.skip(lexeme.length - lexeme.token_length);
             } else {
                 builder.skip(lexeme.length)
             }
