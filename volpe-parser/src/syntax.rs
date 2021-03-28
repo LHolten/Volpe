@@ -64,7 +64,6 @@ pub struct Rule {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RuleKind {
-    Tuple,
     Expr,
     Stmt,
     App,
@@ -74,12 +73,12 @@ pub enum RuleKind {
     Op1,
     Op2,
     Op3,
+    Tuple,
 }
 
 impl From<usize> for RuleKind {
     fn from(val: usize) -> Self {
         match val {
-            v if v == Self::Tuple as usize => Self::Tuple,
             v if v == Self::Expr as usize => Self::Expr,
             v if v == Self::Stmt as usize => Self::Stmt,
             v if v == Self::App as usize => Self::App,
@@ -89,6 +88,7 @@ impl From<usize> for RuleKind {
             v if v == Self::Op1 as usize => Self::Op1,
             v if v == Self::Op2 as usize => Self::Op2,
             v if v == Self::Op3 as usize => Self::Op3,
+            v if v == Self::Tuple as usize => Self::Tuple,
             _ => unreachable!(),
         }
     }

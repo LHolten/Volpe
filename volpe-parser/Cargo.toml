@@ -9,5 +9,8 @@ edition = "2018"
 [profile.dev]
 debug = false
 
+[profile.test]
+debug = false
+
 [dependencies]
 logos = "~0.12.0"
