@@ -3,16 +3,14 @@ use std::collections::HashMap;
 use lsp_server::{Connection, Message, Notification, Request};
 use lsp_types::{self, notification::ShowMessage, MessageType, ShowMessageParams};
 
+use crate::dispatch::{NotificationDispatcher, RequestDispatcher};
 use crate::document::Document;
 use crate::handlers::{self, RequestResult};
-use crate::dispatch::{NotificationDispatcher, RequestDispatcher};
-
 
 pub struct Server {
     connection: Connection,
     pub documents: HashMap<String, Document>,
 }
-
 
 impl Server {
     pub fn new(connection: Connection) -> Server {
@@ -27,16 +25,21 @@ impl Server {
         while let Ok(message) = self.connection.receiver.recv() {
             match message {
                 Message::Request(request) => {
-                    if self.connection.handle_shutdown(&request).unwrap() { break;};
+                    if self.connection.handle_shutdown(&request).unwrap() {
+                        break;
+                    };
                     self.on_request(request);
-                },
+                }
                 Message::Response(response) => {
-                    self.show_warning_message(format!("received a response??? (id: {})", response.id));
+                    self.show_warning_message(format!(
+                        "received a response??? (id: {})",
+                        response.id
+                    ));
                     // TOTO self.on_response
-                },
+                }
                 Message::Notification(notification) => {
                     self.on_notification(notification);
-                },
+                }
             }
         }
     }
@@ -46,8 +49,12 @@ impl Server {
             notification: Some(notification),
             server: self,
         }
-        .on::<lsp_types::notification::DidOpenTextDocument>(handlers::did_open_text_document_notification)
-        .on::<lsp_types::notification::DidChangeTextDocument>(handlers::did_change_text_document_notification)
+        .on::<lsp_types::notification::DidOpenTextDocument>(
+            handlers::did_open_text_document_notification,
+        )
+        .on::<lsp_types::notification::DidChangeTextDocument>(
+            handlers::did_change_text_document_notification,
+        )
         .on::<lsp_types::notification::DidSaveTextDocument>(|_this, _params| {})
         .on::<lsp_types::notification::DidCloseTextDocument>(|_this, _params| {})
         .finish();
@@ -63,7 +70,6 @@ impl Server {
         .finish();
     }
 }
-
 
 #[allow(dead_code)]
 impl Server {
@@ -82,10 +88,10 @@ impl Server {
     pub fn send_response<R: lsp_types::request::Request>(
         &mut self,
         id: lsp_server::RequestId,
-        result: RequestResult<R::Result>
+        result: RequestResult<R::Result>,
     ) {
         let res = match result {
-            Ok(result, ) => lsp_server::Response::new_ok(id, result),
+            Ok(result) => lsp_server::Response::new_ok(id, result),
             Err((err_code, err_msg)) => lsp_server::Response::new_err(id, err_code as i32, err_msg),
         };
         self.send(res.into());

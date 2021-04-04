@@ -1,7 +1,7 @@
 use lsp_server::{Notification, Request};
 
-use crate::server::Server;
 use crate::handlers::RequestResult;
+use crate::server::Server;
 
 pub struct NotificationDispatcher<'a> {
     pub notification: Option<Notification>,
@@ -69,7 +69,8 @@ impl<'a> RequestDispatcher<'a> {
 
     pub fn finish(&mut self) {
         if let Some(req) = &self.request {
-            self.server.show_error_message(format!("unknown request: {:?}", req));
+            self.server
+                .show_error_message(format!("unknown request: {:?}", req));
             let response = lsp_server::Response::new_err(
                 req.id.clone(),
                 lsp_server::ErrorCode::MethodNotFound as i32,

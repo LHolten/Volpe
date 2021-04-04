@@ -1,13 +1,9 @@
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
-
-use crate::semantic_tokens::{lexeme_to_type, type_index, SemanticTokensBuilder};
 use volpe_parser::{offset::Offset, packrat::Parser};
 
 pub struct Document {
-    version: i32,
-    parser: Parser,
+    pub version: i32,
+    pub parser: Parser,
+    pub vars: Vec<Variable>,
 }
 
 impl Document {
@@ -20,6 +16,7 @@ impl Document {
         );
         Document {
             version: params.text_document.version,
+            vars: get_vars(&parser),
             parser,
         }
     }
@@ -35,51 +32,98 @@ impl Document {
                 self.parser.parse(&event.text, start, end - start);
             }
         }
+
+        self.vars = get_vars(&self.parser);
     }
 
     pub fn get_info(&self) -> String {
         format!("version: {}\n{}", self.version, self.parser)
     }
+}
 
-    pub fn write_tree_to_file(&self, path: &Path) -> Result<(), String> {
-        let maybe_file = File::create(path);
-        if let Err(why) = maybe_file {
-            return Err(format!("couldn't open file: {}", why));
-        };
-        let mut file = maybe_file.unwrap();
-        if let Err(why) = file.write_all(self.get_info().as_bytes()) {
-            return Err(format!("couldn't write to file: {}", why));
+pub struct Variable {
+    pub name: String,
+    pub declaration: Offset,
+    pub scope: u32,
+    pub locations: Vec<Offset>,
+    pub parameter: bool,
+}
+
+impl Variable {
+    fn new(name: String, declaration: Offset, scope: u32, parameter: bool) -> Variable {
+        Variable {
+            name,
+            declaration,
+            scope,
+            locations: Vec::new(),
+            parameter,
         }
-        Ok(())
     }
+}
 
-    pub fn get_semantic_tokens(&self) -> lsp_types::SemanticTokens {
-        let mut builder = SemanticTokensBuilder::new();
+use std::collections::{HashMap, HashSet};
+use volpe_parser::{lexeme_kind::LexemeKind, syntax::RuleKind};
 
-        let mut next_lexemes = vec![self.parser.0.as_ref()];
-        while let Some(lexeme) = next_lexemes.pop() {
-            // Follow the tree lexeme by lexeme.
-            for rule in &lexeme.rules {
-                if rule.length == Offset::default() {
-                    continue;
-                }
-                if let Some(next) = &rule.next {
-                    next_lexemes.push(next)
-                }
+// Variable pass
+fn get_vars(parser: &Parser) -> Vec<Variable> {
+    let mut variables = Vec::new();
+    let mut scoped_identifiers: HashMap<&str, HashSet<u32>> = HashMap::new();
+
+    let mut pos = Offset::default();
+    let mut next_lexemes = vec![(parser.0.as_ref(), 0)];
+    while let Some((lexeme, mut scope)) = next_lexemes.pop() {
+        for (i, rule) in lexeme.rules.iter().enumerate() {
+            if rule.length == Offset::default() {
+                continue;
             }
-            if let Some(next) = &lexeme.next {
-                next_lexemes.push(next)
-            }
-
-            // Convert lexeme to semantic token.
-            if let Some(token_type) = lexeme_to_type(&lexeme.kind) {
-                builder.push(lexeme.token_length, type_index(token_type), 0);
-                builder.skip(lexeme.length - lexeme.token_length);
-            } else {
-                builder.skip(lexeme.length)
+            if let Some(next) = &rule.next {
+                next_lexemes.push((next, scope));
+                if matches!(RuleKind::from(i), RuleKind::Func) {
+                    scope += 1;
+                }
             }
         }
 
-        builder.build()
+        match &lexeme.kind {
+            LexemeKind::LBrace => scope += 1,
+            LexemeKind::RBrace => {
+                for (_, scopes) in scoped_identifiers.iter_mut() {
+                    scopes.remove(&scope);
+                }
+                scope -= 1;
+            }
+            LexemeKind::Ident => {
+                let name = &lexeme.string[..lexeme.token_length.char as usize];
+                if matches!(
+                    &lexeme.next, Some(next) if matches!(next.kind, LexemeKind::Func | LexemeKind::Assign)
+                ) {
+                    let scopes = scoped_identifiers.entry(name).or_insert(HashSet::new());
+                    scopes.insert(scope);
+                    variables.push(Variable::new(
+                        name.to_string(),
+                        pos,
+                        scope,
+                        matches!(&lexeme.next, Some(next) if matches!(next.kind, LexemeKind::Func)),
+                    ));
+                } else {
+                    // Variables are ordered, so going from back means we get the latest definition.
+                    // We need to check scope in case of shadowing.
+                    for var in variables.iter_mut().rev() {
+                        if var.name == name && var.scope <= scope {
+                            var.locations.push(pos);
+                            break;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        if let Some(next) = &lexeme.next {
+            next_lexemes.push((next, scope));
+        }
+
+        pos += lexeme.length;
     }
+    variables
 }

@@ -3,8 +3,8 @@ use lsp_server::Connection;
 extern crate volpe_parser;
 
 mod capabilities;
-mod document;
 mod dispatch;
+mod document;
 mod handlers;
 // mod lsp_utils;
 mod semantic_tokens;
@@ -38,7 +38,7 @@ fn main() {
     //     let thread_priority_above_normal = 1;
     //     SetThreadPriority(thread, thread_priority_above_normal);
     // }
-    
+
     Server::new(connection).run();
     io_threads.join().unwrap();
 }
