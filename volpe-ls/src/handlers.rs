@@ -97,20 +97,13 @@ fn get_semantic_tokens(doc: &Document) -> lsp_types::SemanticTokens {
 
         // Convert lexeme to semantic token.
         let maybe_token_type = if matches!(lexeme.kind, LexemeKind::Ident) {
-            let name = &lexeme.string[..lexeme.token_length.char as usize];
-            let mut token_type = None;
-            // TODO Make more efficient with better data structure
-            for var in doc.vars.iter() {
-                if var.name == name && (var.declaration == pos || var.locations.contains(&pos)) {
-                    token_type = Some(if var.parameter {
-                        SemanticTokenType::PARAMETER
-                    } else {
-                        SemanticTokenType::VARIABLE
-                    });
-                    break;
+            doc.vars.get(&pos).map(|var| {
+                if var.parameter {
+                    SemanticTokenType::PARAMETER
+                } else {
+                    SemanticTokenType::VARIABLE
                 }
-            }
-            token_type
+            })
         } else {
             lexeme_to_type(&lexeme.kind)
         };
