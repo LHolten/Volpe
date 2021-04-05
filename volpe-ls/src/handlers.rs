@@ -5,6 +5,7 @@ use lsp_server::ErrorCode;
 use lsp_types::*;
 
 use crate::document::Document;
+use crate::lsp_utils::{to_offset, to_position};
 use crate::server::Server;
 
 //
@@ -147,12 +148,13 @@ pub fn goto_definition(
     Ok(match this.documents.get_mut(&uri.to_string()) {
         Some(doc) => {
             doc.variable_pass();
-            let pos = params.text_document_position_params.position;
             let vars = doc.vars.take().unwrap();
-            let res = vars.get(&Offset::new(pos.line, pos.character)).map(|var| {
-                let pos = Position::new(var.declaration.line, var.declaration.char);
-                GotoDefinitionResponse::Scalar(Location::new(uri, Range::new(pos, pos)))
-            });
+            let res = vars
+                .get(&to_offset(params.text_document_position_params.position))
+                .map(|var| {
+                    let pos = to_position(var.declaration);
+                    GotoDefinitionResponse::Scalar(Location::new(uri, Range::new(pos, pos)))
+                });
             doc.vars = Some(vars);
             res
         }

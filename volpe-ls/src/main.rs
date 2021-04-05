@@ -6,10 +6,10 @@ mod capabilities;
 mod dispatch;
 mod document;
 mod handlers;
-mod variable;
-// mod lsp_utils;
+mod lsp_utils;
 mod semantic_tokens;
 mod server;
+mod variable;
 use server::Server;
 
 fn main() {
