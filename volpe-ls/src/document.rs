@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::variable::{self, Variable};
+use crate::variable::Variable;
 use volpe_parser::{offset::Offset, packrat::Parser};
 
 pub struct Document {
     pub version: i32,
     pub parser: Parser,
-    pub vars: HashMap<Offset, Arc<Variable>>,
+    pub vars: Option<HashMap<Offset, Arc<Variable>>>,
 }
 
 impl Document {
@@ -20,7 +20,7 @@ impl Document {
         );
         Document {
             version: params.text_document.version,
-            vars: variable::pass(&parser),
+            vars: None,
             parser,
         }
     }
@@ -37,7 +37,7 @@ impl Document {
             }
         }
 
-        self.vars = variable::pass(&self.parser);
+        self.vars = None;
     }
 
     pub fn get_info(&self) -> String {

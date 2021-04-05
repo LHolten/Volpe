@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::Write;
 
+use lsp_server::ErrorCode;
 use lsp_types::*;
 
 use crate::document::Document;
@@ -51,7 +52,7 @@ pub fn did_change_text_document_notification(
 // Requests
 //
 
-pub type RequestResult<R> = Result<R, (lsp_server::ErrorCode, String)>;
+pub type RequestResult<R> = Result<R, (ErrorCode, String)>;
 
 pub fn hover_request(this: &mut Server, params: HoverParams) -> RequestResult<Option<Hover>> {
     let hover = this
@@ -76,7 +77,10 @@ pub fn hover_request(this: &mut Server, params: HoverParams) -> RequestResult<Op
 use crate::semantic_tokens::{lexeme_to_type, type_index, SemanticTokensBuilder};
 use volpe_parser::{lexeme_kind::LexemeKind, offset::Offset};
 
-fn get_semantic_tokens(doc: &Document) -> lsp_types::SemanticTokens {
+fn get_semantic_tokens(doc: &mut Document) -> lsp_types::SemanticTokens {
+    doc.variable_pass();
+    let vars = doc.vars.take().unwrap();
+
     let mut builder = SemanticTokensBuilder::new();
 
     let mut pos = Offset::default();
@@ -97,7 +101,7 @@ fn get_semantic_tokens(doc: &Document) -> lsp_types::SemanticTokens {
 
         // Convert lexeme to semantic token.
         let maybe_token_type = if matches!(lexeme.kind, LexemeKind::Ident) {
-            doc.vars.get(&pos).map(|var| {
+            vars.get(&pos).map(|var| {
                 if var.parameter {
                     SemanticTokenType::PARAMETER
                 } else {
@@ -118,6 +122,7 @@ fn get_semantic_tokens(doc: &Document) -> lsp_types::SemanticTokens {
         pos += lexeme.length;
     }
 
+    doc.vars = Some(vars);
     builder.build()
 }
 
@@ -125,12 +130,11 @@ pub fn semantic_tokens_full_request(
     this: &mut Server,
     params: SemanticTokensParams,
 ) -> RequestResult<Option<SemanticTokensResult>> {
-    let potential_doc = this.documents.get(&params.text_document.uri.to_string());
-    Ok(match potential_doc {
-        Some(doc) => {
-            let tokens = get_semantic_tokens(&doc);
-            Some(SemanticTokensResult::Tokens(tokens))
-        }
-        None => None,
-    })
+    let potential_doc = this
+        .documents
+        .get_mut(&params.text_document.uri.to_string());
+    Ok(potential_doc.map(|doc| {
+        let tokens = get_semantic_tokens(doc);
+        SemanticTokensResult::Tokens(tokens)
+    }))
 }
