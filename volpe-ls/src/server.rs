@@ -67,6 +67,7 @@ impl Server {
         }
         .on::<lsp_types::request::HoverRequest>(handlers::hover_request)
         .on::<lsp_types::request::SemanticTokensFullRequest>(handlers::semantic_tokens_full_request)
+        .on::<lsp_types::request::GotoDefinition>(handlers::goto_definition)
         .finish();
     }
 }

@@ -138,3 +138,27 @@ pub fn semantic_tokens_full_request(
         SemanticTokensResult::Tokens(tokens)
     }))
 }
+
+pub fn goto_definition(
+    this: &mut Server,
+    params: GotoDefinitionParams,
+) -> RequestResult<Option<GotoDefinitionResponse>> {
+    let uri = params.text_document_position_params.text_document.uri;
+    Ok(match this.documents.get_mut(&uri.to_string()) {
+        Some(doc) => {
+            doc.variable_pass();
+            let pos = params.text_document_position_params.position;
+            let vars = doc.vars.take().unwrap();
+            let res = vars.get(&Offset::new(pos.line, pos.character)).map(|var| {
+                let pos = Position::new(var.declaration.line, var.declaration.char);
+                GotoDefinitionResponse::Scalar(Location::new(uri, Range::new(pos, pos)))
+            });
+            doc.vars = Some(vars);
+            res
+        }
+        None => {
+            this.show_error_message(format!("{} was not found in documents", uri));
+            None
+        }
+    })
+}

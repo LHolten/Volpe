@@ -1,8 +1,5 @@
 use crate::semantic_tokens::{SUPPORTED_MODIFIERS, SUPPORTED_TYPES};
-use lsp_types::{
-    HoverProviderCapability, SemanticTokensFullOptions, SemanticTokensLegend,
-    SemanticTokensOptions, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
-};
+use lsp_types::*;
 
 pub fn server_capabilities() -> ServerCapabilities {
     ServerCapabilities {
@@ -21,6 +18,7 @@ pub fn server_capabilities() -> ServerCapabilities {
             }
             .into(),
         ),
+        definition_provider: Some(OneOf::Left(true)),
         ..Default::default()
     }
 }
