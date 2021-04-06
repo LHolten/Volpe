@@ -66,44 +66,9 @@ pub fn hover_request(this: &mut Server, params: HoverParams) -> RequestResult<Op
                 .to_string(),
         )
         .map(|doc| {
-            let target = to_offset(params.text_document_position_params.position);
-            let mut current = Offset::default();
-
-            // Get the lexeme at that position.
-            let mut lexeme = doc.parser.0.as_ref();
-            'next: loop {
-                for rule in &lexeme.rules {
-                    if rule.length == Offset::default() {
-                        continue;
-                    }
-                    // Rules are organised from largest to smallest.
-                    // We look for the first rule which is smaller than the target.
-                    if current + rule.length <= target {
-                        if let Some(next) = &rule.next {
-                            current += rule.length;
-                            lexeme = next.as_ref();
-                            continue 'next;
-                        }
-                    }
-                }
-
-                if current + lexeme.length > target {
-                    break;
-                }
-
-                if let Some(next) = &lexeme.next {
-                    current += lexeme.length;
-                    lexeme = next.as_ref();
-                    continue 'next;
-                }
-
-                // If we got here it means that we reached the end of a lexeme chain.
-                // This should never happen because that would mean that the lexeme
-                // we are looking for was not in this rule.
-                // In that case we would have skipped this chain earlier on.
-                unreachable!()
-            }
-
+            let lexeme = doc
+                .parser
+                .lexeme_at_offset(to_offset(params.text_document_position_params.position));
             Hover {
                 contents: HoverContents::Markup(MarkupContent {
                     kind: MarkupKind::PlainText,
