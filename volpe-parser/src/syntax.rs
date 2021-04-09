@@ -1,10 +1,10 @@
-use std::fmt;
+use std::{fmt, usize};
 
 use crate::{lexeme_kind::LexemeKind, offset::Offset};
 
 #[derive(Default)]
 pub struct Lexeme {
-    pub string: String, // white space and unknown in front
+    pub string: String, // white space and unknown at the end
     pub token_length: Offset,
     pub length: Offset,
     pub kind: LexemeKind,
@@ -12,48 +12,93 @@ pub struct Lexeme {
     pub next: Option<Box<Lexeme>>,
 }
 
-fn write_with_indent<D: fmt::Debug>(
-    f: &mut fmt::Formatter<'_>,
-    thing: D,
-    indent: u32,
-) -> fmt::Result {
-    for _ in 0..indent {
-        f.write_str("  ")?;
+impl Lexeme {
+    fn next_kind(&self, rule_from: usize) -> Option<RuleKind> {
+        for rule_kind in rule_from..10 {
+            let rule = &self.rules[rule_kind];
+            if rule.length != Offset::default() {
+                return Some(RuleKind::from(rule_kind));
+            }
+        }
+        None
     }
-    write!(f, "{:?}\n", thing)
 }
 
-impl fmt::Display for Lexeme {
+impl fmt::Display for Box<Lexeme> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Use next_lexemes as a stack for lexemes and indentation.
-        let mut next_lexemes = vec![(self, 0)];
-        while let Some((lexeme, mut indent)) = next_lexemes.pop() {
-            for (i, rule) in lexeme.rules.iter().enumerate() {
-                // Skip unsuccessful rules.
-                if rule.length == Offset::default() {
-                    continue;
-                }
-                // Write name of rule.
-                write_with_indent(f, RuleKind::from(i), indent)?;
-                // Save the next lexeme and indentation level.
-                if let Some(next) = &rule.next {
-                    next_lexemes.push((next, indent));
-                }
-                // Increase the indentation for this scope.
-                indent += 1;
-            }
-            // Write the current lexeme.
-            write_with_indent(f, (lexeme.kind, &lexeme.string), indent)?;
-            // Add the next lexeme so the whole process can be repeated for it.
-            if let Some(next) = &lexeme.next {
-                next_lexemes.push((next, indent));
-            }
+        write!(f, "{:#?}", self)
+    }
+}
+
+impl fmt::Debug for Box<Lexeme> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let iter = SyntaxIter(Some(self.into()));
+        f.debug_list().entries(iter).finish()
+    }
+}
+
+impl fmt::Debug for Syntax<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(rule_kind) = self.kind {
+            write!(f, "{:?} ", rule_kind)?;
+            f.debug_list().entries(*self).finish()?
+        } else {
+            write!(f, "{:?}: {:?}", self.lexeme.kind, self.lexeme.string)?
         }
         Ok(())
     }
 }
 
-// TODO Implement fmt::Debug for Lexeme that shows unsuccessful rules too.
+#[derive(Clone, Copy)]
+pub struct Syntax<'a> {
+    lexeme: &'a Box<Lexeme>,
+    kind: Option<RuleKind>, // None means that this is a lexeme and not a rule
+}
+
+impl<'a> From<&'a Box<Lexeme>> for Syntax<'a> {
+    fn from(lexeme: &'a Box<Lexeme>) -> Self {
+        Self {
+            lexeme,
+            kind: lexeme.next_kind(0),
+        }
+    }
+}
+
+impl<'a> IntoIterator for Syntax<'a> {
+    type Item = Syntax<'a>;
+
+    type IntoIter = SyntaxIter<'a>;
+
+    fn into_iter(mut self) -> Self::IntoIter {
+        if let Some(rule_kind) = self.kind {
+            self.kind = self.lexeme.next_kind(rule_kind as usize + 1);
+            SyntaxIter(Some(self))
+        } else {
+            SyntaxIter(None)
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct SyntaxIter<'a>(Option<Syntax<'a>>);
+
+impl<'a> Iterator for SyntaxIter<'a> {
+    type Item = Syntax<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(inner) = self.0 {
+            let next = if let Some(rule_kind) = inner.kind {
+                &inner.lexeme.rules[rule_kind as usize].next
+            } else {
+                &inner.lexeme.next
+            };
+            self.0 = next.as_ref().map(Syntax::from);
+            Some(inner)
+        } else {
+            None
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct Rule {
