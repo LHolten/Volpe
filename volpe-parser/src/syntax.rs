@@ -22,25 +22,32 @@ impl Lexeme {
         }
         None
     }
+
+    fn first_syntax(&self) -> Syntax<'_> {
+        Syntax {
+            lexeme: self,
+            kind: self.next_kind(0),
+        }
+    }
 }
 
-impl<'a> IntoIterator for &'a Box<Lexeme> {
+impl<'a> IntoIterator for &'a Lexeme {
     type Item = Syntax<'a>;
 
     type IntoIter = SyntaxIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        SyntaxIter(Some(self.into()))
+        SyntaxIter(Some(self.first_syntax()))
     }
 }
 
-impl fmt::Display for Box<Lexeme> {
+impl fmt::Display for Lexeme {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:#?}", self)
     }
 }
 
-impl fmt::Debug for Box<Lexeme> {
+impl fmt::Debug for Lexeme {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self).finish()
     }
@@ -59,17 +66,8 @@ impl fmt::Debug for Syntax<'_> {
 
 #[derive(Clone, Copy)]
 pub struct Syntax<'a> {
-    pub lexeme: &'a Box<Lexeme>,
+    pub lexeme: &'a Lexeme,
     pub kind: Option<RuleKind>, // None means that this is a lexeme and not a rule
-}
-
-impl<'a> From<&'a Box<Lexeme>> for Syntax<'a> {
-    fn from(lexeme: &'a Box<Lexeme>) -> Self {
-        Self {
-            lexeme,
-            kind: lexeme.next_kind(0),
-        }
-    }
 }
 
 impl<'a> IntoIterator for Syntax<'a> {
@@ -98,7 +96,7 @@ impl<'a> Iterator for SyntaxIter<'a> {
             } else {
                 &inner.lexeme.next
             };
-            self.0 = next.as_ref().map(Syntax::from);
+            self.0 = next.as_ref().map(|lexeme| lexeme.first_syntax());
             inner
         })
     }

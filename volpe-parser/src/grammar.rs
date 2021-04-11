@@ -93,11 +93,11 @@ type TupleLine = Pair<App, Opt<Pair<LexemeP<{ L::Colon.mask() }>, App>>>;
 #[cfg(test)]
 mod tests {
     use crate::offset::Offset;
-    use crate::packrat::Parser;
+    use crate::syntax::Lexeme;
 
     macro_rules! test_expr {
         ($s:literal) => {
-            let mut pos = Parser::default();
+            let mut pos = Lexeme::default();
             pos.parse($s, Offset::default(), Offset::default());
         };
     }

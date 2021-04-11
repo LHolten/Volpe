@@ -1,4 +1,3 @@
-use std::fmt;
 use std::mem::take;
 
 use crate::{
@@ -9,20 +8,11 @@ use crate::{
 };
 use crate::{logos::Logos, offset::Offset};
 
-#[derive(Default)]
-pub struct Parser(pub Box<Lexeme>);
-
-impl fmt::Display for Parser {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl Parser {
+impl Lexeme {
     // you can only use offsets that are within the text
     pub fn parse(&mut self, string: &str, offset: Offset, length: Offset) {
         let mut remaining = Vec::new();
-        let (mut lexeme, mut offset) = fix_first(&mut remaining, &mut self.0, offset);
+        let (mut lexeme, mut offset) = fix_first(&mut remaining, self, offset);
         let first = take(lexeme);
         let length = offset + length;
 
@@ -100,13 +90,13 @@ impl Parser {
                     lexeme.next = Some(Default::default());
                     lexeme = lexeme.next.as_mut().unwrap();
                 }
-                *lexeme = Box::new(Lexeme {
+                *lexeme = Lexeme {
                     string: lex.slice().to_string(),
                     token_length: new_length,
                     length: new_length,
                     kind,
                     ..Lexeme::default()
-                });
+                };
             } else {
                 lexeme.string.push_str(lex.slice());
                 lexeme.length += new_length;
@@ -114,7 +104,7 @@ impl Parser {
         }
         lexeme.next = last.next;
 
-        let mut lexeme_option = Some(take(&mut self.0));
+        let mut lexeme_option = Some(Box::new(take(self)));
         FileP::parse(TInput {
             lexeme: &mut lexeme_option,
             length: Offset::default(),
@@ -125,15 +115,15 @@ impl Parser {
         })
         .ok()
         .unwrap();
-        self.0 = lexeme_option.unwrap();
+        *self = *lexeme_option.unwrap();
     }
 }
 
 fn fix_first<'a>(
     remaining: &mut Vec<Box<Lexeme>>,
-    lexeme: &'a mut Box<Lexeme>,
+    lexeme: &'a mut Lexeme,
     offset: Offset,
-) -> (&'a mut Box<Lexeme>, Offset) {
+) -> (&'a mut Lexeme, Offset) {
     let ptr = lexeme as *mut _;
     let mut furthest = (lexeme.length, &mut lexeme.next);
     for rule in &mut lexeme.rules {
@@ -155,9 +145,9 @@ fn fix_first<'a>(
 
 fn fix_last(
     remaining: &mut Vec<Box<Lexeme>>,
-    mut lexeme: Box<Lexeme>,
+    mut lexeme: Lexeme,
     length: Offset,
-) -> (Box<Lexeme>, Offset) {
+) -> (Lexeme, Offset) {
     let mut furthest = (lexeme.length, &mut lexeme.next);
     for rule in &mut lexeme.rules {
         if rule.length >= length {
@@ -176,17 +166,17 @@ fn fix_last(
     fix_last(remaining, take(next), length - furthest.0)
 }
 
-impl<'a> Parser {
-    pub fn lexeme_at_offset(&'a self, target: Offset) -> &'a Lexeme {
+impl Lexeme {
+    pub fn lexeme_at_offset(&self, target: Offset) -> &Lexeme {
         let mut current = Offset::default();
-        let mut lexeme = self.0.as_ref();
+        let mut lexeme = self;
 
         'next: loop {
             for rule in &lexeme.rules {
                 if rule.length == Offset::default() {
                     continue;
                 }
-                // Rules are organised from largest to smallest.
+                // Rules are organized from largest to smallest.
                 // We look for the first rule which is smaller than the target.
                 if current + rule.length <= target {
                     if let Some(next) = &rule.next {

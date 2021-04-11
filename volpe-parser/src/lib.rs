@@ -4,7 +4,7 @@ mod combinators;
 mod grammar;
 pub mod lexeme_kind;
 pub mod offset;
-pub mod packrat;
+mod packrat;
 pub mod syntax;
 mod tracker;
 
@@ -12,11 +12,11 @@ mod tracker;
 mod test {
 
     use crate::offset::Offset;
-    use crate::packrat::Parser;
+    use crate::syntax::Lexeme;
 
     macro_rules! test_expr {
         ($s:literal) => {{
-            let mut parser = Parser::default();
+            let mut parser = Lexeme::default();
             parser.parse($s, Offset::default(), Offset::default());
             parser
         }};
@@ -64,7 +64,7 @@ mod test {
 
     #[test]
     fn incremental_parsing() {
-        let mut parser = Parser::default();
+        let mut parser = Lexeme::default();
         parser.parse("a", Offset::default(), Offset::default());
         parser.parse(" ", Offset::char(1), Offset::char(0));
         parser.parse("+", Offset::char(2), Offset::char(0));
