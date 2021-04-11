@@ -2,17 +2,17 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::variable::Variable;
-use volpe_parser::{offset::Offset, packrat::Parser};
+use volpe_parser::{offset::Offset, syntax::Lexeme};
 
 pub struct Document {
     pub version: i32,
-    pub parser: Parser,
+    pub parser: Lexeme,
     pub vars: Option<HashMap<Offset, Arc<Variable>>>,
 }
 
 impl Document {
     pub fn new(params: &lsp_types::DidOpenTextDocumentParams) -> Document {
-        let mut parser = Parser::default();
+        let mut parser = Lexeme::default();
         parser.parse(
             &params.text_document.text,
             Offset::default(),

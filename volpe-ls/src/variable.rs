@@ -32,7 +32,7 @@ impl Document {
 
         // Traverse parse tree lexeme by lexeme.
         let mut pos = Offset::default();
-        let mut next_lexemes = vec![(self.parser.0.as_ref(), 0)];
+        let mut next_lexemes = vec![(&self.parser, 0)];
         while let Some((lexeme, mut scope)) = next_lexemes.pop() {
             for (i, rule) in lexeme.rules.iter().enumerate() {
                 if rule.length == Offset::default() {
@@ -73,7 +73,7 @@ impl Document {
                         &lexeme.next, Some(next) if matches!(next.kind, LexemeKind::Func | LexemeKind::Assign)
                     ) {
                         // A new variable has been assigned.
-                        let variables = scoped_variables.entry(name).or_insert(Vec::new());
+                        let variables = scoped_variables.entry(name).or_insert_with(Vec::new);
                         let var = Arc::new(Variable::new(
                             pos,
                             scope,

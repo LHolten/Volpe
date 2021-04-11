@@ -90,7 +90,7 @@ fn get_semantic_tokens(doc: &mut Document) -> lsp_types::SemanticTokens {
     let mut builder = SemanticTokensBuilder::new();
 
     let mut pos = Offset::default();
-    let mut next_lexemes = vec![doc.parser.0.as_ref()];
+    let mut next_lexemes = vec![&doc.parser];
     while let Some(lexeme) = next_lexemes.pop() {
         // Follow the tree lexeme by lexeme.
         for rule in &lexeme.rules {
