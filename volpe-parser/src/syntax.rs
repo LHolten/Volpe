@@ -41,18 +41,17 @@ impl fmt::Debug for Syntax<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(rule_kind) = self.kind {
             write!(f, "{:?} ", rule_kind)?;
-            f.debug_list().entries(*self).finish()?
+            f.debug_list().entries(*self).finish()
         } else {
-            write!(f, "{:?}: {:?}", self.lexeme.kind, self.lexeme.string)?
+            write!(f, "{:?}: {:?}", self.lexeme.kind, self.lexeme.string)
         }
-        Ok(())
     }
 }
 
 #[derive(Clone, Copy)]
 pub struct Syntax<'a> {
-    lexeme: &'a Box<Lexeme>,
-    kind: Option<RuleKind>, // None means that this is a lexeme and not a rule
+    pub lexeme: &'a Box<Lexeme>,
+    pub kind: Option<RuleKind>, // None means that this is a lexeme and not a rule
 }
 
 impl<'a> From<&'a Box<Lexeme>> for Syntax<'a> {
@@ -70,12 +69,10 @@ impl<'a> IntoIterator for Syntax<'a> {
     type IntoIter = SyntaxIter<'a>;
 
     fn into_iter(mut self) -> Self::IntoIter {
-        if let Some(rule_kind) = self.kind {
+        SyntaxIter(self.kind.map(|rule_kind| {
             self.kind = self.lexeme.next_kind(rule_kind as usize + 1);
-            SyntaxIter(Some(self))
-        } else {
-            SyntaxIter(None)
-        }
+            self
+        }))
     }
 }
 
@@ -86,17 +83,15 @@ impl<'a> Iterator for SyntaxIter<'a> {
     type Item = Syntax<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(inner) = self.0 {
+        self.0.map(|inner| {
             let next = if let Some(rule_kind) = inner.kind {
                 &inner.lexeme.rules[rule_kind as usize].next
             } else {
                 &inner.lexeme.next
             };
             self.0 = next.as_ref().map(Syntax::from);
-            Some(inner)
-        } else {
-            None
-        }
+            inner
+        })
     }
 }
 
