@@ -24,6 +24,16 @@ impl Lexeme {
     }
 }
 
+impl<'a> IntoIterator for &'a Box<Lexeme> {
+    type Item = Syntax<'a>;
+
+    type IntoIter = SyntaxIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        SyntaxIter(Some(self.into()))
+    }
+}
+
 impl fmt::Display for Box<Lexeme> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:#?}", self)
@@ -32,8 +42,7 @@ impl fmt::Display for Box<Lexeme> {
 
 impl fmt::Debug for Box<Lexeme> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let iter = SyntaxIter(Some(self.into()));
-        f.debug_list().entries(iter).finish()
+        f.debug_list().entries(self).finish()
     }
 }
 
