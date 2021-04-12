@@ -1,22 +1,15 @@
 use crate::document::Document;
 use std::collections::HashMap;
 use std::sync::Arc;
-use volpe_parser::{lexeme_kind::LexemeKind, offset::Offset, syntax::RuleKind};
+use volpe_parser::{
+    lexeme_kind::LexemeKind,
+    offset::Offset,
+    syntax::{RuleKind, Syntax},
+};
 
 pub struct Variable {
     pub declaration: Offset,
-    pub scope: u32,
     pub parameter: bool,
-}
-
-impl Variable {
-    fn new(declaration: Offset, scope: u32, parameter: bool) -> Variable {
-        Variable {
-            declaration,
-            scope,
-            parameter,
-        }
-    }
 }
 
 impl Document {
@@ -25,85 +18,97 @@ impl Document {
             return;
         }
 
-        let mut output_variables = HashMap::new();
+        fn recurse<'a>(
+            syntax: Syntax<'a>,
+            scoped_vars: &mut HashMap<&'a str, Arc<Variable>>,
+            pos: &mut Offset,
+            output_vars: &mut HashMap<Offset, Arc<Variable>>,
+        ) {
+            // Leaf node - Lexeme.
+            if syntax.kind.is_none() {
+                let lexeme = syntax.lexeme;
+                // It is an identifier.
+                if matches!(lexeme.kind, LexemeKind::Ident) {
+                    // Track whether we made a new variable.
+                    let mut new = false;
 
-        // Track which identifiers are in scope.
-        let mut scoped_variables: HashMap<&str, Vec<Arc<Variable>>> = HashMap::new();
-
-        // Traverse parse tree lexeme by lexeme.
-        let mut pos = Offset::default();
-        let mut next_lexemes = vec![(&self.parser, 0)];
-        while let Some((lexeme, mut scope)) = next_lexemes.pop() {
-            for (i, rule) in lexeme.rules.iter().enumerate() {
-                if rule.length == Offset::default() {
-                    continue;
-                }
-                if let Some(next) = &rule.next {
-                    next_lexemes.push((next, scope));
-                    // Entering a function increments scope.
-                    // It is returned back to the previous value when we pop
-                    // the next lexeme that this rule was pointing to (i.e. after this rule)
-                    if matches!(RuleKind::from(i), RuleKind::Func) {
-                        scope += 1;
-                    }
-                }
-            }
-
-            // Track scope.
-            match &lexeme.kind {
-                LexemeKind::LBrace => scope += 1,
-                LexemeKind::RBrace => scope -= 1,
-                _ => {}
-            }
-
-            match &lexeme.kind {
-                LexemeKind::RBrace => {
-                    for (_, variables) in scoped_variables.iter_mut() {
-                        if let Some(var) = variables.last() {
-                            if var.scope >= scope {
-                                variables.pop();
-                            }
-                        }
-                    }
-                }
-                LexemeKind::Ident => {
                     let name = &lexeme.string[..lexeme.token_length.char as usize];
+                    if let Some(next) = lexeme.next.as_deref() {
+                        // Check the next lexeme to see if it is an assignment or function.
+                        let parameter = matches!(next.kind, LexemeKind::Func);
+                        let assignment = matches!(next.kind, LexemeKind::Assign);
+                        if parameter || assignment {
+                            // New variable was created.
+                            new = true;
+                            let var = Arc::new(Variable {
+                                declaration: *pos,
+                                parameter,
+                            });
+                            scoped_vars.insert(name, Arc::clone(&var));
+                            output_vars.insert(*pos, var);
+                        }
+                    }
 
-                    if matches!(
-                        &lexeme.next, Some(next) if matches!(next.kind, LexemeKind::Func | LexemeKind::Assign)
-                    ) {
-                        // A new variable has been assigned.
-                        let variables = scoped_variables.entry(name).or_insert_with(Vec::new);
-                        let var = Arc::new(Variable::new(
-                            pos,
-                            scope,
-                            matches!(&lexeme.next, Some(next) if matches!(next.kind, LexemeKind::Func)),
-                        ));
-                        output_variables.insert(pos, Arc::clone(&var));
-                        variables.push(var);
-                    } else {
+                    if !new {
                         // Connect the use of a variable to its declaration.
-                        if let Some(variables) = scoped_variables.get(name) {
-                            if let Some(var) = variables.last() {
-                                if var.scope <= scope {
-                                    output_variables.insert(pos, Arc::clone(&var));
-                                }
-                            }
+                        if let Some(var) = scoped_vars.get(name) {
+                            output_vars.insert(*pos, Arc::clone(var));
                         }
                     }
                 }
-                _ => {}
+
+                *pos += syntax.lexeme.length;
+                return;
             }
 
-            // Follow lexeme chains.
-            if let Some(next) = &lexeme.next {
-                next_lexemes.push((next, scope));
+            // Rule node
+            // Optionally save the current scope if we are entering a new one.
+            let mut checkpoint = None;
+            if matches!(syntax.kind.unwrap(), RuleKind::Func | RuleKind::Expr) {
+                checkpoint = Some(scoped_vars.clone());
             }
 
-            // Track current position in text.
-            pos += lexeme.length;
+            // Parse the right hand side of assignment separately.
+            // The variable we are just defining is not yet in scope for the rhs.
+            let mut syntax_iter = syntax.into_iter();
+            let assignment = syntax_iter
+                .position(|child| matches!(child.lexeme.kind, LexemeKind::Assign));
+            let semicolon = syntax_iter
+                .position(|child| matches!(child.lexeme.kind, LexemeKind::Semicolon))
+                .unwrap_or(usize::MAX);
+
+            if let Some(start) = assignment {
+                // TODO Maybe get rid of this clone by tracking pos instead?
+                let mut before_assign = scoped_vars.clone();
+                for (i, child) in syntax.into_iter().enumerate() {
+                    if i < start || i - start > semicolon {
+                        recurse(child, scoped_vars, pos, output_vars)
+                    } else {
+                        recurse(child, &mut before_assign, pos, output_vars)
+                    }
+                }
+
+            // If it is not assignment we just recurse normally.
+            } else {
+                for child in syntax {
+                    recurse(child, scoped_vars, pos, output_vars)
+                }
+            }
+
+            // If we made a checkpoint it means we should use it.
+            // This "drops" the local variables made in that scope.
+            if let Some(before) = checkpoint {
+                *scoped_vars = before;
+            }
         }
 
-        self.vars = Some(output_variables)
+        // Begin recursion.
+        let mut output_vars = HashMap::new();
+        let mut pos = Offset::default();
+        for syntax in &self.parser {
+            recurse(syntax, &mut HashMap::new(), &mut pos, &mut output_vars);
+        }
+
+        self.vars = Some(output_vars)
     }
 }
