@@ -1,12 +1,17 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+use std::sync::Arc;
 
 use lsp_server::ErrorCode;
 use lsp_types::*;
+use volpe_parser::{lexeme_kind::LexemeKind, offset::Offset, syntax::Syntax};
 
 use crate::document::Document;
 use crate::lsp_utils::{to_offset, to_position};
+use crate::semantic_tokens::{lexeme_to_type, type_index, SemanticTokensBuilder};
 use crate::server::Server;
+use crate::variable::Variable;
 
 //
 // Notifications
@@ -80,54 +85,53 @@ pub fn hover_request(this: &mut Server, params: HoverParams) -> RequestResult<Op
     Ok(hover)
 }
 
-use crate::semantic_tokens::{lexeme_to_type, type_index, SemanticTokensBuilder};
-use volpe_parser::{lexeme_kind::LexemeKind, offset::Offset};
-
 fn get_semantic_tokens(doc: &mut Document) -> lsp_types::SemanticTokens {
-    doc.variable_pass();
-    let vars = doc.vars.take().unwrap();
+    fn recurse(
+        syntax: Syntax,
+        pos: &mut Offset,
+        builder: &mut SemanticTokensBuilder,
+        vars: &HashMap<Offset, Arc<Variable>>,
+    ) {
+        // Leaf node - Lexeme.
+        if syntax.kind.is_none() {
+            let lexeme = syntax.lexeme;
+            // Convert lexeme to semantic token.
+            let maybe_token_type = if matches!(lexeme.kind, LexemeKind::Ident) {
+                vars.get(pos).map(|var| {
+                    if var.parameter {
+                        SemanticTokenType::PARAMETER
+                    } else {
+                        SemanticTokenType::VARIABLE
+                    }
+                })
+            } else {
+                lexeme_to_type(&lexeme.kind)
+            };
 
-    let mut builder = SemanticTokensBuilder::new();
-
-    let mut pos = Offset::default();
-    let mut next_lexemes = vec![&doc.parser];
-    while let Some(lexeme) = next_lexemes.pop() {
-        // Follow the tree lexeme by lexeme.
-        for rule in &lexeme.rules {
-            if rule.length == Offset::default() {
-                continue;
+            if let Some(token_type) = maybe_token_type {
+                builder.push(lexeme.token_length, type_index(token_type), 0);
+                builder.skip(lexeme.length - lexeme.token_length);
+            } else {
+                builder.skip(lexeme.length)
             }
-            if let Some(next) = &rule.next {
-                next_lexemes.push(next);
-            }
-        }
-        if let Some(next) = &lexeme.next {
-            next_lexemes.push(next);
+
+            *pos += lexeme.length;
+            return;
         }
 
-        // Convert lexeme to semantic token.
-        let maybe_token_type = if matches!(lexeme.kind, LexemeKind::Ident) {
-            vars.get(&pos).map(|var| {
-                if var.parameter {
-                    SemanticTokenType::PARAMETER
-                } else {
-                    SemanticTokenType::VARIABLE
-                }
-            })
-        } else {
-            lexeme_to_type(&lexeme.kind)
-        };
-
-        if let Some(token_type) = maybe_token_type {
-            builder.push(lexeme.token_length, type_index(token_type), 0);
-            builder.skip(lexeme.length - lexeme.token_length);
-        } else {
-            builder.skip(lexeme.length)
+        // Recurse for all children.
+        for child in syntax {
+            recurse(child, pos, builder, vars);
         }
-
-        pos += lexeme.length;
     }
 
+    doc.variable_pass();
+    let vars = doc.vars.take().unwrap();
+    let mut builder = SemanticTokensBuilder::new();
+    let mut pos = Offset::default();
+    for syntax in &doc.parser {
+        recurse(syntax, &mut pos, &mut builder, &vars);
+    }
     doc.vars = Some(vars);
     builder.build()
 }
