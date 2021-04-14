@@ -60,7 +60,7 @@ pub fn did_change_text_document_notification(
 
 pub type RequestResult<R> = Result<R, (ErrorCode, String)>;
 
-pub fn hover_request(this: &mut Server, params: HoverParams) -> RequestResult<Option<Hover>> {
+pub fn hover(this: &mut Server, params: HoverParams) -> RequestResult<Option<Hover>> {
     let hover = this
         .documents
         .get(
@@ -161,7 +161,7 @@ fn get_semantic_tokens(
     builder.build()
 }
 
-pub fn semantic_tokens_full_request(
+pub fn semantic_tokens_full(
     this: &mut Server,
     params: SemanticTokensParams,
 ) -> RequestResult<Option<SemanticTokensResult>> {
@@ -174,7 +174,7 @@ pub fn semantic_tokens_full_request(
     }))
 }
 
-pub fn semantic_tokens_range_request(
+pub fn semantic_tokens_range(
     this: &mut Server,
     params: SemanticTokensRangeParams,
 ) -> RequestResult<Option<SemanticTokensRangeResult>> {

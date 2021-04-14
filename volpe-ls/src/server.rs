@@ -66,9 +66,9 @@ impl Server {
             request: Some(request),
             server: self,
         }
-        .on::<lsp_types::request::HoverRequest>(handlers::hover_request)
-        .on::<lsp_types::request::SemanticTokensFullRequest>(handlers::semantic_tokens_full_request)
-        .on::<lsp_types::request::SemanticTokensRangeRequest>(handlers::semantic_tokens_range_request)
+        .on::<lsp_types::request::HoverRequest>(handlers::hover)
+        .on::<lsp_types::request::SemanticTokensFullRequest>(handlers::semantic_tokens_full)
+        .on::<lsp_types::request::SemanticTokensRangeRequest>(handlers::semantic_tokens_range)
         .on::<lsp_types::request::GotoDefinition>(handlers::goto_definition)
         .finish();
     }
