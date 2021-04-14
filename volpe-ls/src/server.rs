@@ -61,12 +61,14 @@ impl Server {
     }
 
     fn on_request(&mut self, request: Request) {
+        #[rustfmt::skip]
         RequestDispatcher {
             request: Some(request),
             server: self,
         }
         .on::<lsp_types::request::HoverRequest>(handlers::hover_request)
         .on::<lsp_types::request::SemanticTokensFullRequest>(handlers::semantic_tokens_full_request)
+        .on::<lsp_types::request::SemanticTokensRangeRequest>(handlers::semantic_tokens_range_request)
         .on::<lsp_types::request::GotoDefinition>(handlers::goto_definition)
         .finish();
     }

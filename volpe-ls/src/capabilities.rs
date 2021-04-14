@@ -14,6 +14,7 @@ pub fn server_capabilities() -> ServerCapabilities {
                     token_modifiers: SUPPORTED_MODIFIERS.to_vec(),
                 },
                 full: Some(SemanticTokensFullOptions::Bool(true)),
+                range: Some(true),
                 ..Default::default()
             }
             .into(),
