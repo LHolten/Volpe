@@ -70,6 +70,12 @@ pub struct Syntax<'a> {
     pub kind: Option<RuleKind>, // None means that this is a lexeme and not a rule
 }
 
+impl Syntax<'_> {
+    pub fn rule_length(&self) -> Option<Offset> {
+        self.kind.map(|kind| self.lexeme.rules[kind as usize].length)
+    }
+}
+
 impl<'a> IntoIterator for Syntax<'a> {
     type Item = Syntax<'a>;
 
