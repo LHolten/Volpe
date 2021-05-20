@@ -29,6 +29,23 @@ impl Lexeme {
             kind: self.next_kind(0),
         }
     }
+
+    pub fn get_text(&self) -> String {
+        let mut text = String::new();
+        fn rec(syntax: Syntax, text: &mut String) {
+            if syntax.kind.is_none() {
+                text.push_str(&syntax.lexeme.string);
+                return;
+            }
+            for child in syntax {
+                rec(child, text);
+            }
+        }
+        for syntax in self {
+            rec(syntax, &mut text);
+        }
+        text
+    }
 }
 
 impl<'a> IntoIterator for &'a Lexeme {
@@ -72,7 +89,8 @@ pub struct Syntax<'a> {
 
 impl Syntax<'_> {
     pub fn rule_length(&self) -> Option<Offset> {
-        self.kind.map(|kind| self.lexeme.rules[kind as usize].length)
+        self.kind
+            .map(|kind| self.lexeme.rules[kind as usize].length)
     }
 }
 
