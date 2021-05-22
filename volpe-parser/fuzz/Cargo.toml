@@ -1,0 +1,32 @@
+
+[package]
+name = "volpe-parser-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.volpe-parser]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "one_shot"
+path = "fuzz_targets/one_shot.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "incremental_write"
+path = "fuzz_targets/incremental_write.rs"
+test = false
+doc = false
