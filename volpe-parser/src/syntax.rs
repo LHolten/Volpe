@@ -46,6 +46,23 @@ impl Lexeme {
         }
         text
     }
+
+    pub fn get_size(&self) -> Offset {
+        let mut size = Offset::default();
+        fn rec(syntax: Syntax, size: &mut Offset) {
+            if syntax.kind.is_none() {
+                *size += syntax.lexeme.length;
+                return;
+            }
+            for child in syntax {
+                rec(child, size);
+            }
+        }
+        for syntax in self {
+            rec(syntax, &mut size);
+        }
+        size
+    }
 }
 
 impl<'a> IntoIterator for &'a Lexeme {
