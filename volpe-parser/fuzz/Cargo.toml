@@ -10,7 +10,8 @@ edition = "2018"
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "0.4"
+libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
+arbitrary = "1.0"
 
 [dependencies.volpe-parser]
 path = ".."
@@ -28,5 +29,17 @@ doc = false
 [[bin]]
 name = "incremental_write"
 path = "fuzz_targets/incremental_write.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "incremental_insert"
+path = "fuzz_targets/incremental_insert.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "incremental_replace"
+path = "fuzz_targets/incremental_replace.rs"
 test = false
 doc = false
