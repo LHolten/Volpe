@@ -75,5 +75,43 @@ mod test {
         parser.parse(")", Offset::char(4), Offset::char(0));
     }
 
-    // TODO add some more complicated tests.
+    use std::{
+        sync::{Arc, Condvar, Mutex},
+        thread,
+        time::Duration,
+    };
+
+    fn with_timeout<F: 'static + FnOnce() + Send>(f: F, duration: Duration) {
+        let finished = Arc::new((Mutex::new(false), Condvar::new()));
+        thread::spawn({
+            let finished = Arc::clone(&finished);
+            move || {
+                f();
+                let mut guard = finished.0.lock().unwrap();
+                *guard = true;
+                finished.1.notify_one();
+            }
+        });
+
+        let timed_out = finished
+            .1
+            .wait_timeout_while(finished.0.lock().unwrap(), duration, |&mut finished| {
+                !finished
+            })
+            .unwrap()
+            .1
+            .timed_out();
+
+        assert!(!timed_out);
+    }
+
+    #[test]
+    fn slow_brackets() {
+        with_timeout(
+            || {
+                test_expr!("(((");
+            },
+            Duration::from_secs(5),
+        );
+    }
 }
