@@ -18,8 +18,8 @@ impl<const L: usize> TFunc for LexemeP<L> {
         if lexeme.kind.mask() & L != 0 {
             for rule in &mut lexeme.rules {
                 // could possibly also ignore failed rules
-                let rule = take(rule);
-                if let Some(next) = rule.next {
+                let next = take(&mut rule.next);
+                if let Some(next) = next {
                     t.error.remaining.push(next)
                 }
             }
@@ -43,7 +43,7 @@ impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
         }
         let rules = &mut t.lexeme.as_mut().unwrap().rules as *mut [Rule; 10];
         let rules = unsafe { &mut *rules };
-        if t.lexeme.as_mut().unwrap().rules[R].sensitive_length == Offset::default() {
+        if rules[R].sensitive_length == Offset::default() {
             // current rule is not tried yet
             let result = F::parse(TInput {
                 lexeme: t.lexeme,
@@ -77,8 +77,8 @@ impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
         );
         if rules[R].length != Offset::default() {
             for i in 0..R {
-                let rule = take(&mut rules[i]);
-                if let Some(next) = rule.next {
+                let next = take(&mut rules[i].next);
+                if let Some(next) = next {
                     t.error.remaining.push(next)
                 }
             }
