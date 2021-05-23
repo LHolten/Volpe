@@ -119,6 +119,7 @@ impl Lexeme {
     }
 }
 
+#[allow(clippy::vec_box)]
 fn fix_first<'a>(
     remaining: &mut Vec<Box<Lexeme>>,
     lexeme: &'a mut Lexeme,
@@ -143,6 +144,7 @@ fn fix_first<'a>(
     fix_first(remaining, next, offset - furthest.0)
 }
 
+#[allow(clippy::vec_box)]
 fn fix_last(
     remaining: &mut Vec<Box<Lexeme>>,
     mut lexeme: Lexeme,

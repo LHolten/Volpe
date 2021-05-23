@@ -12,6 +12,7 @@ pub struct TInput<'a> {
     pub error: TError,
 }
 
+#[allow(clippy::vec_box)]
 pub struct TError {
     pub remaining: Vec<Box<Lexeme>>,
     pub sensitive_length: Offset, // the length of text that triggers reparse if changed

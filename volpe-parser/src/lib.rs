@@ -23,6 +23,7 @@ mod test {
     }
 
     // Use this if you want to see how the parse tree changes with each edit.
+    #[allow(unused_macros)]
     macro_rules! examine_parser {
         ( $i:ident, $( $e:expr )* ) => {
             $(
@@ -81,6 +82,7 @@ mod test {
         time::Duration,
     };
 
+    #[allow(clippy::mutex_atomic)]
     fn with_timeout<F: 'static + FnOnce() + Send>(f: F, duration: Duration) {
         let finished = Arc::new((Mutex::new(false), Condvar::new()));
         thread::spawn({

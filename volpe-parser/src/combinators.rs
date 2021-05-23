@@ -76,8 +76,8 @@ impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
             t.length + rules[R].sensitive_length,
         );
         if rules[R].length != Offset::default() {
-            for i in 0..R {
-                let next = take(&mut rules[i].next);
+            for rule in rules.iter_mut().take(R) {
+                let next = take(&mut rule.next);
                 if let Some(next) = next {
                     t.error.remaining.push(next)
                 }

@@ -177,6 +177,7 @@ impl From<usize> for RuleKind {
 }
 
 pub trait OrRemaining {
+    #[allow(clippy::vec_box)]
     fn or_remaining(&mut self, remaining: &mut Vec<Box<Lexeme>>) -> &mut Self;
 }
 
