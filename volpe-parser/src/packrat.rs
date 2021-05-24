@@ -1,6 +1,7 @@
 use std::mem::take;
 
 use crate::{
+    error::ParseError,
     grammar::FileP,
     lexeme_kind::LexemeKind,
     syntax::{Lexeme, OrRemaining},
@@ -13,9 +14,14 @@ impl Lexeme {
     // you can only use offsets that are within the text
     // if you give an offset outside of the text,
     // then this function will return None and likely mess up the lexemes
-    pub fn parse(&mut self, string: &str, offset: Offset, length: Offset) -> Option<()> {
+    pub fn parse(
+        &mut self,
+        string: &str,
+        offset: Offset,
+        length: Offset,
+    ) -> Result<(), ParseError> {
         if offset + length > self.get_size() {
-            return None;
+            return Err(ParseError::LengthOutOfRange);
         }
         let mut remaining = Vec::new();
         let (mut lexeme, mut offset) = fix_first(&mut remaining, self, offset);
@@ -24,13 +30,23 @@ impl Lexeme {
 
         let mut input = String::default();
         if offset < Offset::line() {
-            input.push_str(first.string.get(..offset.char as usize)?);
+            input.push_str(
+                first
+                    .string
+                    .get(..offset.char as usize)
+                    .ok_or(ParseError::OffsetOutOfRange)?,
+            );
         } else {
             for (i, c) in first.string.char_indices() {
                 if c == '\n' {
                     offset -= Offset::line();
                     if offset < Offset::line() {
-                        input.push_str(first.string.get(..1 + i + offset.char as usize)?);
+                        input.push_str(
+                            first
+                                .string
+                                .get(..1 + i + offset.char as usize)
+                                .ok_or(ParseError::OffsetOutOfRange)?,
+                        );
                         break;
                     }
                 }
@@ -42,13 +58,21 @@ impl Lexeme {
         let (mut last, mut length) = fix_last(&mut remaining, first, length);
 
         if length < Offset::line() {
-            input.push_str(last.string.get(length.char as usize..)?)
+            input.push_str(
+                last.string
+                    .get(length.char as usize..)
+                    .ok_or(ParseError::LengthOutOfRange)?,
+            )
         } else {
             for (i, c) in last.string.char_indices() {
                 if c == '\n' {
                     length -= Offset::line();
                     if length < Offset::line() {
-                        input.push_str(last.string.get(1 + i + length.char as usize..)?);
+                        input.push_str(
+                            last.string
+                                .get(1 + i + length.char as usize..)
+                                .ok_or(ParseError::LengthOutOfRange)?,
+                        );
                         break;
                     }
                 }
@@ -122,7 +146,7 @@ impl Lexeme {
         .ok()
         .unwrap();
         *self = *lexeme_option.unwrap();
-        Some(())
+        Ok(())
     }
 }
 

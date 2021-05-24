@@ -1,6 +1,7 @@
 extern crate logos;
 
 mod combinators;
+pub mod error;
 mod grammar;
 pub mod lexeme_kind;
 pub mod offset;
@@ -12,6 +13,7 @@ mod tracker;
 mod test {
 
     use crate::offset::Offset;
+    use crate::error::ParseError;
     use crate::syntax::Lexeme;
 
     macro_rules! test_expr {
@@ -66,18 +68,17 @@ mod test {
     }
 
     #[test]
-    fn incremental_parsing() {
+    fn incremental_parsing() -> Result<(), ParseError> {
         let mut parser = Lexeme::default();
-        parser
-            .parse("a", Offset::default(), Offset::default())
-            .unwrap();
-        parser.parse(" ", Offset::char(1), Offset::char(0)).unwrap();
-        parser.parse("+", Offset::char(2), Offset::char(0)).unwrap();
-        parser.parse(" ", Offset::char(3), Offset::char(0)).unwrap();
-        parser.parse("b", Offset::char(3), Offset::char(0)).unwrap();
-        parser.parse("(", Offset::char(0), Offset::char(0)).unwrap();
-        parser.parse(" ", Offset::char(2), Offset::char(2)).unwrap();
-        parser.parse(")", Offset::char(4), Offset::char(0)).unwrap();
+        parser.parse("a", Offset::default(), Offset::default())?;
+        parser.parse(" ", Offset::char(1), Offset::char(0))?;
+        parser.parse("+", Offset::char(2), Offset::char(0))?;
+        parser.parse(" ", Offset::char(3), Offset::char(0))?;
+        parser.parse("b", Offset::char(3), Offset::char(0))?;
+        parser.parse("(", Offset::char(0), Offset::char(0))?;
+        parser.parse(" ", Offset::char(2), Offset::char(2))?;
+        parser.parse(")", Offset::char(4), Offset::char(0))?;
+        Ok(())
     }
 
     use std::{
@@ -122,17 +123,14 @@ mod test {
     }
 
     #[test]
-    fn bug() {
-        fn inner() -> Option<()> {
-            let mut parser = Lexeme::default();
-            parser.parse("A.AA", Offset::default(), Offset::default())?;
-            parser.parse(" .A ", Offset::default(), Offset::default())?;
-            parser.parse(" A", Offset::default(), Offset::default())?;
-            parser.parse("A&", Offset::default(), Offset::default())?;
-            parser.parse(".,", Offset::new(0, 2), Offset::default())?;
-            parser.parse("A", Offset::new(0, 14), Offset::default())?;
-            Some(())
-        }
-        let _ = inner();
+    fn bug() -> Result<(), ParseError> {
+        let mut parser = Lexeme::default();
+        parser.parse("A.AA", Offset::default(), Offset::default())?;
+        parser.parse(" .A ", Offset::default(), Offset::default())?;
+        parser.parse(" A", Offset::default(), Offset::default())?;
+        parser.parse("A&", Offset::default(), Offset::default())?;
+        parser.parse(".,", Offset::new(0, 2), Offset::default())?;
+        parser.parse("A", Offset::new(0, 14), Offset::default())?;
+        Ok(())
     }
 }
