@@ -37,3 +37,9 @@ name = "incremental_replace"
 path = "fuzz_targets/incremental_replace.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "incremental_vs_one_shot"
+path = "fuzz_targets/incremental_vs_one_shot.rs"
+test = false
+doc = false

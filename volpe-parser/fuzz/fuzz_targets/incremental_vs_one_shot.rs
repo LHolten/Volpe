@@ -26,4 +26,11 @@ fuzz_target!(|edits: Vec<Edit>| {
             return;
         }
     }
+    same_as_one_shot(parser);
 });
+
+fn same_as_one_shot(parser: Lexeme) {
+    let mut one_shot = Lexeme::default();
+    one_shot.parse(&parser.get_text(), Offset::default(), Offset::default()).unwrap();
+    assert_eq!(parser, one_shot);
+}
