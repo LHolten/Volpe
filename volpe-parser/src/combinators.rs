@@ -2,7 +2,7 @@ use std::{cmp::max, marker::PhantomData, mem::take};
 
 use crate::{
     offset::Offset,
-    syntax::{OrRemaining, Rule},
+    syntax::{OrRemaining, Rule, RULE_COUNT},
     tracker::{TError, TFunc, TInput, TResult},
 };
 
@@ -18,8 +18,8 @@ impl<const L: usize> TFunc for LexemeP<L> {
         if lexeme.kind.mask() & L != 0 {
             for rule in &mut lexeme.rules {
                 // could possibly also ignore failed rules
-                let next = take(&mut rule.next);
-                if let Some(next) = next {
+                let rule = take(rule);
+                if let Some(next) = rule.next {
                     t.error.remaining.push(next)
                 }
             }
@@ -41,7 +41,7 @@ impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
         if t.lexeme.or_remaining(&mut t.error.remaining).is_none() {
             return Err(t.error);
         }
-        let rules = &mut t.lexeme.as_mut().unwrap().rules as *mut [Rule; 10];
+        let rules = &mut t.lexeme.as_mut().unwrap().rules as *mut [Rule; RULE_COUNT];
         let rules = unsafe { &mut *rules };
         if rules[R].sensitive_length == Offset::default() {
             // current rule is not tried yet
@@ -77,8 +77,8 @@ impl<F: TFunc, const R: usize> TFunc for RuleP<F, R> {
         );
         if rules[R].length != Offset::default() {
             for rule in rules.iter_mut().take(R) {
-                let next = take(&mut rule.next);
-                if let Some(next) = next {
+                let rule = take(rule);
+                if let Some(next) = rule.next {
                     t.error.remaining.push(next)
                 }
             }

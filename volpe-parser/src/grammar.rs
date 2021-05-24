@@ -66,7 +66,9 @@ type Op2 = Alt<RuleP<Separated<Op3, LexemeP<{ TAG2 }>>, { RuleKind::Op2 as usize
 const TAG3: usize = L::Mul.mask() | L::Div.mask() | L::Mod.mask() | L::BitAnd.mask();
 type Op3 = Alt<RuleP<Separated<Term, LexemeP<{ TAG3 }>>, { RuleKind::Op3 as usize }>, Term>;
 
-type Term = Opt<Alt<LexemeP<{ L::Num.mask() | L::Ident.mask() }>, Alt<Block, Tuple>>>;
+type Term = Alt<RuleP<Block, { RuleKind::Block as usize }>, Alt<Tuple, Literal>>;
+
+type Literal = Opt<LexemeP<{ L::Num.mask() | L::Ident.mask() }>>;
 
 pub struct Block;
 impl TFunc for Block {

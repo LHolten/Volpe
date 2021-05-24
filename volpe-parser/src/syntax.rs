@@ -2,19 +2,21 @@ use std::{fmt, usize};
 
 use crate::{lexeme_kind::LexemeKind, offset::Offset};
 
+pub const RULE_COUNT: usize = 11;
+
 #[derive(Default)]
 pub struct Lexeme {
     pub string: String, // white space and unknown at the end
     pub token_length: Offset,
     pub length: Offset,
     pub kind: LexemeKind,
-    pub rules: [Rule; 10],
+    pub rules: [Rule; RULE_COUNT],
     pub next: Option<Box<Lexeme>>,
 }
 
 impl Lexeme {
     fn next_kind(&self, rule_from: usize) -> Option<RuleKind> {
-        for rule_kind in rule_from..10 {
+        for rule_kind in rule_from..RULE_COUNT {
             let rule = &self.rules[rule_kind];
             if rule.length != Offset::default() {
                 return Some(RuleKind::from(rule_kind));
@@ -155,6 +157,7 @@ pub enum RuleKind {
     Op1,
     Op2,
     Op3,
+    Block,
     Tuple,
 }
 
@@ -170,6 +173,7 @@ impl From<usize> for RuleKind {
             v if v == Self::Op1 as usize => Self::Op1,
             v if v == Self::Op2 as usize => Self::Op2,
             v if v == Self::Op3 as usize => Self::Op3,
+            v if v == Self::Block as usize => Self::Block,
             v if v == Self::Tuple as usize => Self::Tuple,
             _ => unreachable!(),
         }
