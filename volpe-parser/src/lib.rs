@@ -120,4 +120,19 @@ mod test {
             Duration::from_secs(5),
         );
     }
+
+    #[test]
+    fn bug() {
+        fn inner() -> Option<()> {
+            let mut parser = Lexeme::default();
+            parser.parse("A.AA", Offset::default(), Offset::default())?;
+            parser.parse(" .A ", Offset::default(), Offset::default())?;
+            parser.parse(" A", Offset::default(), Offset::default())?;
+            parser.parse("A&", Offset::default(), Offset::default())?;
+            parser.parse(".,", Offset::new(0, 2), Offset::default())?;
+            parser.parse("A", Offset::new(0, 14), Offset::default())?;
+            Some(())
+        }
+        let _ = inner();
+    }
 }
