@@ -79,7 +79,6 @@ impl Lexeme {
             }
         }
 
-        // when input is empty this will produce an unnecessary Start Lexeme
         let mut lex = LexemeKind::lexer(&input);
         while let Some(mut kind) = lex.next() {
             if lex.remainder().is_empty()
@@ -132,7 +131,12 @@ impl Lexeme {
                 lexeme.length += new_length;
             }
         }
-        lexeme.next = last.next;
+        if lexeme.length != Offset::default() {
+            lexeme.next = last.next;
+        } else if let Some(next) = last.next {
+            // if lexeme is empty then just replace it
+            *lexeme = *next;
+        }
 
         let mut lexeme_option = Some(Box::new(take(self)));
         FileP::parse(TInput {

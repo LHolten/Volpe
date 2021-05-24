@@ -4,7 +4,7 @@ use crate::{lexeme_kind::LexemeKind, offset::Offset};
 
 pub const RULE_COUNT: usize = 11;
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 pub struct Lexeme {
     pub string: String, // white space and unknown at the end
     pub token_length: Offset,
@@ -139,7 +139,7 @@ impl<'a> Iterator for SyntaxIter<'a> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 pub struct Rule {
     pub sensitive_length: Offset, // Total length including failed rules/lexemes (zero means unevaluated)
     pub length: Offset,           // Offset of next (zero means failed)
