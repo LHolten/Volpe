@@ -89,35 +89,3 @@ impl TFunc for TupleInner {
 }
 
 type TupleLine = Pair<App, Opt<Pair<LexemeP<{ L::Colon.mask() }>, App>>>;
-
-#[cfg(test)]
-mod tests {
-    use crate::offset::Offset;
-    use crate::syntax::Lexeme;
-
-    macro_rules! test_expr {
-        ($s:literal) => {
-            let mut pos = Lexeme::default();
-            pos.parse($s, Offset::default(), Offset::default());
-        };
-    }
-
-    #[test]
-    fn functions() {
-        test_expr!("hello world");
-        // test_expr!("[1, 2, 3; 4, 5, 6] 10 (cool thing)");
-        test_expr!("(a = 1; b = 2; add a b)");
-        // test_expr!(
-        //     "my_object = {
-        //         alpha : something,
-        //         beta : 3404,
-        //     }; my_object"
-        // );
-        test_expr!("a.b.(add a b) 10 20");
-        test_expr!("{1, 2, 3}");
-        test_expr!("{1}");
-        test_expr!("{}");
-        test_expr!("1 > 2 => {}");
-        // test_expr!("1 /* /* wow */ cool */ > 2 // hello");
-    }
-}
