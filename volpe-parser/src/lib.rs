@@ -17,7 +17,9 @@ mod test {
     macro_rules! test_expr {
         ($s:literal) => {{
             let mut parser = Lexeme::default();
-            parser.parse($s, Offset::default(), Offset::default());
+            parser
+                .parse($s, Offset::default(), Offset::default())
+                .unwrap();
             parser
         }};
     }
@@ -66,14 +68,16 @@ mod test {
     #[test]
     fn incremental_parsing() {
         let mut parser = Lexeme::default();
-        parser.parse("a", Offset::default(), Offset::default());
-        parser.parse(" ", Offset::char(1), Offset::char(0));
-        parser.parse("+", Offset::char(2), Offset::char(0));
-        parser.parse(" ", Offset::char(3), Offset::char(0));
-        parser.parse("b", Offset::char(3), Offset::char(0));
-        parser.parse("(", Offset::char(0), Offset::char(0));
-        parser.parse(" ", Offset::char(2), Offset::char(2));
-        parser.parse(")", Offset::char(4), Offset::char(0));
+        parser
+            .parse("a", Offset::default(), Offset::default())
+            .unwrap();
+        parser.parse(" ", Offset::char(1), Offset::char(0)).unwrap();
+        parser.parse("+", Offset::char(2), Offset::char(0)).unwrap();
+        parser.parse(" ", Offset::char(3), Offset::char(0)).unwrap();
+        parser.parse("b", Offset::char(3), Offset::char(0)).unwrap();
+        parser.parse("(", Offset::char(0), Offset::char(0)).unwrap();
+        parser.parse(" ", Offset::char(2), Offset::char(2)).unwrap();
+        parser.parse(")", Offset::char(4), Offset::char(0)).unwrap();
     }
 
     use std::{

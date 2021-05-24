@@ -8,9 +8,15 @@ use crate::{
 };
 use crate::{logos::Logos, offset::Offset};
 
+#[allow(clippy::vec_box)]
 impl Lexeme {
     // you can only use offsets that are within the text
-    pub fn parse(&mut self, string: &str, offset: Offset, length: Offset) {
+    // if you give an offset outside of the text,
+    // then this function will return None and likely mess up the lexemes
+    pub fn parse(&mut self, string: &str, offset: Offset, length: Offset) -> Option<()> {
+        if offset + length > self.get_size() {
+            return None;
+        }
         let mut remaining = Vec::new();
         let (mut lexeme, mut offset) = fix_first(&mut remaining, self, offset);
         let first = take(lexeme);
@@ -18,13 +24,13 @@ impl Lexeme {
 
         let mut input = String::default();
         if offset < Offset::line() {
-            input.push_str(&first.string[..offset.char as usize]);
+            input.push_str(first.string.get(..offset.char as usize)?);
         } else {
             for (i, c) in first.string.char_indices() {
                 if c == '\n' {
                     offset -= Offset::line();
                     if offset < Offset::line() {
-                        input.push_str(&first.string[..1 + i + offset.char as usize]);
+                        input.push_str(first.string.get(..1 + i + offset.char as usize)?);
                         break;
                     }
                 }
@@ -36,13 +42,13 @@ impl Lexeme {
         let (mut last, mut length) = fix_last(&mut remaining, first, length);
 
         if length < Offset::line() {
-            input.push_str(&last.string[length.char as usize..])
+            input.push_str(last.string.get(length.char as usize..)?)
         } else {
             for (i, c) in last.string.char_indices() {
                 if c == '\n' {
                     length -= Offset::line();
                     if length < Offset::line() {
-                        input.push_str(&last.string[1 + i + length.char as usize..]);
+                        input.push_str(last.string.get(1 + i + length.char as usize..)?);
                         break;
                     }
                 }
@@ -116,6 +122,7 @@ impl Lexeme {
         .ok()
         .unwrap();
         *self = *lexeme_option.unwrap();
+        Some(())
     }
 }
 
@@ -129,11 +136,13 @@ fn fix_first<'a>(
     let mut furthest = (lexeme.length, &mut lexeme.next);
     for rule in &mut lexeme.rules {
         if rule.sensitive_length >= offset {
+            // rule is invalid, delete it
             let rule = take(rule);
             if let Some(next) = rule.next {
                 remaining.push(next);
             }
         } else if rule.length > furthest.0 || rule.length == furthest.0 && furthest.1.is_none() {
+            // skip as many valid rules as possible
             furthest = (rule.length, &mut rule.next);
         }
     }
