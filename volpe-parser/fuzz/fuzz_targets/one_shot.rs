@@ -1,6 +1,6 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use volpe_parser::{syntax::Lexeme, offset::Offset};
+use volpe_parser::{offset::Offset, syntax::Lexeme};
 
 fuzz_target!(|data: &[u8]| {
     if let Ok(s) = std::str::from_utf8(data) {

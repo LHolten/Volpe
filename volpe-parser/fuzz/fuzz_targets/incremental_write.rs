@@ -1,6 +1,6 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use volpe_parser::{syntax::Lexeme, offset::Offset};
+use volpe_parser::{offset::Offset, syntax::Lexeme};
 
 fuzz_target!(|strings: Vec<String>| {
     let mut parser = Lexeme::default();
@@ -15,8 +15,5 @@ fuzz_target!(|strings: Vec<String>| {
 fn same_as_one_shot(parser: Lexeme) {
     let mut one_shot = Lexeme::default();
     one_shot.parse(&parser.get_text(), Offset::default(), Offset::default());
-    assert_eq!(
-        format!("{}", parser),
-        format!("{}", one_shot),
-    );
+    assert_eq!(format!("{}", parser), format!("{}", one_shot),);
 }
