@@ -5,9 +5,6 @@ pub enum LexemeKind {
     #[token("=")]
     Assign,
 
-    #[token(":=")]
-    MultiAssign,
-
     #[token("=>")]
     Ite,
 

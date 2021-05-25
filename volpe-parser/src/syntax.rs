@@ -2,7 +2,7 @@ use std::{fmt, usize};
 
 use crate::{lexeme_kind::LexemeKind, offset::Offset};
 
-pub const RULE_COUNT: usize = 11;
+pub const RULE_COUNT: usize = 10;
 
 #[derive(Default, PartialEq, Debug)]
 pub struct Lexeme {
@@ -143,7 +143,6 @@ pub struct Rule {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RuleKind {
     Expr,
-    Stmt,
     App,
     Func,
     Or,
@@ -159,7 +158,6 @@ impl From<usize> for RuleKind {
     fn from(val: usize) -> Self {
         match val {
             v if v == Self::Expr as usize => Self::Expr,
-            v if v == Self::Stmt as usize => Self::Stmt,
             v if v == Self::App as usize => Self::App,
             v if v == Self::Func as usize => Self::Func,
             v if v == Self::Or as usize => Self::Or,

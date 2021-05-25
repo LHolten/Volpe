@@ -1,5 +1,5 @@
 use crate::{
-    combinators::{Alt, Id, LexemeP, Many0, Many1, NotOpt, Opt, Pair, RuleP, Separated},
+    combinators::{Alt, Id, LexemeP, Many0, NotOpt, Opt, Pair, RuleP, Separated},
     lexeme_kind::LexemeKind as L,
     syntax::RuleKind,
     tracker::{TFunc, TInput, TResult},
@@ -18,7 +18,7 @@ impl TFunc for FileP {
     }
 }
 
-type Expr = Alt<RuleP<ExprInner, { RuleKind::Expr as usize }>, Alt<Stmt, App>>;
+type Expr = Alt<RuleP<ExprInner, { RuleKind::Expr as usize }>, App>;
 type Semi = LexemeP<{ L::Semicolon.mask() }>;
 
 pub struct ExprInner;
@@ -29,19 +29,6 @@ impl TFunc for ExprInner {
         t = LexemeP::<{ L::Assign.mask() | L::Ite.mask() }>::parse(t)?;
         t = App::parse(t)?;
         t = Opt::<Semi>::parse(t)?;
-        Expr::parse(t)
-    }
-}
-
-type Stmt = RuleP<StmtInner, { RuleKind::Stmt as usize }>;
-type MultiAssign = Many1<Pair<LexemeP<{ L::MultiAssign as usize }>, App>>;
-
-pub struct StmtInner;
-
-impl TFunc for StmtInner {
-    fn parse(mut t: TInput) -> TResult {
-        t = App::parse(t)?;
-        t = Alt::<Pair<MultiAssign, Opt<Semi>>, Semi>::parse(t)?;
         Expr::parse(t)
     }
 }
