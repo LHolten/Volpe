@@ -112,7 +112,7 @@ pub struct NotOpt<F> {
 }
 
 impl<F: TFunc> TFunc for NotOpt<F> {
-    fn parse(t: TInput) -> Result<TInput, TError> {
+    fn parse(t: TInput) -> TResult {
         let length = t.length;
         F::parse(t).and_then(|t| {
             if t.length == length {

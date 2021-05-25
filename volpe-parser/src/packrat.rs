@@ -139,7 +139,7 @@ impl Lexeme {
         }
 
         let mut lexeme_option = Some(Box::new(take(self)));
-        FileP::parse(TInput {
+        let res = FileP::parse(TInput {
             lexeme: &mut lexeme_option,
             length: Offset::default(),
             error: TError {
@@ -149,6 +149,7 @@ impl Lexeme {
         })
         .ok()
         .unwrap();
+        debug_assert!(res.error.remaining.is_empty());
         *self = *lexeme_option.unwrap();
         Ok(())
     }
