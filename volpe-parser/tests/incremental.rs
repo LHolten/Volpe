@@ -1,5 +1,6 @@
 mod common;
 use common::*;
+use pretty_assertions::assert_eq;
 
 #[test]
 fn simple() {
@@ -29,7 +30,7 @@ fn found_by_fuzz() {
 }
 
 #[test]
-fn incremental_vs_one_shot() {
+fn incremental_vs_one_shot_fuzz01() {
     let one_shot = test_expr!("0((:0f(f");
 
     let incremental = test_edits!(
@@ -37,6 +38,17 @@ fn incremental_vs_one_shot() {
         ["0((:", (0, 0), (0, 0)]
     );
 
-    assert_eq!(format!("{}", one_shot), format!("{}", incremental));
+    assert_eq!(one_shot, incremental);
+}
+
+#[test]
+fn incremental_vs_one_shot_fuzz02() {
+    let one_shot = test_expr!("/(;");
+
+    let incremental = test_edits!(
+        ["(;", (0, 0), (0, 0)]
+        ["/", (0, 0), (0, 0)]
+    );
+
     assert_eq!(one_shot, incremental);
 }
