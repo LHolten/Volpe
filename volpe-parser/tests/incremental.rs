@@ -27,3 +27,16 @@ fn found_by_fuzz() {
         ["A", (0, 14), (0, 0)]
     );
 }
+
+#[test]
+fn incremental_vs_one_shot() {
+    let one_shot = test_expr!("0((:0f(f");
+
+    let incremental = test_edits!(
+        ["0f(f", (0, 0), (0, 0)]
+        ["0((:", (0, 0), (0, 0)]
+    );
+
+    assert_eq!(format!("{}", one_shot), format!("{}", incremental));
+    assert_eq!(one_shot, incremental);
+}
