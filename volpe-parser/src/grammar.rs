@@ -19,7 +19,7 @@ impl TFunc for FileP {
 }
 
 const EXPR: usize = L::Assign.mask() | L::Ite.mask() | L::Semicolon.mask();
-type Expr = Alt<RuleP<Separated<Or, LexemeP<{ EXPR }>>, { RuleKind::Expr as usize }>, App>;
+type Expr = Alt<RuleP<Separated<App, LexemeP<{ EXPR }>>, { RuleKind::Expr as usize }>, App>;
 
 type App = Alt<RuleP<Separated<NotOpt<Func>, Id>, { RuleKind::App as usize }>, Func>;
 
