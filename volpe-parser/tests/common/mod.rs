@@ -21,8 +21,8 @@ macro_rules! test_edits {
     ($([$s:literal, ($offset_line:literal, $offset_char:literal), ($length_line:literal, $length_char:literal)])*) => {
         {
             let mut parser = Lexeme::default();
-            $(parser.parse($s, Offset::new($offset_line, $offset_char), Offset::new($length_line, $length_char))?;)*
-            Ok(())
+            $(parser.parse($s, Offset::new($offset_line, $offset_char), Offset::new($length_line, $length_char)).unwrap();)*
+            parser
         }
     };
 }

@@ -2,7 +2,7 @@ mod common;
 use common::*;
 
 #[test]
-fn simple() -> Result<(), ParseError> {
+fn simple() {
     test_edits!(
         ["a", (0, 0), (0, 0)]
         [" ", (0, 1), (0, 0)]
@@ -12,11 +12,11 @@ fn simple() -> Result<(), ParseError> {
         ["(", (0, 0), (0, 0)]
         [" ", (0, 2), (0, 0)]
         [")", (0, 4), (0, 0)]
-    )
+    );
 }
 
 #[test]
-fn found_by_fuzz() -> Result<(), ParseError> {
+fn found_by_fuzz() {
     test_edits!(
         ["A.AA", (0, 0), (0, 0)]
         [" .A ", (0, 0), (0, 0)]
@@ -25,5 +25,5 @@ fn found_by_fuzz() -> Result<(), ParseError> {
         ["A&", (0, 0), (0, 0)]
         [".,", (0, 2), (0, 0)]
         ["A", (0, 14), (0, 0)]
-    )
+    );
 }
