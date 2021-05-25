@@ -42,47 +42,49 @@ fn edits_fuzz02() {
 #[test]
 fn property_fuzz01() {
     let one_shot = test_expr!("0((:0f(f");
-
     let incremental = test_edits!(
         ["0f(f", (0, 0), (0, 0)]
         ["0((:", (0, 0), (0, 0)]
     );
-
     assert_eq!(one_shot, incremental);
 }
 
 #[test]
 fn property_fuzz02() {
     let one_shot = test_expr!("/(;");
-
     let incremental = test_edits!(
         ["(;", (0, 0), (0, 0)]
         ["/", (0, 0), (0, 0)]
     );
-
     assert_eq!(one_shot, incremental);
 }
 
 #[test]
 fn property_fuzz03() {
     let one_shot = test_expr!("^ <<");
-
     let incremental = test_edits!(
         [" <<", (0, 0), (0, 0)]
         ["^", (0, 0), (0, 0)]
     );
-
     assert_eq!(one_shot, incremental);
 }
 
 #[test]
 fn property_fuzz04() {
     let one_shot = test_expr!("f=>=");
-
     let incremental = test_edits!(
         ["f=>=", (0, 0), (0, 0)]
         ["", (0, 0), (0, 0)]
     );
+    assert_eq!(one_shot, incremental);
+}
 
+#[test]
+fn property_fuzz05() {
+    let one_shot = test_expr!("a1a");
+    let incremental = test_edits!(
+        [" 1a", (0, 0), (0, 0)]
+        ["a", (0, 0), (0, 1)]
+    );
     assert_eq!(one_shot, incremental);
 }
