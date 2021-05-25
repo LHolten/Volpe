@@ -72,7 +72,17 @@ fn property_fuzz03() {
         ["^", (0, 0), (0, 0)]
     );
 
-    println!("{:#}", one_shot);
-    println!("{:#}", incremental);
+    assert_eq!(one_shot, incremental);
+}
+
+#[test]
+fn property_fuzz04() {
+    let one_shot = test_expr!("f=>=");
+
+    let incremental = test_edits!(
+        ["f=>=", (0, 0), (0, 0)]
+        ["", (0, 0), (0, 0)]
+    );
+
     assert_eq!(one_shot, incremental);
 }
