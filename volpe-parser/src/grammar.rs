@@ -49,8 +49,12 @@ const TAG1: usize = L::Equals.mask()
     | L::LessEqual.mask();
 type Op1 = Alt<RuleP<Separated<Op2, LexemeP<{ TAG1 }>>, { RuleKind::Op1 as usize }>, Op2>;
 
-const TAG2: usize =
-    L::Plus.mask() | L::Minus.mask() | L::BitOr.mask() | L::BitShl.mask() | L::BitShr.mask();
+const TAG2: usize = L::Plus.mask()
+    | L::Minus.mask()
+    | L::BitOr.mask()
+    | L::BitShl.mask()
+    | L::BitShr.mask()
+    | L::BitXor.mask();
 type Op2 = Alt<RuleP<Separated<Op3, LexemeP<{ TAG2 }>>, { RuleKind::Op2 as usize }>, Op3>;
 
 const TAG3: usize = L::Mul.mask() | L::Div.mask() | L::Mod.mask() | L::BitAnd.mask();
