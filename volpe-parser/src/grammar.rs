@@ -7,11 +7,14 @@ use crate::{
 
 pub struct FileP;
 
+const RESET_MASK: usize =
+    L::RBrace.mask() | L::RCurlyBrace.mask() | L::Comma.mask() | L::Colon.mask();
+
 impl TFunc for FileP {
     fn parse(mut t: TInput) -> TResult {
         t = Opt::<LexemeP<{ L::Start.mask() }>>::parse(t)?;
         t = Expr::parse(t)?;
-        Many0::<Pair<LexemeP<{ L::RBrace.mask() | L::RCurlyBrace.mask() | L::Comma.mask() }>, Expr>>::parse(t)
+        Many0::<Pair<LexemeP<{ RESET_MASK }>, Expr>>::parse(t)
     }
 }
 
