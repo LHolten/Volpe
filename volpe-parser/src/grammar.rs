@@ -18,20 +18,8 @@ impl TFunc for FileP {
     }
 }
 
-type Expr = Alt<RuleP<ExprInner, { RuleKind::Expr as usize }>, App>;
-type Semi = LexemeP<{ L::Semicolon.mask() }>;
-
-pub struct ExprInner;
-
-impl TFunc for ExprInner {
-    fn parse(mut t: TInput) -> TResult {
-        t = App::parse(t)?;
-        t = LexemeP::<{ L::Assign.mask() | L::Ite.mask() }>::parse(t)?;
-        t = App::parse(t)?;
-        t = Opt::<Semi>::parse(t)?;
-        Expr::parse(t)
-    }
-}
+const EXPR: usize = L::Assign.mask() | L::Ite.mask() | L::Semicolon.mask();
+type Expr = Alt<RuleP<Separated<Or, LexemeP<{ EXPR }>>, { RuleKind::Expr as usize }>, App>;
 
 type App = Alt<RuleP<Separated<NotOpt<Func>, Id>, { RuleKind::App as usize }>, Func>;
 
