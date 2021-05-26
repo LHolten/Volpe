@@ -27,7 +27,12 @@ type Func = Alt<RuleP<Separated<Or, LexemeP<{ L::Func.mask() }>>, { RuleKind::Fu
 
 type Or = Alt<RuleP<Separated<And, LexemeP<{ L::Or.mask() }>>, { RuleKind::Or as usize }>, And>;
 
-type And = Alt<RuleP<Separated<Op1, LexemeP<{ L::And.mask() }>>, { RuleKind::And as usize }>, Op1>;
+struct And;
+impl TFunc for And {
+    fn parse(t: TInput) -> Result<TInput, crate::tracker::TError> {
+        Alt::<RuleP<Separated<Op1, LexemeP<{ L::And.mask() }>>, { RuleKind::And as usize }>, Op1>::parse(t)
+    }
+}
 
 const TAG1: usize = L::Equals.mask()
     | L::UnEquals.mask()
@@ -52,7 +57,7 @@ type Term = Alt<RuleP<Block, { RuleKind::Block as usize }>, Alt<Tuple, Literal>>
 
 type Literal = Opt<LexemeP<{ L::Num.mask() | L::Ident.mask() }>>;
 
-pub struct Block;
+struct Block;
 impl TFunc for Block {
     fn parse(mut t: TInput) -> TResult {
         t = LexemeP::<{ L::LBrace.mask() }>::parse(t)?;
@@ -63,7 +68,7 @@ impl TFunc for Block {
 
 type Tuple = RuleP<TupleInner, { RuleKind::Tuple as usize }>;
 
-pub struct TupleInner;
+struct TupleInner;
 impl TFunc for TupleInner {
     fn parse(mut t: TInput) -> TResult {
         t = LexemeP::<{ L::LCurlyBrace.mask() }>::parse(t)?;
