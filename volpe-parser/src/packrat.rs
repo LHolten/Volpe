@@ -81,7 +81,7 @@ impl Lexeme {
 
         let mut lex = LexemeKind::lexer(&input);
         while let Some(mut kind) = lex.next() {
-            if lex.remainder().is_empty()
+            while lex.remainder().is_empty()
                 && kind != LexemeKind::Error
                 && last.next.or_remaining(&mut remaining).is_some()
             {
@@ -105,6 +105,8 @@ impl Lexeme {
                             remaining.push(next);
                         }
                     }
+                } else {
+                    break;
                 }
             }
 
