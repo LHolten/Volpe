@@ -53,7 +53,14 @@ impl LexemeKind {
     }
 
     pub fn reduce_brackets(&self) -> bool {
-        matches!(self, LexemeKind::LBrace | LexemeKind::LCurlyBrace)
+        matches!(
+            self,
+            LexemeKind::LBrace
+                | LexemeKind::LCurlyBrace
+                | LexemeKind::Ident
+                | LexemeKind::Num
+                | LexemeKind::Error
+        )
     }
 }
 
@@ -66,17 +73,19 @@ impl LexemeKind {
             LexemeKind::RCurlyBrace => 1,
             LexemeKind::Ident => 0,
             LexemeKind::Num => 0,
-            LexemeKind::Error => 1,
+            LexemeKind::Error => 0,
             _ => 2,
         }
     }
 
     pub fn reduce(&self, new: &Self) -> bool {
         match self {
-            LexemeKind::Error => true,
-            LexemeKind::Plus => new.reduce_additive(),
-            LexemeKind::Minus => new.reduce_additive(),
+            LexemeKind::App => new.reduce_or(),
+            LexemeKind::Plus => new.reduce_multiplicative(),
+            LexemeKind::Minus => new.reduce_multiplicative(),
             LexemeKind::Num => false,
+            LexemeKind::Ident => false,
+            LexemeKind::Error => false,
             _ => unimplemented!(),
         }
     }

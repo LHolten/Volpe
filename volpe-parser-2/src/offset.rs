@@ -16,16 +16,6 @@ impl Offset {
     pub fn char(char: usize) -> Self {
         Self { line: 0, char }
     }
-    pub fn measure(string: &str) -> Self {
-        Self {
-            line: string.lines().count(),
-            char: string
-                .lines()
-                .last()
-                .map(|s| s.chars().count())
-                .unwrap_or_default(),
-        }
-    }
 }
 
 impl AddAssign for Offset {
