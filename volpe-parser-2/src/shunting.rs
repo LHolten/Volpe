@@ -119,6 +119,11 @@ impl File {
             dbg!(&yard.terminals);
             yard.shunt(ERROR_RULE);
         }
-        yard.terminals.pop().unwrap()
+        let mut rule = yard.terminals.pop().unwrap();
+        if rule.kind == LexemeKind::Error && rule.children[0].kind == LexemeKind::Error {
+            rule.children.pop().unwrap()
+        } else {
+            rule
+        }
     }
 }

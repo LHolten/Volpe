@@ -6,7 +6,7 @@ impl LexemeKind {
     }
 
     pub fn reduce_item(&self) -> bool {
-        matches!(self, LexemeKind::Colon) || self.reduce_func()
+        matches!(self, LexemeKind::Colon) || self.reduce_app()
     }
 
     pub fn reduce_expr(&self) -> bool {
@@ -14,7 +14,11 @@ impl LexemeKind {
     }
 
     pub fn reduce_stmt(&self) -> bool {
-        matches!(self, LexemeKind::Assign | LexemeKind::Ite) || self.reduce_func()
+        matches!(self, LexemeKind::Assign | LexemeKind::Ite) || self.reduce_app()
+    }
+
+    pub fn reduce_app(&self) -> bool {
+        matches!(self, LexemeKind::App) || self.reduce_func()
     }
 
     pub fn reduce_func(&self) -> bool {
@@ -99,12 +103,35 @@ impl LexemeKind {
             LexemeKind::App => new.reduce_or(),
             LexemeKind::Plus => new.reduce_multiplicative(),
             LexemeKind::Minus => new.reduce_multiplicative(),
-            LexemeKind::Num => false,
-            LexemeKind::Ident => false,
+            LexemeKind::Num => unimplemented!(),
+            LexemeKind::Ident => unimplemented!(),
             LexemeKind::Error => true,
             LexemeKind::LBrace => true,
             LexemeKind::LCurlyBrace => true,
-            _ => unimplemented!(),
+            LexemeKind::Semicolon => new.reduce_expr(),
+            LexemeKind::Assign => new.reduce_stmt(),
+            LexemeKind::Ite => new.reduce_stmt(),
+            LexemeKind::Func => new.reduce_func(),
+            LexemeKind::Or => new.reduce_and(),
+            LexemeKind::And => new.reduce_equality() || new.reduce_comparative(),
+            LexemeKind::Equals => new.reduce_equality(),
+            LexemeKind::UnEquals => new.reduce_equality(),
+            LexemeKind::Less => new.reduce_comparative(),
+            LexemeKind::Greater => new.reduce_comparative(),
+            LexemeKind::LessEqual => new.reduce_comparative(),
+            LexemeKind::GreaterEqual => new.reduce_comparative(),
+            LexemeKind::BitOr => new.reduce_bit_and(),
+            LexemeKind::BitAnd => false,
+            LexemeKind::BitXor => false,
+            LexemeKind::BitShl => false,
+            LexemeKind::BitShr => false,
+            LexemeKind::Mul => false,
+            LexemeKind::Div => false,
+            LexemeKind::Mod => false,
+            LexemeKind::RBrace => unimplemented!(),
+            LexemeKind::RCurlyBrace => unimplemented!(),
+            LexemeKind::Colon => new.reduce_item(),
+            LexemeKind::Comma => new.reduce_object(),
         }
     }
 }
