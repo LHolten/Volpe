@@ -4,8 +4,8 @@ use crate::{file::File, grammar::RuleKind, lexeme_kind::LexemeKind};
 
 #[derive(Debug)]
 pub struct Rule<'a> {
-    pub slice: &'a str,
     pub children: Vec<Rule<'a>>,
+    pub slice: &'a str,
     pub kind: LexemeKind,
 }
 
@@ -16,14 +16,14 @@ pub struct Yard<'a> {
 }
 
 const ERROR_RULE: Rule = Rule {
-    slice: "",
     children: Vec::new(),
+    slice: "",
     kind: LexemeKind::Error,
 };
 
 const APP_RULE: Rule = Rule {
-    slice: "",
     children: Vec::new(),
+    slice: "",
     kind: LexemeKind::App,
 };
 
@@ -108,15 +108,15 @@ impl File {
                 }
 
                 yard.shunt(Rule {
-                    slice: lexemes.slice(),
                     children: Vec::new(),
+                    slice: lexemes.slice(),
                     kind,
                 });
             }
         }
 
+        yard.shunt(ERROR_RULE);
         while yard.terminals.len() > 1 {
-            dbg!(&yard.terminals);
             yard.shunt(ERROR_RULE);
         }
         let mut rule = yard.terminals.pop().unwrap();

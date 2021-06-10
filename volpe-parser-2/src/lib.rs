@@ -13,7 +13,7 @@ mod test {
     #[test]
     fn parse() {
         let mut file = File::default();
-        file.patch(Offset::char(0), Offset::char(0), "1 1 + ".to_string());
+        file.patch(Offset::char(0), Offset::char(0), "+ (1) 1".to_string());
         dbg!(file.rule());
     }
 }
