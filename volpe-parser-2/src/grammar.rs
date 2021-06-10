@@ -1,6 +1,26 @@
 use crate::lexeme_kind::LexemeKind;
 
 impl LexemeKind {
+    pub fn reduce_object(&self) -> bool {
+        matches!(self, LexemeKind::Comma) || self.reduce_item()
+    }
+
+    pub fn reduce_item(&self) -> bool {
+        matches!(self, LexemeKind::Colon) || self.reduce_func()
+    }
+
+    pub fn reduce_expr(&self) -> bool {
+        matches!(self, LexemeKind::Semicolon) || self.reduce_stmt()
+    }
+
+    pub fn reduce_stmt(&self) -> bool {
+        matches!(self, LexemeKind::Assign | LexemeKind::Ite) || self.reduce_func()
+    }
+
+    pub fn reduce_func(&self) -> bool {
+        matches!(self, LexemeKind::Func) || self.reduce_or()
+    }
+
     pub fn reduce_or(&self) -> bool {
         matches!(self, LexemeKind::Or) || self.reduce_and()
     }
@@ -33,7 +53,6 @@ impl LexemeKind {
 
     pub fn reduce_multiplicative(&self) -> bool {
         matches!(self, LexemeKind::Mul | LexemeKind::Div | LexemeKind::Mod)
-            || self.reduce_brackets()
     }
 
     pub fn reduce_bit_or(&self) -> bool {
@@ -41,40 +60,37 @@ impl LexemeKind {
     }
 
     pub fn reduce_bit_and(&self) -> bool {
-        matches!(self, LexemeKind::BitAnd) || self.reduce_brackets()
+        matches!(self, LexemeKind::BitAnd)
     }
 
     pub fn reduce_bit_xor(&self) -> bool {
-        matches!(self, LexemeKind::BitXor) || self.reduce_brackets()
+        matches!(self, LexemeKind::BitXor)
     }
 
     pub fn reduce_bit_shift(&self) -> bool {
-        matches!(self, LexemeKind::BitShl | LexemeKind::BitShr) || self.reduce_brackets()
-    }
-
-    pub fn reduce_brackets(&self) -> bool {
-        matches!(
-            self,
-            LexemeKind::LBrace
-                | LexemeKind::LCurlyBrace
-                | LexemeKind::Ident
-                | LexemeKind::Num
-                | LexemeKind::Error
-        )
+        matches!(self, LexemeKind::BitShl | LexemeKind::BitShr)
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum RuleKind {
+    OpeningBrace,
+    ClosingBrace,
+    Terminal,
+    Operator,
+}
+
 impl LexemeKind {
-    pub fn child_count(&self) -> usize {
+    pub fn rule_kind(&self) -> RuleKind {
         match self {
-            LexemeKind::LBrace => 1,
-            LexemeKind::RBrace => 1,
-            LexemeKind::LCurlyBrace => 1,
-            LexemeKind::RCurlyBrace => 1,
-            LexemeKind::Ident => 0,
-            LexemeKind::Num => 0,
-            LexemeKind::Error => 0,
-            _ => 2,
+            LexemeKind::LBrace => RuleKind::OpeningBrace,
+            LexemeKind::RBrace => RuleKind::ClosingBrace,
+            LexemeKind::LCurlyBrace => RuleKind::OpeningBrace,
+            LexemeKind::RCurlyBrace => RuleKind::ClosingBrace,
+            LexemeKind::Ident => RuleKind::Terminal,
+            LexemeKind::Num => RuleKind::Terminal,
+            LexemeKind::Error => RuleKind::ClosingBrace,
+            _ => RuleKind::Operator,
         }
     }
 
@@ -85,7 +101,9 @@ impl LexemeKind {
             LexemeKind::Minus => new.reduce_multiplicative(),
             LexemeKind::Num => false,
             LexemeKind::Ident => false,
-            LexemeKind::Error => false,
+            LexemeKind::Error => true,
+            LexemeKind::LBrace => true,
+            LexemeKind::LCurlyBrace => true,
             _ => unimplemented!(),
         }
     }

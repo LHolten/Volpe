@@ -5,12 +5,6 @@ pub struct File {
 }
 
 impl File {
-    pub fn new() -> Self {
-        Self {
-            lines: vec!["".to_string()],
-        }
-    }
-
     pub fn patch(&mut self, offset: Offset, length: Offset, mut text: String) {
         let end = offset + length;
         text.push_str(&self.lines[end.line][end.char..]);
@@ -29,6 +23,8 @@ impl File {
 
 impl Default for File {
     fn default() -> Self {
-        Self::new()
+        Self {
+            lines: vec!["".to_string()],
+        }
     }
 }

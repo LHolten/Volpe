@@ -1,60 +1,98 @@
 use logos::Logos;
 
-use crate::{file::File, lexeme_kind::LexemeKind};
+use crate::{file::File, grammar::RuleKind, lexeme_kind::LexemeKind};
 
 #[derive(Debug)]
 pub struct Rule<'a> {
-    pub kind: LexemeKind,
-    pub children: Vec<Rule<'a>>,
     pub slice: &'a str,
+    pub children: Vec<Rule<'a>>,
+    pub kind: LexemeKind,
 }
 
 pub struct Yard<'a> {
     terminals: Vec<Rule<'a>>,
     operators: Vec<Rule<'a>>,
-    expected: usize,
+    last_kind: RuleKind,
 }
 
+const ERROR_RULE: Rule = Rule {
+    slice: "",
+    children: Vec::new(),
+    kind: LexemeKind::Error,
+};
+
+const APP_RULE: Rule = Rule {
+    slice: "",
+    children: Vec::new(),
+    kind: LexemeKind::App,
+};
+
 impl<'a> Yard<'a> {
+    fn operator_reduce(&self, kind: &LexemeKind) -> bool {
+        self.operators
+            .last()
+            .map_or(&LexemeKind::Error, |r| &r.kind)
+            .reduce(kind)
+    }
+
+    fn terminal_pop(&mut self) -> Rule<'a> {
+        self.terminals.pop().unwrap_or(ERROR_RULE)
+    }
+
+    fn operator_pop(&mut self) -> Rule<'a> {
+        self.operators.pop().unwrap_or(ERROR_RULE)
+    }
+
     fn new() -> Self {
         Self {
             terminals: Vec::new(),
             operators: Vec::new(),
-            expected: 1,
+            last_kind: RuleKind::Operator,
         }
     }
 
-    fn shunt(&mut self, rule: Rule<'a>) {
-        while self.operators.last().is_some()
-            && !self.operators.last().unwrap().kind.reduce(&rule.kind)
-        {
-            let mut last = self.operators.pop().unwrap();
-            if self.terminals.len() < self.expected {
-                self.terminals.push(Rule {
-                    kind: LexemeKind::Error,
-                    children: Vec::new(),
-                    slice: "",
-                })
-            }
-            self.expected -= last.kind.child_count();
-            last.children = self
-                .terminals
-                .split_off(self.terminals.len() - last.kind.child_count());
-            self.expected += 1;
+    fn begin_terminal(&mut self) {
+        if matches!(self.last_kind, RuleKind::Terminal | RuleKind::ClosingBrace) {
+            self.shunt(APP_RULE)
+        }
+    }
+
+    fn shunt_operator(&mut self, rule: Rule<'a>) {
+        if matches!(self.last_kind, RuleKind::Operator | RuleKind::OpeningBrace) {
+            self.terminals.push(ERROR_RULE);
+        }
+
+        while !self.operator_reduce(&rule.kind) {
+            let mut last = self.operator_pop();
+            let tmp = self.terminal_pop();
+            last.children.push(self.terminal_pop());
+            last.children.push(tmp);
             self.terminals.push(last);
         }
-
-        if self.terminals.len() > self.expected + rule.kind.child_count() - 1 {
-            self.shunt(Rule {
-                kind: LexemeKind::App,
-                children: Vec::new(),
-                slice: "",
-            })
-        }
-
-        self.expected += rule.kind.child_count();
-        self.expected -= 1;
         self.operators.push(rule);
+    }
+
+    fn shunt(&mut self, rule: Rule<'a>) {
+        let rule_kind = rule.kind.rule_kind();
+        match rule_kind {
+            RuleKind::OpeningBrace => {
+                self.begin_terminal();
+                self.operators.push(rule);
+            }
+            RuleKind::ClosingBrace => {
+                self.shunt_operator(rule);
+                let mut last = self.operator_pop();
+                last.children.push(self.operator_pop());
+                last.children.push(self.terminal_pop());
+                self.terminals.push(last);
+            }
+            RuleKind::Terminal => {
+                self.begin_terminal();
+                self.terminals.push(rule)
+            }
+            RuleKind::Operator => self.shunt_operator(rule),
+        }
+        self.last_kind = rule_kind
     }
 }
 
@@ -70,29 +108,17 @@ impl File {
                 }
 
                 yard.shunt(Rule {
-                    kind,
-                    children: Vec::new(),
                     slice: lexemes.slice(),
+                    children: Vec::new(),
+                    kind,
                 });
-
-                if yard.terminals.len() + 1 < yard.expected {
-                    yard.terminals.push(Rule {
-                        kind: LexemeKind::Error,
-                        children: Vec::new(),
-                        slice: "",
-                    })
-                }
             }
         }
 
-        yard.shunt(Rule {
-            kind: LexemeKind::RBrace,
-            children: Vec::new(),
-            slice: "",
-        });
-
-        dbg!(&yard.terminals);
-
+        while yard.terminals.len() > 1 {
+            dbg!(&yard.terminals);
+            yard.shunt(ERROR_RULE);
+        }
         yard.terminals.pop().unwrap()
     }
 }
