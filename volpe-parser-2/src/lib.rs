@@ -1,5 +1,6 @@
 extern crate logos;
 
+mod error;
 pub mod file;
 mod grammar;
 mod lexeme_kind;

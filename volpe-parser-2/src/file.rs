@@ -1,12 +1,22 @@
+use crate::error::PatchError;
 use crate::offset::Offset;
 
 pub struct File {
     pub lines: Vec<String>,
 }
 
+type PatchResult = Result<(), PatchError>;
+
 impl File {
-    pub fn patch(&mut self, offset: Offset, length: Offset, mut text: String) {
+    pub fn patch(&mut self, offset: Offset, length: Offset, mut text: String) -> PatchResult {
         let end = offset + length;
+        if offset.line >= self.lines.len() || offset.char > self.lines[offset.line].len() {
+            Err(PatchError::OffsetOutOfRange)?
+        }
+        if end.line >= self.lines.len() || end.char > self.lines[end.line].len() {
+            Err(PatchError::LengthOutOfRange)?
+        }
+
         text.push_str(&self.lines[end.line][end.char..]);
         let mut text_lines = text.lines();
 
@@ -18,6 +28,8 @@ impl File {
             offset.line + 1..end.line + 1,
             text_lines.map(str::to_string),
         );
+
+        Ok(())
     }
 }
 
