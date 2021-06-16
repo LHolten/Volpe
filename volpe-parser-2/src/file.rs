@@ -5,7 +5,7 @@ pub struct File {
     pub lines: Vec<String>,
 }
 
-type PatchResult = Result<(), PatchError>;
+pub type PatchResult = Result<(), PatchError>;
 
 impl File {
     pub fn patch(&mut self, offset: Offset, length: Offset, mut text: String) -> PatchResult {
