@@ -17,6 +17,7 @@ fuzz_target!(|edits: Vec<Edit>| {
     let mut file = File::default();
     for edit in edits {
         if let Ok(s) = std::str::from_utf8(&edit.text) {
+            if !s.chars().all(|c| c.is_ascii()) { return; }
             let offset = to_offset(edit.offset);
             let length = to_offset(edit.length);
             if let Err(_) = file.patch(offset, length, s.to_string()) {
