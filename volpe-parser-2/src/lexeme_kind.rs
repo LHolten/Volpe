@@ -69,16 +69,16 @@ pub enum LexemeKind {
     Mod,
 
     #[token("(")]
-    LBrace,
+    LRoundBracket,
 
     #[token(")")]
-    RBrace,
+    RRoundBracket,
 
     #[token("{")]
-    LCurlyBrace,
+    LCurlyBracket,
 
     #[token("}")]
-    RCurlyBrace,
+    RCurlyBracket,
 
     #[regex(r":")]
     Colon,

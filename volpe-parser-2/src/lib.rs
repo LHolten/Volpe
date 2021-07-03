@@ -6,10 +6,14 @@ mod grammar;
 mod lexeme_kind;
 pub mod offset;
 mod shunting;
+pub mod syntax;
 
 #[cfg(test)]
 mod test {
-    use crate::{file::{File, PatchResult}, offset::Offset};
+    use crate::{
+        file::{File, PatchResult},
+        offset::Offset,
+    };
 
     #[test]
     fn parse() {

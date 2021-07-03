@@ -1,129 +1,138 @@
+use std::marker::PhantomData;
+
 use logos::Logos;
 
-use crate::{file::File, grammar::RuleKind, lexeme_kind::LexemeKind};
-
-#[derive(Debug)]
-pub struct Rule<'a> {
-    pub children: Vec<Rule<'a>>,
-    pub slice: &'a str,
-    pub kind: LexemeKind,
-}
+use crate::{
+    file::File,
+    grammar::RuleKind,
+    lexeme_kind::LexemeKind,
+    offset::Offset,
+    syntax::{Lexeme, Syntax},
+};
 
 pub struct Yard<'a> {
-    terminals: Vec<Rule<'a>>,
-    operators: Vec<Rule<'a>>,
+    terminals: Vec<Syntax<'a, ()>>,
+    stack: Vec<Option<Lexeme<'a>>>, // holds the operators that still need to be executed
     last_kind: RuleKind,
 }
 
-const ERROR_RULE: Rule = Rule {
-    children: Vec::new(),
-    slice: "",
-    kind: LexemeKind::Error,
-};
-
-const APP_RULE: Rule = Rule {
-    children: Vec::new(),
-    slice: "",
-    kind: LexemeKind::App,
-};
+const ERROR_RULE: Syntax<()> = Syntax::Terminal(Err(()));
 
 impl<'a> Yard<'a> {
-    fn operator_reduce(&self, kind: &LexemeKind) -> bool {
-        self.operators
-            .last()
-            .map_or(&LexemeKind::Error, |r| &r.kind)
-            .reduce(kind)
-    }
-
-    fn terminal_pop(&mut self) -> Rule<'a> {
-        self.terminals.pop().unwrap_or(ERROR_RULE)
-    }
-
-    fn operator_pop(&mut self) -> Rule<'a> {
-        self.operators.pop().unwrap_or(ERROR_RULE)
+    fn stack_can_hold(&self, lexeme_kind: &LexemeKind) -> bool {
+        if let Some(op) = self.stack.last() {
+            if let Some(op) = op {
+                op.kind.reduce(lexeme_kind)
+            } else {
+                LexemeKind::App.reduce(lexeme_kind)
+            }
+        } else {
+            true
+        }
     }
 
     fn new() -> Self {
         Self {
             terminals: Vec::new(),
-            operators: Vec::new(),
+            stack: Vec::new(),
             last_kind: RuleKind::Operator,
         }
     }
 
     fn begin_terminal(&mut self) {
-        if matches!(self.last_kind, RuleKind::Terminal | RuleKind::ClosingBrace) {
-            self.shunt(APP_RULE)
+        if matches!(
+            self.last_kind,
+            RuleKind::Terminal | RuleKind::ClosingBracket
+        ) {
+            self.begin_operator(&LexemeKind::App);
+            self.stack.push(None);
         }
     }
 
-    fn shunt_operator(&mut self, rule: Rule<'a>) {
-        if matches!(self.last_kind, RuleKind::Operator | RuleKind::OpeningBrace) {
+    fn begin_operator(&mut self, lexeme_kind: &LexemeKind) {
+        if matches!(
+            self.last_kind,
+            RuleKind::Operator | RuleKind::OpeningBracket
+        ) {
             self.terminals.push(ERROR_RULE);
         }
 
-        while !self.operator_reduce(&rule.kind) {
-            let mut last = self.operator_pop();
-            let tmp = self.terminal_pop();
-            last.children.push(self.terminal_pop());
-            last.children.push(tmp);
-            self.terminals.push(last);
+        while !self.stack_can_hold(lexeme_kind) {
+            let second = self.terminals.pop().unwrap().into(); // needed to get the correct operand order
+            let first = self.terminals.pop().unwrap().into();
+            self.terminals.push(Syntax::Operator {
+                operator: self.stack.pop().unwrap(),
+                operands: [first, second],
+            });
         }
-        self.operators.push(rule);
     }
 
-    fn shunt(&mut self, rule: Rule<'a>) {
-        let rule_kind = rule.kind.rule_kind();
+    fn shunt(&mut self, lexeme: Lexeme<'a>) {
+        let rule_kind = lexeme.kind.rule_kind();
         match rule_kind {
-            RuleKind::OpeningBrace => {
+            RuleKind::OpeningBracket => {
                 self.begin_terminal();
-                self.operators.push(rule);
+                self.stack.push(Some(lexeme));
             }
-            RuleKind::ClosingBrace => {
-                self.shunt_operator(rule);
-                let mut last = self.operator_pop();
-                last.children.push(self.operator_pop());
-                last.children.push(self.terminal_pop());
-                self.terminals.push(last);
+            RuleKind::ClosingBracket => {
+                self.begin_operator(&lexeme.kind);
+                let close = Ok(lexeme);
+                let open = self.stack.pop().map_or(Err(()), |op| Ok(op.unwrap()));
+                let inner = self.terminals.pop().unwrap().into();
+                self.terminals.push(Syntax::Brackets {
+                    inner,
+                    brackets: [open, close],
+                });
             }
             RuleKind::Terminal => {
                 self.begin_terminal();
-                self.terminals.push(rule)
+                self.terminals.push(Syntax::Terminal(Ok(lexeme)))
             }
-            RuleKind::Operator => self.shunt_operator(rule),
+            RuleKind::Operator => {
+                self.begin_operator(&lexeme.kind);
+                self.stack.push(Some(lexeme))
+            }
         }
         self.last_kind = rule_kind
     }
 }
 
 impl File {
-    pub fn rule(&self) -> Rule {
+    pub fn rule(&self) -> Syntax<()> {
         let mut yard = Yard::new();
 
-        for line in &self.lines {
+        for (line_num, line) in self.lines.iter().enumerate() {
             let mut lexemes = LexemeKind::lexer(line);
             while let Some(kind) = lexemes.next() {
                 if kind == LexemeKind::Error {
                     continue;
                 }
 
-                yard.shunt(Rule {
-                    children: Vec::new(),
-                    slice: lexemes.slice(),
+                let span = lexemes.span();
+
+                let lexeme = Lexeme {
+                    start: Offset::new(line_num, span.start),
+                    end: Offset::new(line_num, span.end),
                     kind,
-                });
+                    _marker: PhantomData,
+                };
+
+                yard.shunt(lexeme);
             }
         }
 
-        yard.shunt(ERROR_RULE);
-        while yard.terminals.len() > 1 {
-            yard.shunt(ERROR_RULE);
+        while {
+            yard.begin_operator(&LexemeKind::RRoundBracket);
+            !yard.stack.is_empty()
+        } {
+            let close = Err(());
+            let open = Ok(yard.stack.pop().unwrap().unwrap());
+            let inner = yard.terminals.pop().unwrap().into();
+            yard.terminals.push(Syntax::Brackets {
+                inner,
+                brackets: [open, close],
+            });
         }
-        let mut rule = yard.terminals.pop().unwrap();
-        if rule.kind == LexemeKind::Error && rule.children[0].kind == LexemeKind::Error {
-            rule.children.pop().unwrap()
-        } else {
-            rule
-        }
+        yard.terminals.pop().unwrap()
     }
 }

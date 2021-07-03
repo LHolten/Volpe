@@ -78,8 +78,8 @@ impl LexemeKind {
 
 #[derive(Debug, Clone, Copy)]
 pub enum RuleKind {
-    OpeningBrace,
-    ClosingBrace,
+    OpeningBracket,
+    ClosingBracket,
     Terminal,
     Operator,
 }
@@ -87,13 +87,13 @@ pub enum RuleKind {
 impl LexemeKind {
     pub fn rule_kind(&self) -> RuleKind {
         match self {
-            LexemeKind::LBrace => RuleKind::OpeningBrace,
-            LexemeKind::RBrace => RuleKind::ClosingBrace,
-            LexemeKind::LCurlyBrace => RuleKind::OpeningBrace,
-            LexemeKind::RCurlyBrace => RuleKind::ClosingBrace,
+            LexemeKind::LRoundBracket => RuleKind::OpeningBracket,
+            LexemeKind::RRoundBracket => RuleKind::ClosingBracket,
+            LexemeKind::LCurlyBracket => RuleKind::OpeningBracket,
+            LexemeKind::RCurlyBracket => RuleKind::ClosingBracket,
             LexemeKind::Ident => RuleKind::Terminal,
             LexemeKind::Num => RuleKind::Terminal,
-            LexemeKind::Error => RuleKind::ClosingBrace,
+            LexemeKind::Error => RuleKind::ClosingBracket,
             _ => RuleKind::Operator,
         }
     }
@@ -106,8 +106,8 @@ impl LexemeKind {
             LexemeKind::Num => unreachable!(),
             LexemeKind::Ident => unreachable!(),
             LexemeKind::Error => true,
-            LexemeKind::LBrace => true,
-            LexemeKind::LCurlyBrace => true,
+            LexemeKind::LRoundBracket => true,
+            LexemeKind::LCurlyBracket => true,
             LexemeKind::Semicolon => new.reduce_expr(),
             LexemeKind::Assign => new.reduce_stmt(),
             LexemeKind::Ite => new.reduce_stmt(),
@@ -128,8 +128,8 @@ impl LexemeKind {
             LexemeKind::Mul => false,
             LexemeKind::Div => false,
             LexemeKind::Mod => false,
-            LexemeKind::RBrace => unreachable!(),
-            LexemeKind::RCurlyBrace => unreachable!(),
+            LexemeKind::RRoundBracket => unreachable!(),
+            LexemeKind::RCurlyBracket => unreachable!(),
             LexemeKind::Colon => new.reduce_item(),
             LexemeKind::Comma => new.reduce_object(),
         }
