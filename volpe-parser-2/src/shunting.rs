@@ -16,8 +16,6 @@ pub struct Yard<'a> {
     last_kind: RuleKind,
 }
 
-const ERROR_RULE: Syntax<()> = Syntax::Terminal(Err(()));
-
 impl<'a> Yard<'a> {
     fn stack_can_hold(&self, lexeme_kind: &LexemeKind) -> bool {
         if let Some(op) = self.stack.last() {
@@ -39,6 +37,10 @@ impl<'a> Yard<'a> {
         }
     }
 
+    fn pop_terminal(&mut self) -> Syntax<'a, ()> {
+        self.terminals.pop().unwrap()
+    }
+
     fn begin_terminal(&mut self) {
         if matches!(
             self.last_kind,
@@ -54,12 +56,12 @@ impl<'a> Yard<'a> {
             self.last_kind,
             RuleKind::Operator | RuleKind::OpeningBracket
         ) {
-            self.terminals.push(ERROR_RULE);
+            self.terminals.push(Syntax::Terminal(Err(())));
         }
 
         while !self.stack_can_hold(lexeme_kind) {
-            let second = self.terminals.pop().unwrap().into(); // needed to get the correct operand order
-            let first = self.terminals.pop().unwrap().into();
+            let second = self.pop_terminal().into(); // needed to get the correct operand order
+            let first = self.pop_terminal().into();
             self.terminals.push(Syntax::Operator {
                 operator: self.stack.pop().unwrap(),
                 operands: [first, second],
@@ -76,12 +78,11 @@ impl<'a> Yard<'a> {
             }
             RuleKind::ClosingBracket => {
                 self.begin_operator(&lexeme.kind);
-                let close = Ok(lexeme);
-                let open = self.stack.pop().map_or(Err(()), |op| Ok(op.unwrap()));
-                let inner = self.terminals.pop().unwrap().into();
+                let open = self.stack.pop().map(Option::unwrap).ok_or(());
+                let inner = self.pop_terminal().into();
                 self.terminals.push(Syntax::Brackets {
                     inner,
-                    brackets: [open, close],
+                    brackets: [open, Ok(lexeme)],
                 });
             }
             RuleKind::Terminal => {
@@ -121,18 +122,18 @@ impl File {
             }
         }
 
-        while {
+        while let Some(lexeme) = {
             yard.begin_operator(&LexemeKind::RRoundBracket);
-            !yard.stack.is_empty()
+            yard.stack.pop()
         } {
-            let close = Err(());
-            let open = Ok(yard.stack.pop().unwrap().unwrap());
-            let inner = yard.terminals.pop().unwrap().into();
+            let inner = yard.pop_terminal().into();
             yard.terminals.push(Syntax::Brackets {
                 inner,
-                brackets: [open, close],
+                brackets: [Ok(lexeme.unwrap()), Err(())],
             });
         }
-        yard.terminals.pop().unwrap()
+
+        assert_eq!(yard.terminals.len(), 1);
+        yard.pop_terminal()
     }
 }

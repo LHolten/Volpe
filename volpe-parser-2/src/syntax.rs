@@ -15,7 +15,6 @@ pub struct Lexeme<'a> {
     pub _marker: PhantomData<&'a str>,
 }
 
-// this is any of the above
 // the data-structure is as simple as possible but allows code highlighting
 #[derive(Debug)]
 pub enum Syntax<'a, E> {
@@ -29,6 +28,6 @@ pub enum Syntax<'a, E> {
         brackets: [Result<Lexeme<'a>, E>; 2],
         inner: Box<Syntax<'a, E>>,
     },
-    // terminal is just a single self contained token
+    // terminal is just a single self contained lexeme
     Terminal(Result<Lexeme<'a>, E>),
 }
