@@ -7,6 +7,7 @@ mod lexeme_kind;
 pub mod offset;
 mod shunting;
 pub mod syntax;
+pub mod validate;
 
 #[cfg(test)]
 mod test {

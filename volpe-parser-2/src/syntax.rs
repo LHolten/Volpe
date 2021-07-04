@@ -7,7 +7,7 @@ use crate::{lexeme_kind::LexemeKind, offset::Offset};
 // using an empty error type guarantees a valid syntax tree.
 
 // this is a reference to the source text
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Lexeme<'a> {
     pub start: Offset,
     pub end: Offset,
