@@ -55,7 +55,9 @@ impl Server {
         .on::<lsp_types::notification::DidChangeTextDocument>(
             handlers::did_change_text_document_notification,
         )
-        .on::<lsp_types::notification::DidSaveTextDocument>(|_this, _params| {})
+        .on::<lsp_types::notification::DidSaveTextDocument>(
+            handlers::did_save_text_document_notification,
+        )
         .on::<lsp_types::notification::DidCloseTextDocument>(|_this, _params| {})
         .finish();
     }

@@ -1,8 +1,10 @@
 // Basically same as rust-analyzer, except simpler
 // https://github.com/rust-analyzer/rust-analyzer/blob/master/crates/rust-analyzer/src/semantic_tokens.rs
 
+#![allow(dead_code)]
+
 use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens};
-use volpe_parser::{lexeme_kind::LexemeKind, offset::Offset};
+use volpe_parser_2::{lexeme_kind::LexemeKind, offset::Offset};
 
 pub const SUPPORTED_TYPES: &[SemanticTokenType] = &[
     SemanticTokenType::PARAMETER,
@@ -69,7 +71,6 @@ impl SemanticTokensBuilder {
 pub fn lexeme_to_type(kind: &LexemeKind) -> Option<SemanticTokenType> {
     match kind {
         LexemeKind::Assign
-        | LexemeKind::MultiAssign
         | LexemeKind::Ite
         | LexemeKind::Func
         | LexemeKind::Or

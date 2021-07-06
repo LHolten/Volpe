@@ -1,7 +1,5 @@
 use lsp_server::Connection;
 
-extern crate volpe_parser;
-
 mod capabilities;
 mod dispatch;
 mod document;
@@ -9,7 +7,6 @@ mod handlers;
 mod lsp_utils;
 mod semantic_tokens;
 mod server;
-mod variable;
 use server::Server;
 
 fn main() {
