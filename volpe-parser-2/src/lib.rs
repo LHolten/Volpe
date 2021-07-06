@@ -1,9 +1,9 @@
 extern crate logos;
 
-mod error;
+pub mod error;
 pub mod file;
 mod grammar;
-mod lexeme_kind;
+pub mod lexeme_kind;
 pub mod offset;
 mod shunting;
 pub mod syntax;

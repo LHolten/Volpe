@@ -134,4 +134,13 @@ impl LexemeKind {
             LexemeKind::Comma => new.reduce_object(),
         }
     }
+
+    pub fn closing_counterpart(&self) -> LexemeKind {
+        assert!(matches!(self.rule_kind(), RuleKind::OpeningBracket));
+        match self {
+            LexemeKind::LCurlyBracket => LexemeKind::RCurlyBracket,
+            LexemeKind::LRoundBracket => LexemeKind::RRoundBracket,
+            _ => unreachable!(),
+        }
+    }
 }
