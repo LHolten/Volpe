@@ -2,18 +2,24 @@ use crate::lexeme_kind::LexemeKind;
 use crate::syntax::Syntax;
 use std::fmt;
 
-fn write_with_indent<T: fmt::Debug>(
-    f: &mut fmt::Formatter<'_>,
-    thing: T,
+fn with_indent<T: fmt::Debug>(f: &mut fmt::Formatter, thing: T, indent: usize) -> fmt::Result {
+    writeln!(f, "{:i$}{:?}", "", thing, i = indent * 2)
+}
+
+fn with_indent2<T: fmt::Debug, G: fmt::Debug>(
+    f: &mut fmt::Formatter,
+    first: T,
+    second: G,
     indent: usize,
 ) -> fmt::Result {
-    writeln!(f, "{:indent$}{:?}", "", thing, indent = indent * 2)
+    writeln!(f, "{:i$}{:?} {:?}", "", first, second, i = indent * 2)
 }
 
 fn display_syntax<E>(
     f: &mut fmt::Formatter<'_>,
     syntax: &Syntax<'_, E>,
     indent: usize,
+    hide_semicolon: bool,
 ) -> fmt::Result {
     match syntax {
         Syntax::Operator { operator, operands } => {
@@ -23,25 +29,25 @@ fn display_syntax<E>(
                 LexemeKind::App
             };
             // Prevent indents for Semicolon so that indent remains small.
-            let indent = if matches!(kind, LexemeKind::Semicolon) {
+            let indent = if hide_semicolon && matches!(kind, LexemeKind::Semicolon) {
                 indent
             } else {
-                write_with_indent(f, kind, indent)?;
+                with_indent(f, kind, indent)?;
                 indent + 1
             };
             for operand in operands {
-                display_syntax(f, operand, indent)?
+                display_syntax(f, operand, indent, hide_semicolon)?
             }
             Ok(())
         }
-        Syntax::Brackets { inner, .. } => display_syntax(f, inner, indent),
-        Syntax::Terminal(Ok(lexeme)) => write_with_indent(f, lexeme.kind, indent),
-        Syntax::Terminal(Err(_)) => write_with_indent(f, None::<()>, indent),
+        Syntax::Brackets { inner, .. } => display_syntax(f, inner, indent, hide_semicolon),
+        Syntax::Terminal(Ok(lexeme)) => with_indent2(f, lexeme.kind, lexeme.text, indent),
+        Syntax::Terminal(Err(_)) => with_indent(f, None::<()>, indent),
     }
 }
 
 impl<E> fmt::Display for Syntax<'_, E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        display_syntax(f, self, 0)
+        display_syntax(f, self, 0, f.alternate())
     }
 }
