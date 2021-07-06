@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use logos::Logos;
 
 use crate::{
@@ -115,7 +113,7 @@ impl File {
                     start: Offset::new(line_num, span.start),
                     end: Offset::new(line_num, span.end),
                     kind,
-                    _marker: PhantomData,
+                    text: &line[span.start..span.end],
                 };
 
                 yard.shunt(lexeme);

@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use crate::{lexeme_kind::LexemeKind, offset::Offset};
 
 // the syntax tree type in this file is meant for use with code highlighting.
@@ -12,7 +10,7 @@ pub struct Lexeme<'a> {
     pub start: Offset,
     pub end: Offset,
     pub kind: LexemeKind,
-    pub _marker: PhantomData<&'a str>,
+    pub text: &'a str,
 }
 
 // the data-structure is as simple as possible but allows code highlighting
