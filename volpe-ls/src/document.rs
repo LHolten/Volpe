@@ -38,7 +38,7 @@ impl Document {
     }
 
     pub fn get_info(&self) -> String {
-        format!("version: {}\n{:#?}", self.version, self.file.rule())
+        format!("version: {}\n{:#}", self.version, self.file.rule())
     }
 
     pub fn get_diagnostics(&self) -> Vec<Diagnostic> {

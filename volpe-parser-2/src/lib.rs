@@ -1,5 +1,6 @@
 extern crate logos;
 
+mod display;
 pub mod error;
 pub mod file;
 mod grammar;
