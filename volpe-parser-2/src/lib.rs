@@ -30,6 +30,14 @@ mod test {
     }
 
     #[test]
+    fn manual_001() -> PatchResult {
+        let mut file = File::default();
+        file.patch(Offset::default(), Offset::default(), "(".to_string())?;
+        file.rule();
+        Ok(())
+    }
+
+    #[test]
     fn fuzz_incr_edits_001() -> PatchResult {
         let mut file = File::default();
         file.patch(Offset::default(), Offset::default(), "ȃ".to_string())?;
