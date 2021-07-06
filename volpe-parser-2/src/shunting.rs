@@ -131,6 +131,7 @@ impl File {
                 inner,
                 brackets: [Ok(lexeme.unwrap()), Err(())],
             });
+            yard.last_kind = RuleKind::ClosingBracket;
         }
 
         assert_eq!(yard.terminals.len(), 1);
