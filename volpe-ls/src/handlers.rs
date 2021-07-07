@@ -37,6 +37,18 @@ fn with_doc<T, F: FnOnce(&mut Document) -> T>(
     }
 }
 
+fn diagnostics(this: &mut Server, uri: Url) {
+    if let Some((diagnostics, version)) = with_doc(this, uri.to_string(), |doc| {
+        (doc.get_diagnostics(), doc.version)
+    }) {
+        this.send_notification::<notification::PublishDiagnostics>(PublishDiagnosticsParams {
+            uri,
+            diagnostics,
+            version: Some(version),
+        })
+    }
+}
+
 pub fn did_open_text_document_notification(this: &mut Server, params: DidOpenTextDocumentParams) {
     let doc = Document::new(&params);
     if let Err(err_msg) = write_tree_to_file(&doc, &params.text_document.uri) {
@@ -44,6 +56,7 @@ pub fn did_open_text_document_notification(this: &mut Server, params: DidOpenTex
     };
     this.documents
         .insert(params.text_document.uri.to_string(), doc);
+    diagnostics(this, params.text_document.uri);
 }
 
 pub fn did_change_text_document_notification(
@@ -56,19 +69,11 @@ pub fn did_change_text_document_notification(
     }) {
         this.show_error_message(err_msg);
     }
+    diagnostics(this, params.text_document.uri);
 }
 
 pub fn did_save_text_document_notification(this: &mut Server, params: DidSaveTextDocumentParams) {
-    let uri = params.text_document.uri;
-    if let Some((diagnostics, version)) = with_doc(this, uri.to_string(), |doc| {
-        (doc.get_diagnostics(), doc.version)
-    }) {
-        this.send_notification::<notification::PublishDiagnostics>(PublishDiagnosticsParams {
-            uri,
-            diagnostics,
-            version: Some(version),
-        })
-    }
+    diagnostics(this, params.text_document.uri);
 }
 
 //
