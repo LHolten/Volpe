@@ -1,6 +1,6 @@
 use crate::lsp_utils::range;
 use lsp_types::{Diagnostic, DiagnosticSeverity};
-use volpe_parser_2::{file::File, offset::Offset};
+use volpe_parser_2::{error::SyntaxError, file::File, offset::Offset};
 
 pub struct Document {
     pub version: i32,
@@ -45,6 +45,7 @@ impl Document {
         self.file
             .rule()
             .iter_errs()
+            .filter(SyntaxError::should_show)
             .map(|error| {
                 let (start, end) = error.get_range();
                 Diagnostic {
