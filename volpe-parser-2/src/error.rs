@@ -33,7 +33,8 @@ impl Error for PatchError {
 #[derive(Debug)]
 pub enum SyntaxError {
     MissingTerminal {
-        offset: Offset,
+        start: Offset,
+        end: Offset,
     },
     MissingBracket {
         start: Offset,
@@ -52,7 +53,7 @@ pub enum SyntaxError {
 impl SyntaxError {
     pub fn get_range(&self) -> (Offset, Offset) {
         match self {
-            SyntaxError::MissingTerminal { offset } => (*offset, *offset),
+            SyntaxError::MissingTerminal { start, end, .. } => (*start, *end),
             SyntaxError::MissingBracket { start, end, .. } => (*start, *end),
             SyntaxError::MismatchedBracket { start, end, .. } => (*start, *end),
         }
@@ -85,42 +86,74 @@ impl Error for SyntaxError {
     }
 }
 
-// TODO Fix inner bracket err check
-
-impl<'a> Syntax<'a, ()> {
+impl<'a, E: std::fmt::Debug> Syntax<'a, E> {
     pub fn iter_errs(&self) -> impl Iterator<Item = SyntaxError> {
-        self._iter_errs(&mut Offset::default(), &mut false)
+        self._iter_errs(&mut false)
     }
 
-    fn _iter_errs(
-        &self,
-        offset: &mut Offset,
-        inner_bracket_err: &mut bool,
-    ) -> impl Iterator<Item = SyntaxError> {
+    fn _iter_errs(&self, inner_bracket_err: &mut bool) -> impl Iterator<Item = SyntaxError> {
         let mut errs = Vec::new();
         match self {
             Syntax::Operator { operator, operands } => {
-                errs.extend(operands[0]._iter_errs(offset, inner_bracket_err));
-                if let Some(operator) = operator {
-                    *offset = operator.end;
+                for operand in operands {
+                    if let Syntax::Terminal(Err(_)) = operand.as_ref() {
+                        let operator = operator.as_ref().unwrap();
+                        errs.push(SyntaxError::MissingTerminal {
+                            start: operator.start,
+                            end: operator.end,
+                        });
+                    } else {
+                        errs.extend(operand._iter_errs(inner_bracket_err));
+                    }
                 }
-                errs.extend(operands[1]._iter_errs(offset, inner_bracket_err));
             }
-            Syntax::Brackets { brackets, inner } => {
-                let expected_kind = if let Ok(bracket) = brackets[0] {
-                    *offset = bracket.end;
-                    Some(bracket.kind.closing_counterpart())
-                } else {
-                    None
-                };
-
-                // Check inner first to see if this is these are innermost bracket errors.
+            Syntax::Brackets {
+                brackets: [opening, closing],
+                inner,
+            } => {
                 let mut this_inner_bracket_err = false;
-                let inner_errs = inner._iter_errs(offset, &mut this_inner_bracket_err);
+                let missing_terminal = matches!(inner.as_ref(), Syntax::Terminal(Err(_)));
+                if !missing_terminal {
+                    errs.extend(inner._iter_errs(&mut this_inner_bracket_err));
+                }
 
-                if brackets[0].is_err() {
-                    // Both brackets cannot be missing, we place the missing bracket error on the existing one.
-                    let closing = brackets[1].as_ref().unwrap();
+                // Try to find the range of the missing terminal.
+                let mut terminal_start = None;
+                let mut terminal_end = None;
+
+                if let Ok(opening) = opening {
+                    terminal_start = Some(opening.end);
+                    if let Ok(closing) = closing {
+                        // Both brackets exist, we can place missing terminal exactly between.
+                        terminal_end = Some(closing.start);
+                        // Handle mismatched brackets.
+                        if opening.kind.bracket_counterpart() != closing.kind {
+                            errs.push(SyntaxError::MismatchedBracket {
+                                start: opening.start,
+                                end: opening.end,
+                                innermost: !this_inner_bracket_err,
+                                kind: opening.kind.bracket_counterpart(),
+                            });
+                            errs.push(SyntaxError::MismatchedBracket {
+                                start: closing.start,
+                                end: closing.end,
+                                innermost: !this_inner_bracket_err,
+                                kind: closing.kind.bracket_counterpart(),
+                            });
+                            *inner_bracket_err = true;
+                        }
+                    } else {
+                        errs.push(SyntaxError::MissingBracket {
+                            start: opening.start,
+                            end: opening.end,
+                            innermost: !this_inner_bracket_err,
+                        });
+                        *inner_bracket_err = true;
+                    }
+                } else {
+                    // Both brackets cannot be missing.
+                    let closing = closing.as_ref().unwrap();
+                    terminal_end = Some(closing.start);
                     errs.push(SyntaxError::MissingBracket {
                         start: closing.start,
                         end: closing.end,
@@ -128,41 +161,20 @@ impl<'a> Syntax<'a, ()> {
                     });
                     *inner_bracket_err = true;
                 }
-                // We extend here to preserve correct error order.
-                errs.extend(inner_errs);
 
-                if let Ok(bracket) = brackets[1] {
-                    *offset = bracket.end;
-                    match expected_kind {
-                        Some(kind) if kind != bracket.kind => {
-                            errs.push(SyntaxError::MismatchedBracket {
-                                start: bracket.start,
-                                end: bracket.end,
-                                innermost: !this_inner_bracket_err,
-                                kind,
-                            });
-                            *inner_bracket_err = true;
-                        }
-                        _ => (),
-                    }
-                } else {
-                    // Both brackets cannot be missing.
-                    let opening = brackets[0].as_ref().unwrap();
-                    errs.push(SyntaxError::MissingBracket {
-                        start: opening.start,
-                        end: opening.end,
-                        innermost: !this_inner_bracket_err,
+                if missing_terminal {
+                    errs.push(SyntaxError::MissingTerminal {
+                        start: terminal_start.or(terminal_end).unwrap(),
+                        end: terminal_end.or(terminal_start).unwrap(),
                     });
-                    *inner_bracket_err = true;
                 }
             }
-            Syntax::Terminal(t) => {
-                if let Ok(lexeme) = t {
-                    *offset = lexeme.end;
-                } else {
-                    errs.push(SyntaxError::MissingTerminal { offset: *offset });
-                }
-            }
+            Syntax::Terminal(Ok(_)) => (),
+            // We can only get here if there is no other code - empty file.
+            Syntax::Terminal(Err(_)) => errs.push(SyntaxError::MissingTerminal {
+                start: Offset::default(),
+                end: Offset::default(),
+            }),
         }
         errs.into_iter()
     }

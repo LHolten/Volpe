@@ -135,11 +135,16 @@ impl LexemeKind {
         }
     }
 
-    pub fn closing_counterpart(&self) -> LexemeKind {
-        assert!(matches!(self.rule_kind(), RuleKind::OpeningBracket));
+    pub fn bracket_counterpart(&self) -> LexemeKind {
+        assert!(matches!(
+            self.rule_kind(),
+            RuleKind::OpeningBracket | RuleKind::ClosingBracket
+        ));
         match self {
             LexemeKind::LCurlyBracket => LexemeKind::RCurlyBracket,
             LexemeKind::LRoundBracket => LexemeKind::RRoundBracket,
+            LexemeKind::RCurlyBracket => LexemeKind::LCurlyBracket,
+            LexemeKind::RRoundBracket => LexemeKind::LRoundBracket,
             _ => unreachable!(),
         }
     }
