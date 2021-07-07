@@ -151,7 +151,7 @@ impl<'a> Syntax<'a, ()> {
                     errs.push(SyntaxError::MissingBracket {
                         start: opening.start,
                         end: opening.end,
-                        innermost: !*inner_bracket_err,
+                        innermost: !this_inner_bracket_err,
                     });
                     *inner_bracket_err = true;
                 }
