@@ -18,9 +18,9 @@ impl<'a> Yard<'a> {
     fn stack_can_hold(&self, lexeme_kind: &LexemeKind) -> bool {
         if let Some(op) = self.stack.last() {
             if let Some(op) = op {
-                op.kind.reduce(lexeme_kind)
+                op.kind.stack_can_hold(lexeme_kind)
             } else {
-                LexemeKind::App.reduce(lexeme_kind)
+                LexemeKind::App.stack_can_hold(lexeme_kind)
             }
         } else {
             true
