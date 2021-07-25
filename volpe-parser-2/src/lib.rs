@@ -46,4 +46,12 @@ mod test {
         file.rule();
         Ok(())
     }
+
+    #[test]
+    fn fuzz_incr_edits_002() -> PatchResult {
+        let mut file = File::default();
+        file.patch(Offset::default(), Offset::default(), "%=>".to_string())?;
+        file.rule();
+        Ok(())
+    }
 }
