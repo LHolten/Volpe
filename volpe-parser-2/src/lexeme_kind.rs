@@ -8,9 +8,6 @@ pub enum LexemeKind {
     #[token("=")]
     Assign,
 
-    #[token("=>")]
-    Ite,
-
     #[token(".")]
     Func,
 
@@ -80,14 +77,14 @@ pub enum LexemeKind {
     #[token("}")]
     RCurlyBracket,
 
-    #[regex(r":")]
-    Colon,
-
     #[regex(r",")]
     Comma,
 
-    #[regex("[_a-zA-Z][_a-zA-Z0-9]*")]
+    #[regex("[_a-z][_a-zA-Z0-9]*")]
     Ident,
+
+    #[regex("[A-Z][_a-zA-Z0-9]*")]
+    Const,
 
     #[regex("[0-9]+")]
     Num,

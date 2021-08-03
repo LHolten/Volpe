@@ -1,12 +1,12 @@
 [package]
-name = "volpe-parser-2"
+name = "volpe-compiler-2"
 version = "0.1.0"
-authors = ["Hytak <lhc.holten@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-logos = "*"
-void = "*"
+volpe-parser-2 = { path = "../volpe-parser-2" }
+wasm-encoder = "0.5.0"
 string-interner = "0.12.2"
+wasmer = "2.0.0"

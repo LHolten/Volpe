@@ -1,4 +1,5 @@
 target
+ignore
 Cargo.lock
 !volpe-compiler/Cargo.lock
 

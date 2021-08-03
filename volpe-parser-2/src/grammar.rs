@@ -15,7 +15,6 @@ impl LexemeKind {
         match self {
             LexemeKind::Semicolon => 0,
             LexemeKind::Comma => 0,
-            LexemeKind::Colon => 1,
             LexemeKind::Assign => 1,
             LexemeKind::App => 2,
             LexemeKind::Or => 3,
@@ -48,6 +47,7 @@ impl LexemeKind {
             LexemeKind::LCurlyBracket => RuleKind::OpeningBracket,
             LexemeKind::RCurlyBracket => RuleKind::ClosingBracket,
             LexemeKind::Ident => RuleKind::Terminal,
+            LexemeKind::Const => RuleKind::Terminal,
             LexemeKind::Num => RuleKind::Terminal,
             LexemeKind::Error => RuleKind::ClosingBracket,
             _ => RuleKind::Operator,
@@ -58,7 +58,6 @@ impl LexemeKind {
         match self.rule_kind() {
             RuleKind::OpeningBracket => true,
             RuleKind::Operator => match new.rule_kind() {
-                RuleKind::OpeningBracket => true,
                 RuleKind::ClosingBracket => false,
                 RuleKind::Operator => match self.priority().cmp(&new.priority()) {
                     Ordering::Less => true,
