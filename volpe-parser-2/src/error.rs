@@ -112,20 +112,12 @@ impl<'a, E: std::fmt::Debug> Syntax<'a, E> {
                 inner,
             } => {
                 let mut this_inner_bracket_err = false;
-                let missing_terminal = matches!(inner.as_ref(), Syntax::Terminal(Err(_)));
-                if !missing_terminal {
+                if let Some(inner) = inner {
                     errs.extend(inner._iter_errs(&mut this_inner_bracket_err));
                 }
 
-                // Try to find the range of the missing terminal.
-                let mut terminal_start = None;
-                let mut terminal_end = None;
-
                 if let Ok(opening) = opening {
-                    terminal_start = Some(opening.end);
                     if let Ok(closing) = closing {
-                        // Both brackets exist, we can place missing terminal exactly between.
-                        terminal_end = Some(closing.start);
                         // Handle mismatched brackets.
                         if opening.kind.bracket_counterpart() != closing.kind {
                             errs.push(SyntaxError::MismatchedBracket {
@@ -153,20 +145,12 @@ impl<'a, E: std::fmt::Debug> Syntax<'a, E> {
                 } else {
                     // Both brackets cannot be missing.
                     let closing = closing.as_ref().unwrap();
-                    terminal_end = Some(closing.start);
                     errs.push(SyntaxError::MissingBracket {
                         start: closing.start,
                         end: closing.end,
                         innermost: !this_inner_bracket_err,
                     });
                     *inner_bracket_err = true;
-                }
-
-                if missing_terminal {
-                    errs.push(SyntaxError::MissingTerminal {
-                        start: terminal_start.or(terminal_end).unwrap(),
-                        end: terminal_end.or(terminal_start).unwrap(),
-                    });
                 }
             }
             Syntax::Terminal(Ok(_)) => (),

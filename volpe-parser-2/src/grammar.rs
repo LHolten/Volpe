@@ -35,7 +35,8 @@ impl LexemeKind {
             LexemeKind::Div => 7,
             LexemeKind::Mod => 7,
             LexemeKind::BitAnd => 8,
-            LexemeKind::Func => 9,
+            LexemeKind::Abs => 9,
+            LexemeKind::AbsStrict => 9,
             _ => unreachable!(),
         }
     }

@@ -24,7 +24,7 @@ pub enum Syntax<'a, E> {
     // this annotates a node to be inside brackets
     Brackets {
         brackets: [Result<Lexeme<'a>, E>; 2],
-        inner: Box<Syntax<'a, E>>,
+        inner: Option<Box<Syntax<'a, E>>>,
     },
     // terminal is just a single self contained lexeme
     Terminal(Result<Lexeme<'a>, E>),

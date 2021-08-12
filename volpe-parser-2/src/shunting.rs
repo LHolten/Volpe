@@ -77,7 +77,10 @@ impl<'a> Yard<'a> {
             RuleKind::ClosingBracket => {
                 self.begin_operator(&lexeme.kind);
                 let open = self.stack.pop().map(Option::unwrap).ok_or(());
-                let inner = self.pop_terminal().into();
+                let inner = match self.pop_terminal() {
+                    Syntax::Terminal(Err(())) => None,
+                    val => Some(val.into()),
+                };
                 self.terminals.push(Syntax::Brackets {
                     inner,
                     brackets: [open, Ok(lexeme)],
@@ -124,7 +127,10 @@ impl File {
             yard.begin_operator(&LexemeKind::RRoundBracket);
             yard.stack.pop()
         } {
-            let inner = yard.pop_terminal().into();
+            let inner = match yard.pop_terminal() {
+                Syntax::Terminal(Err(())) => None,
+                val => Some(val.into()),
+            };
             yard.terminals.push(Syntax::Brackets {
                 inner,
                 brackets: [Ok(lexeme.unwrap()), Err(())],

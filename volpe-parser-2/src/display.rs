@@ -40,7 +40,10 @@ fn display_syntax<E>(
             }
             Ok(())
         }
-        Syntax::Brackets { inner, .. } => display_syntax(f, inner, indent, hide_semicolon),
+        Syntax::Brackets { inner, .. } => inner
+            .as_ref()
+            .map(|inner| display_syntax(f, inner, indent, hide_semicolon))
+            .unwrap_or(Ok(())),
         Syntax::Terminal(Ok(lexeme)) => with_indent2(f, lexeme.kind, lexeme.text, indent),
         Syntax::Terminal(Err(_)) => with_indent(f, None::<()>, indent),
     }

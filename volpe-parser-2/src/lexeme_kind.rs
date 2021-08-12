@@ -9,7 +9,10 @@ pub enum LexemeKind {
     Assign,
 
     #[token(".")]
-    Func,
+    Abs,
+
+    #[token(":")]
+    AbsStrict,
 
     #[token("||")]
     Or,

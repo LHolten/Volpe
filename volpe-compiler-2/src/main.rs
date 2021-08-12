@@ -5,19 +5,21 @@ use wasm_encoder::{
 };
 use wasmer::{imports, Instance};
 
-use crate::wasm::{Closure, Compiler};
+use crate::wasm::Compiler;
 
 mod wasm;
 
 fn main() {
     let mut file = File::default();
-    file.patch(Offset::default(), Offset::default(), "1 + 1".to_string())
-        .unwrap();
+    file.patch(
+        Offset::default(),
+        Offset::default(),
+        "a.(a + 2) 3".to_string(),
+    )
+    .unwrap();
+    println!("{}", file.rule());
+
     let ast = ASTBuilder::default().convert(&Box::new(file.rule().unwrap()));
-    let closure = Closure {
-        val: ast.into(),
-        env: vec![],
-    };
 
     let mut module = Module::new();
 
@@ -44,7 +46,7 @@ fn main() {
         stack: vec![],
         func: Function::new(vec![]),
     };
-    assert!(compiler.build(closure).is_num());
+    assert!(compiler.build(&ast).is_num());
     compiler.func.instruction(Instruction::End);
 
     let mut codes = CodeSection::new();
@@ -61,5 +63,5 @@ fn main() {
 
     let test = instance.exports.get_function("test").unwrap();
     let result = test.call(&[]).unwrap();
-    assert_eq!(result[0], wasmer::Value::I32(2));
+    assert_eq!(result[0], wasmer::Value::I32(5));
 }

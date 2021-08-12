@@ -13,7 +13,7 @@ impl<'a> Syntax<'a, ()> {
             },
             Syntax::Brackets { brackets, inner } => Syntax::Brackets {
                 brackets: [Ok(brackets[0].unwrap()), Ok(brackets[1].unwrap())],
-                inner: inner.unwrap().into(),
+                inner: inner.as_ref().map(|inner| inner.unwrap().into()),
             },
             Syntax::Terminal(t) => Syntax::Terminal(Ok(t.unwrap())),
         }
