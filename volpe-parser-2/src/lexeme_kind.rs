@@ -1,6 +1,6 @@
 use logos::Logos;
 
-#[derive(Logos, Debug, PartialEq, Clone, Copy)]
+#[derive(Logos, Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum LexemeKind {
     #[regex(r";")]
     Semicolon,

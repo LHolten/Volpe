@@ -1,11 +1,12 @@
+use std::collections::HashMap;
+
 use volpe_parser_2::{ast::ASTBuilder, file::File, offset::Offset};
 use wasm_encoder::{
-    CodeSection, Export, ExportSection, Function, FunctionSection, Instruction, Module,
-    TypeSection, ValType,
+    CodeSection, Export, ExportSection, Function, FunctionSection, Module, TypeSection, ValType,
 };
 use wasmer::{imports, Instance};
 
-use crate::wasm::Compiler;
+use crate::wasm::{Compiler, Signature};
 
 mod wasm;
 
@@ -14,43 +15,41 @@ fn main() {
     file.patch(
         Offset::default(),
         Offset::default(),
-        "a.(a + 2) 3".to_string(),
+        "a:(a + 2) 3".to_string(),
     )
     .unwrap();
     println!("{}", file.rule());
 
     let ast = ASTBuilder::default().convert(&Box::new(file.rule().unwrap()));
 
-    let mut module = Module::new();
-
-    // Encode the type section.
-    let mut types = TypeSection::new();
-    let params = vec![];
-    let results = vec![ValType::I32];
-    types.function(params, results);
-    module.section(&types);
-
-    // Encode the function section.
-    let mut functions = FunctionSection::new();
-    let type_index = 0;
-    functions.function(type_index);
-    module.section(&functions);
-
-    // Encode the export section.
-    let mut exports = ExportSection::new();
-    exports.export("test", Export::Function(0));
-    module.section(&exports);
-
-    // Encode the code section.
     let mut compiler = Compiler {
-        stack: vec![],
+        signatures: HashMap::new(),
+        functions: vec![],
         func: Function::new(vec![]),
     };
-    assert!(compiler.build(&ast).is_num());
-    compiler.func.instruction(Instruction::End);
 
+    let index = compiler.compile_new(&Signature {
+        expression: ast,
+        arg_stack: vec![],
+    });
+
+    let mut exports = ExportSection::new();
+    exports.export("test", Export::Function(index as u32));
+
+    let mut types = TypeSection::new();
+    let mut functions = FunctionSection::new();
     let mut codes = CodeSection::new();
-    codes.function(&compiler.func);
+    for (t, (signature, func)) in compiler.functions.iter().enumerate() {
+        let strict_len = signature.expression.strict_len();
+        types.function((0..strict_len).map(|_| ValType::I32), vec![ValType::I32]);
+        functions.function(t as u32);
+        codes.function(func);
+    }
+
+    let mut module = Module::new();
+    module.section(&types);
+    module.section(&functions);
+    module.section(&exports);
     module.section(&codes);
 
     // Extract the encoded Wasm bytes for this module.

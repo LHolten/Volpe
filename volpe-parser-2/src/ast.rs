@@ -9,20 +9,21 @@ use crate::{
     syntax::{Lexeme, Syntax},
 };
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Const {
     BuiltIn(LexemeKind),
     Custom(DefaultSymbol),
 }
 
 // this type can only hold the desugared version of the source code
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Simple {
     Abs(bool, Rc<Simple>), //strict
     App([Rc<Simple>; 2]),
     Const(Const),
     Ident(usize),
     Num(i32),
+    Strict(u32),
 }
 
 impl Simple {
@@ -48,6 +49,15 @@ impl Simple {
                 }
             }
             _ => self.clone(),
+        }
+    }
+
+    pub fn strict_len(&self) -> u32 {
+        match self {
+            Simple::Abs(_, func) => func.strict_len(),
+            Simple::App([func, arg]) => func.strict_len().max(arg.strict_len()),
+            Simple::Strict(i) => i + 1,
+            _ => 0,
         }
     }
 }
