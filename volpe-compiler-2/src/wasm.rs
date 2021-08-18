@@ -50,7 +50,7 @@ impl Compiler {
         let strict_len = signature.expression.strict_len();
         let mut func_compiler = FuncCompiler {
             compiler: self,
-            function: Function::new((0..strict_len).map(|x| (x, ValType::I32))),
+            function: Function::new((0..strict_len).map(|x| (x as u32, ValType::I32))),
         };
         func_compiler.build(signature);
         func_compiler.function.instruction(Instruction::End);
@@ -67,9 +67,8 @@ impl<'a> FuncCompiler<'a> {
                 let mut arg_stack = signature.arg_stack.clone();
                 let arg = arg_stack.pop().unwrap();
                 if *strict {
-                    let strict_len = new_func.strict_len();
                     let signature = Signature {
-                        expression: new_func.replace(0, &Simple::Strict(strict_len)),
+                        expression: new_func.as_ref().clone(),
                         arg_stack,
                     };
 
@@ -80,15 +79,15 @@ impl<'a> FuncCompiler<'a> {
                         .position(|entry| entry.signature == signature)
                         .unwrap_or_else(|| self.compiler.compile_new(&signature));
 
-                    // push all arguments to the stack
-                    for i in 0..strict_len {
-                        self.function.instruction(Instruction::LocalGet(i));
-                    }
                     // calculate and push last argument
                     self.build(&Signature {
                         expression: arg,
                         arg_stack: vec![],
                     });
+                    // push the rest of the arguments to the stack
+                    for i in 0..new_func.strict_len() - 1 {
+                        self.function.instruction(Instruction::LocalGet(i as u32));
+                    }
                     self.function.instruction(Instruction::Call(f_index as u32)); // need to replace this with tail call
                     Kind::Num
                 } else {
@@ -114,11 +113,11 @@ impl<'a> FuncCompiler<'a> {
                 self.function.instruction(Instruction::I32Const(*val));
                 self.number(signature)
             }
-            Simple::Strict(index) => {
-                self.function.instruction(Instruction::LocalGet(*index));
+            Simple::Ident(index) => {
+                self.function
+                    .instruction(Instruction::LocalGet(*index as u32));
                 self.number(signature)
             }
-            Simple::Ident(_) => unreachable!(),
         }
     }
 

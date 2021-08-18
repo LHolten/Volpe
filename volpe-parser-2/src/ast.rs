@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{cmp::Ordering, rc::Rc};
 
 use string_interner::{DefaultSymbol, StringInterner};
 use void::{ResultVoidExt, Void};
@@ -24,7 +24,6 @@ pub enum Simple {
     Const(Const),
     Ident(usize),
     Num(i32),
-    Strict(u32),
 }
 
 impl Simple {
@@ -42,22 +41,20 @@ impl Simple {
                 func.replace(depth, val).into(),
                 arg.replace(depth, val).into(),
             ]),
-            Simple::Ident(index) => {
-                if index == &depth {
-                    val.clone()
-                } else {
-                    self.clone()
-                }
-            }
+            Simple::Ident(index) => match index.cmp(&depth) {
+                Ordering::Less => self.clone(),
+                Ordering::Equal => val.clone(),
+                Ordering::Greater => Simple::Ident(index - 1),
+            },
             _ => self.clone(),
         }
     }
 
-    pub fn strict_len(&self) -> u32 {
+    pub fn strict_len(&self) -> usize {
         match self {
-            Simple::Abs(_, func) => func.strict_len(),
+            Simple::Abs(_, func) => func.strict_len().saturating_sub(1),
             Simple::App([func, arg]) => func.strict_len().max(arg.strict_len()),
-            Simple::Strict(i) => i + 1,
+            Simple::Ident(i) => i + 1,
             _ => 0,
         }
     }
