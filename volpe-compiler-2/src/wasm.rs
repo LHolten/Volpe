@@ -26,7 +26,7 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// Returns `true` if the kind is [`Num`].
+    /// Returns `true` if the kind is [`Kind::Num`].
     pub fn is_num(&self) -> bool {
         matches!(self, Self::Num)
     }

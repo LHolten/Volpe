@@ -1,4 +1,4 @@
-use volpe_parser_2::{ast::ASTBuilder, file::File, offset::Offset};
+use volpe_parser_2::{ast::ASTBuilder, file::File, offset::Offset, stack_list::StackList};
 use wasm_encoder::{
     CodeSection, Export, ExportSection, FunctionSection, Module, TypeSection, ValType,
 };
@@ -18,7 +18,7 @@ fn main() {
     .unwrap();
     println!("{}", file.rule());
 
-    let ast = ASTBuilder::default().convert(&Box::new(file.rule().unwrap()));
+    let ast = ASTBuilder::default().convert(StackList::default(), &Box::new(file.rule().unwrap()));
 
     let mut compiler = Compiler(vec![]);
 

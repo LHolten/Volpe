@@ -6,6 +6,7 @@ use void::{ResultVoidExt, Void};
 use crate::{
     grammar::RuleKind,
     lexeme_kind::LexemeKind,
+    stack_list::StackList,
     syntax::{Lexeme, Syntax},
 };
 
@@ -65,11 +66,14 @@ impl Simple {
 #[derive(Default)]
 pub struct ASTBuilder {
     interner: StringInterner,
-    arg_ident: Vec<DefaultSymbol>,
 }
 
 impl ASTBuilder {
-    pub fn convert<'a>(&mut self, syntax: impl AsRef<Syntax<'a, Void>>) -> Simple {
+    pub fn convert<'a>(
+        &mut self,
+        env: StackList<DefaultSymbol>,
+        syntax: impl AsRef<Syntax<'a, Void>>,
+    ) -> Simple {
         match syntax.as_ref() {
             Syntax::Operator { operator, operands } => {
                 if matches!(
@@ -86,9 +90,7 @@ impl ASTBuilder {
                         _ => todo!(),
                     };
 
-                    self.arg_ident.push(ident);
-                    let second = self.convert(&operands[1]).into();
-                    self.arg_ident.pop();
+                    let second = self.convert(env.push(&ident), &operands[1]).into();
 
                     if operator.unwrap().kind == LexemeKind::Abs {
                         Simple::Abs(false, second)
@@ -96,7 +98,7 @@ impl ASTBuilder {
                         Simple::Abs(true, second)
                     }
                 } else {
-                    let mut item = self.convert(&operands[0]).into();
+                    let mut item = self.convert(env, &operands[0]).into();
 
                     if let Some(lexeme) = operator {
                         lexeme.kind.assert_simple_operator();
@@ -104,16 +106,18 @@ impl ASTBuilder {
                             Simple::App([item, Simple::Const(Const::BuiltIn(lexeme.kind)).into()])
                                 .into();
                     }
-                    Simple::App([item, self.convert(&operands[1]).into()])
+                    Simple::App([item, self.convert(env, &operands[1]).into()])
                 }
             }
             Syntax::Brackets { brackets, inner } => match brackets[0].void_unwrap().kind {
                 LexemeKind::LRoundBracket => inner
                     .as_ref()
-                    .map(|inner| self.convert(inner))
+                    .map(|inner| self.convert(env, inner))
                     .unwrap_or_else(|| Simple::Abs(false, Rc::new(Simple::Ident(0)))),
                 LexemeKind::LCurlyBracket => Simple::Abs(false, {
-                    self.arg_ident.push(self.interner.get_or_intern_static("$"));
+                    let ident = self.interner.get_or_intern_static("$");
+                    let env = env.push(&ident);
+
                     let mut func_call = Simple::Ident(0);
                     if let Some(mut item) = inner.as_ref() {
                         while let Syntax::Operator {
@@ -125,13 +129,14 @@ impl ASTBuilder {
                             operands,
                         } = item.as_ref()
                         {
-                            func_call =
-                                Simple::App([func_call.into(), self.convert(&operands[0]).into()]);
+                            func_call = Simple::App([
+                                func_call.into(),
+                                self.convert(env, &operands[0]).into(),
+                            ]);
                             item = &operands[1]
                         }
-                        func_call = Simple::App([func_call.into(), self.convert(item).into()]);
+                        func_call = Simple::App([func_call.into(), self.convert(env, item).into()]);
                     }
-                    self.arg_ident.pop().unwrap();
                     func_call.into()
                 }),
                 _ => unreachable!(),
@@ -140,13 +145,7 @@ impl ASTBuilder {
                 let lexeme = l.void_unwrap();
                 let symbol = self.interner.get_or_intern(lexeme.text);
                 match lexeme.kind {
-                    LexemeKind::Ident => Simple::Ident({
-                        self.arg_ident
-                            .iter()
-                            .rev()
-                            .position(|ident| ident == &symbol)
-                            .unwrap()
-                    }),
+                    LexemeKind::Ident => Simple::Ident(env.find(&symbol).unwrap()),
                     LexemeKind::Const => Simple::Const(Const::Custom(symbol)),
                     LexemeKind::Num => Simple::Num(lexeme.text.parse().unwrap()),
                     _ => unreachable!(),
