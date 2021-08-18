@@ -1,5 +1,3 @@
-use std::{collections::HashMap, mem::swap};
-
 use volpe_parser_2::ast::{Const, Simple};
 use wasm_encoder::{Function, Instruction, ValType};
 
@@ -9,10 +7,16 @@ pub struct Signature {
     pub arg_stack: Vec<Simple>,
 }
 
-pub struct Compiler {
-    pub signatures: HashMap<Signature, usize>,
-    pub functions: Vec<(Signature, Function)>,
-    pub func: Function,
+pub struct CompilerEntry {
+    pub signature: Signature,
+    pub function: Option<Function>,
+}
+
+pub struct Compiler(pub Vec<CompilerEntry>);
+
+pub struct FuncCompiler<'a> {
+    pub compiler: &'a mut Compiler,
+    pub function: Function,
 }
 
 #[derive(Clone)]
@@ -36,28 +40,27 @@ impl Kind {
 }
 
 impl Compiler {
-    pub fn with_func(&mut self, func: &mut Function, f: impl Fn(&mut Self) -> Kind) -> Kind {
-        swap(&mut self.func, func);
-        let res = f(self);
-        swap(&mut self.func, func);
-        res
-    }
-
     pub fn compile_new(&mut self, signature: &Signature) -> usize {
-        let index = self.functions.len();
-        self.signatures.insert(signature.clone(), index);
-        self.functions
-            .push((signature.clone(), Function::new(vec![])));
+        let index = self.0.len();
+        self.0.push(CompilerEntry {
+            signature: signature.clone(),
+            function: None,
+        });
 
         let strict_len = signature.expression.strict_len();
-        let mut new_func = Function::new((0..strict_len).map(|x| (x, ValType::I32)));
-        self.with_func(&mut new_func, |compiler| compiler.build(signature));
-        new_func.instruction(Instruction::End);
-        self.functions[index].1 = new_func;
+        let mut func_compiler = FuncCompiler {
+            compiler: self,
+            function: Function::new((0..strict_len).map(|x| (x, ValType::I32))),
+        };
+        func_compiler.build(signature);
+        func_compiler.function.instruction(Instruction::End);
 
+        self.0[index].function = Some(func_compiler.function);
         index
     }
+}
 
+impl<'a> FuncCompiler<'a> {
     pub fn build(&mut self, signature: &Signature) -> Kind {
         match &signature.expression {
             Simple::Abs(strict, new_func) => {
@@ -71,21 +74,22 @@ impl Compiler {
                     };
 
                     let f_index = self
-                        .signatures
-                        .get(&signature)
-                        .copied()
-                        .unwrap_or_else(|| self.compile_new(&signature));
+                        .compiler
+                        .0
+                        .iter()
+                        .position(|entry| entry.signature == signature)
+                        .unwrap_or_else(|| self.compiler.compile_new(&signature));
 
                     // push all arguments to the stack
                     for i in 0..strict_len {
-                        self.func.instruction(Instruction::LocalGet(i));
+                        self.function.instruction(Instruction::LocalGet(i));
                     }
                     // calculate and push last argument
                     self.build(&Signature {
                         expression: arg,
                         arg_stack: vec![],
                     });
-                    self.func.instruction(Instruction::Call(f_index as u32)); // need to replace this with tail call
+                    self.function.instruction(Instruction::Call(f_index as u32)); // need to replace this with tail call
                     Kind::Num
                 } else {
                     self.build(&Signature {
@@ -107,11 +111,11 @@ impl Compiler {
                 Kind::Const(val.clone())
             }
             Simple::Num(val) => {
-                self.func.instruction(Instruction::I32Const(*val));
+                self.function.instruction(Instruction::I32Const(*val));
                 self.number(signature)
             }
             Simple::Strict(index) => {
-                self.func.instruction(Instruction::LocalGet(*index));
+                self.function.instruction(Instruction::LocalGet(*index));
                 self.number(signature)
             }
             Simple::Ident(_) => unreachable!(),
@@ -133,7 +137,7 @@ impl Compiler {
                     arg_stack: vec![],
                 })
                 .is_num());
-            self.func.instruction(Instruction::I32Add);
+            self.function.instruction(Instruction::I32Add);
         }
         Kind::Num
     }

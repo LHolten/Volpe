@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-
 use volpe_parser_2::{ast::ASTBuilder, file::File, offset::Offset};
 use wasm_encoder::{
-    CodeSection, Export, ExportSection, Function, FunctionSection, Module, TypeSection, ValType,
+    CodeSection, Export, ExportSection, FunctionSection, Module, TypeSection, ValType,
 };
 use wasmer::{imports, Instance};
 
@@ -22,11 +20,7 @@ fn main() {
 
     let ast = ASTBuilder::default().convert(&Box::new(file.rule().unwrap()));
 
-    let mut compiler = Compiler {
-        signatures: HashMap::new(),
-        functions: vec![],
-        func: Function::new(vec![]),
-    };
+    let mut compiler = Compiler(vec![]);
 
     let index = compiler.compile_new(&Signature {
         expression: ast,
@@ -39,11 +33,11 @@ fn main() {
     let mut types = TypeSection::new();
     let mut functions = FunctionSection::new();
     let mut codes = CodeSection::new();
-    for (t, (signature, func)) in compiler.functions.iter().enumerate() {
-        let strict_len = signature.expression.strict_len();
+    for (t, entry) in compiler.0.iter().enumerate() {
+        let strict_len = entry.signature.expression.strict_len();
         types.function((0..strict_len).map(|_| ValType::I32), vec![ValType::I32]);
         functions.function(t as u32);
-        codes.function(func);
+        codes.function(entry.function.as_ref().unwrap());
     }
 
     let mut module = Module::new();
