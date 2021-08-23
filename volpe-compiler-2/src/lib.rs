@@ -1,4 +1,4 @@
-use volpe_parser_2::{ast::ASTBuilder, file::File, offset::Offset, stack_list::StackList};
+use volpe_parser_2::{ast::ASTBuilder, file::File, stack_list::StackList};
 use wasm_encoder::{
     CodeSection, Export, ExportSection, FunctionSection, Module, TypeSection, ValType,
 };
@@ -8,16 +8,8 @@ use crate::wasm::{Compiler, Signature};
 
 mod wasm;
 
-fn main() {
-    let mut file = File::default();
-    file.patch(
-        Offset::default(),
-        Offset::default(),
-        "a:(a + 2) 3".to_string(),
-    )
-    .unwrap();
-    println!("{}", file.rule());
-
+// TEMPORARY
+pub fn compile(file: File) -> Instance {
     let ast = ASTBuilder::default().convert(StackList::default(), &Box::new(file.rule().unwrap()));
 
     let mut compiler = Compiler(vec![]);
@@ -28,7 +20,7 @@ fn main() {
     });
 
     let mut exports = ExportSection::new();
-    exports.export("test", Export::Function(index as u32));
+    exports.export("main", Export::Function(index as u32));
 
     let mut types = TypeSection::new();
     let mut functions = FunctionSection::new();
@@ -52,9 +44,27 @@ fn main() {
     let module = wasmer::Module::from_binary(&wasmer::Store::default(), &wasm_bytes).unwrap();
     // The module doesn't import anything, so we create an empty import object.
     let import_object = imports! {};
-    let instance = Instance::new(&module, &import_object).unwrap();
+    Instance::new(&module, &import_object).unwrap()
+}
 
-    let test = instance.exports.get_function("test").unwrap();
-    let result = test.call(&[]).unwrap();
-    assert_eq!(result[0], wasmer::Value::I32(5));
+#[cfg(test)]
+mod tests {
+    use volpe_parser_2::{file::File, offset::Offset};
+    use super::compile;
+
+    #[test]
+    fn strict_func() {
+        let mut file = File::default();
+        file.patch(
+            Offset::default(),
+            Offset::default(),
+            "a:(a + 2) 3".to_string(),
+        )
+        .unwrap();
+
+        let instance = compile(file);
+        let main = instance.exports.get_function("main").unwrap();
+        let result = main.call(&[]).unwrap();
+        assert_eq!(result[0], wasmer::Value::I32(5));
+    }
 }
