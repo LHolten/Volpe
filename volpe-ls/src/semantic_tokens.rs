@@ -71,8 +71,8 @@ impl SemanticTokensBuilder {
 pub fn lexeme_to_type(kind: &LexemeKind) -> Option<SemanticTokenType> {
     match kind {
         LexemeKind::Assign
-        | LexemeKind::Ite
-        | LexemeKind::Func
+        | LexemeKind::Abs
+        | LexemeKind::AbsStrict
         | LexemeKind::Or
         | LexemeKind::And
         | LexemeKind::Equals
@@ -92,6 +92,7 @@ pub fn lexeme_to_type(kind: &LexemeKind) -> Option<SemanticTokenType> {
         | LexemeKind::Div
         | LexemeKind::Mod => Some(SemanticTokenType::OPERATOR),
         LexemeKind::Ident => Some(SemanticTokenType::VARIABLE),
+        LexemeKind::Const => Some(SemanticTokenType::KEYWORD),
         LexemeKind::Num => Some(SemanticTokenType::NUMBER),
         _ => None,
     }

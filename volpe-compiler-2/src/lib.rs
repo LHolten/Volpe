@@ -9,7 +9,7 @@ use crate::wasm::{Compiler, Signature};
 mod wasm;
 
 // TEMPORARY
-pub fn compile(file: File) -> Instance {
+pub fn compile(file: &File) -> Result<Instance, Box<dyn std::error::Error>> {
     let ast = ASTBuilder::default().convert(StackList::default(), &Box::new(file.rule().unwrap()));
 
     let mut compiler = Compiler(vec![]);
@@ -29,7 +29,7 @@ pub fn compile(file: File) -> Instance {
         let strict_len = entry.signature.expression.strict_len();
         types.function((0..strict_len).map(|_| ValType::I32), vec![ValType::I32]);
         functions.function(t as u32);
-        codes.function(entry.function.as_ref().unwrap());
+        codes.function(entry.function.as_ref().ok_or("")?);
     }
 
     let mut module = Module::new();
@@ -41,10 +41,11 @@ pub fn compile(file: File) -> Instance {
     // Extract the encoded Wasm bytes for this module.
     let wasm_bytes = module.finish();
 
-    let module = wasmer::Module::from_binary(&wasmer::Store::default(), &wasm_bytes).unwrap();
+    let module = wasmer::Module::from_binary(&wasmer::Store::default(), &wasm_bytes)?;
     // The module doesn't import anything, so we create an empty import object.
     let import_object = imports! {};
-    Instance::new(&module, &import_object).unwrap()
+    let instance = Instance::new(&module, &import_object)?;
+    Ok(instance)
 }
 
 #[cfg(test)]
@@ -62,7 +63,7 @@ mod tests {
         )
         .unwrap();
 
-        let instance = compile(file);
+        let instance = compile(&file).unwrap();
         let main = instance.exports.get_function("main").unwrap();
         let result = main.call(&[]).unwrap();
         assert_eq!(result[0], wasmer::Value::I32(5));

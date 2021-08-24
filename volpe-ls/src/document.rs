@@ -1,6 +1,7 @@
 use crate::lsp_utils::range;
 use lsp_types::{Diagnostic, DiagnosticSeverity};
 use volpe_parser_2::{error::SyntaxError, file::File, offset::Offset};
+use volpe_compiler_2::compile;
 
 pub struct Document {
     pub version: i32,
@@ -38,7 +39,7 @@ impl Document {
     }
 
     pub fn get_info(&self) -> String {
-        format!("version: {}\n{:#}", self.version, self.file.rule())
+        format!("version: {}\nresult: {}\n{:#}", self.version, self.compile_and_run().unwrap_or_else(|| "...".to_string()), self.file.rule())
     }
 
     pub fn get_diagnostics(&self) -> Vec<Diagnostic> {
@@ -57,5 +58,16 @@ impl Document {
                 }
             })
             .collect()
+    }
+
+    // TEMP
+    pub fn compile_and_run(&self) -> Option<String> {
+        if self.file.rule().iter_errs().next().is_none() {
+            let instance = compile(&self.file).ok()?;
+            let main = instance.exports.get_function("main").ok()?;
+            let result = main.call(&[]).ok()?;
+            return Some(format!("{:?}", result[0]));
+        }
+        None
     }
 }
