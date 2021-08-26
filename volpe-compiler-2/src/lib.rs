@@ -50,8 +50,8 @@ pub fn compile(file: &File) -> Result<Instance, Box<dyn std::error::Error>> {
 
 #[cfg(test)]
 mod tests {
-    use volpe_parser_2::{file::File, offset::Offset};
     use super::compile;
+    use volpe_parser_2::{file::File, offset::Offset};
 
     #[test]
     fn strict_func() {
@@ -67,5 +67,21 @@ mod tests {
         let main = instance.exports.get_function("main").unwrap();
         let result = main.call(&[]).unwrap();
         assert_eq!(result[0], wasmer::Value::I32(5));
+    }
+
+    #[test]
+    fn conditional() {
+        let mut file = File::default();
+        file.patch(
+            Offset::default(),
+            Offset::default(),
+            "(Test.5, Beta.10, ()) Beta".to_string(),
+        )
+        .unwrap();
+
+        let instance = compile(&file).unwrap();
+        let main = instance.exports.get_function("main").unwrap();
+        let result = main.call(&[]).unwrap();
+        assert_eq!(result[0], wasmer::Value::I32(10));
     }
 }

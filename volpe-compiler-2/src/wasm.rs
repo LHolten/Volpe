@@ -1,4 +1,5 @@
-use volpe_parser_2::ast::{Const, Simple};
+use string_interner::DefaultSymbol;
+use volpe_parser_2::ast::Simple;
 use wasm_encoder::{Function, Instruction, ValType};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -21,7 +22,7 @@ pub struct FuncCompiler<'a> {
 
 #[derive(Clone)]
 pub enum Kind {
-    Const(Const),
+    Const(DefaultSymbol),
     Num,
 }
 
@@ -31,10 +32,10 @@ impl Kind {
         matches!(self, Self::Num)
     }
 
-    pub fn as_const(&self) -> Const {
+    pub fn as_const(&self) -> DefaultSymbol {
         match self {
-            Kind::Const(c) => c.clone(),
-            Kind::Num => unreachable!(),
+            Kind::Const(c) => *c,
+            _ => unreachable!(),
         }
     }
 }
@@ -107,7 +108,7 @@ impl<'a> FuncCompiler<'a> {
             }
             Simple::Const(val) => {
                 assert!(signature.arg_stack.is_empty());
-                Kind::Const(val.clone())
+                Kind::Const(*val)
             }
             Simple::Num(val) => {
                 self.function.instruction(Instruction::I32Const(*val));
@@ -118,6 +119,31 @@ impl<'a> FuncCompiler<'a> {
                     .instruction(Instruction::LocalGet(*index as u32));
                 self.number(signature)
             }
+            Simple::Case(c, body) => {
+                let mut arg_stack = signature.arg_stack.clone();
+                let alternative = arg_stack.pop().unwrap();
+                let value = arg_stack.pop().unwrap();
+                if &self
+                    .build(&Signature {
+                        expression: value.clone(),
+                        arg_stack: vec![],
+                    })
+                    .as_const()
+                    == c
+                {
+                    self.build(&Signature {
+                        expression: body.as_ref().clone(),
+                        arg_stack,
+                    })
+                } else {
+                    arg_stack.push(value); // bring back the value for the next case
+                    self.build(&Signature {
+                        expression: alternative,
+                        arg_stack,
+                    })
+                }
+            }
+            Simple::Bot => panic!("evaluated bottom"),
         }
     }
 

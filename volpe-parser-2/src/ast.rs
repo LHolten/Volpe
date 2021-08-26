@@ -4,26 +4,21 @@ use string_interner::{DefaultSymbol, StringInterner};
 use void::{ResultVoidExt, Void};
 
 use crate::{
-    grammar::RuleKind,
     lexeme_kind::LexemeKind,
     stack_list::StackList,
     syntax::{Lexeme, Syntax},
 };
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub enum Const {
-    BuiltIn(LexemeKind),
-    Custom(DefaultSymbol),
-}
-
 // this type can only hold the desugared version of the source code
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Simple {
     Abs(bool, Rc<Simple>), //strict
     App([Rc<Simple>; 2]),
-    Const(Const),
+    Const(DefaultSymbol),
     Ident(usize),
     Num(i32),
+    Case(DefaultSymbol, Rc<Simple>),
+    Bot,
 }
 
 impl Simple {
@@ -73,36 +68,37 @@ impl ASTBuilder {
     ) -> Simple {
         match syntax.as_ref() {
             Syntax::Operator { operator, operands } => {
-                if matches!(
-                    operator,
-                    Some(Lexeme {
-                        kind: LexemeKind::Abs | LexemeKind::AbsStrict,
-                        ..
-                    })
-                ) {
-                    let ident = match operands[0].as_ref() {
-                        Syntax::Terminal(Ok(Lexeme { text, .. })) => {
-                            self.interner.get_or_intern(text)
+                if let Some(operator) = operator {
+                    match operator.kind {
+                        LexemeKind::Semicolon => Simple::App([
+                            self.convert(env, &operands[0]).into(),
+                            self.convert(env, &operands[1]).into(),
+                        ]),
+                        LexemeKind::Assign => todo!(),
+                        LexemeKind::Abs => {
+                            let mut constant = false;
+                            let ident = match operands[0].as_ref() {
+                                Syntax::Terminal(Ok(Lexeme { text, kind, .. })) => {
+                                    if kind == &LexemeKind::Const {
+                                        constant = true;
+                                    }
+                                    self.interner.get_or_intern(text)
+                                }
+                                _ => todo!(),
+                            };
+                            let strict = operator.text == ":";
+                            let second = self.convert(env.push(&ident), &operands[1]).into();
+
+                            if constant {
+                                Simple::Case(ident, second)
+                            } else {
+                                Simple::Abs(strict, second)
+                            }
                         }
-                        _ => todo!(),
-                    };
-
-                    let second = self.convert(env.push(&ident), &operands[1]).into();
-
-                    if operator.unwrap().kind == LexemeKind::Abs {
-                        Simple::Abs(false, second)
-                    } else {
-                        Simple::Abs(true, second)
+                        _ => unreachable!(),
                     }
                 } else {
-                    let mut item = self.convert(env, &operands[0]).into();
-
-                    if let Some(lexeme) = operator {
-                        lexeme.kind.assert_simple_operator();
-                        item =
-                            Simple::App([item, Simple::Const(Const::BuiltIn(lexeme.kind)).into()])
-                                .into();
-                    }
+                    let item = self.convert(env, &operands[0]).into();
                     Simple::App([item, self.convert(env, &operands[1]).into()])
                 }
             }
@@ -110,19 +106,16 @@ impl ASTBuilder {
                 LexemeKind::LRoundBracket => inner
                     .as_ref()
                     .map(|inner| self.convert(env, inner))
-                    .unwrap_or_else(|| Simple::Abs(false, Rc::new(Simple::Ident(0)))),
+                    .unwrap_or_else(|| Simple::Bot),
                 LexemeKind::LCurlyBracket => Simple::Abs(false, {
+                    // this is just to increment the env local count
                     let ident = self.interner.get_or_intern_static("$");
                     let env = env.push(&ident);
 
                     let mut func_call = Simple::Ident(0);
                     if let Some(mut item) = inner.as_ref() {
                         while let Syntax::Operator {
-                            operator:
-                                Some(Lexeme {
-                                    kind: LexemeKind::Comma,
-                                    ..
-                                }),
+                            operator: None,
                             operands,
                         } = item.as_ref()
                         {
@@ -143,21 +136,11 @@ impl ASTBuilder {
                 let symbol = self.interner.get_or_intern(lexeme.text);
                 match lexeme.kind {
                     LexemeKind::Ident => Simple::Ident(env.find(&symbol).unwrap()),
-                    LexemeKind::Const => Simple::Const(Const::Custom(symbol)),
+                    LexemeKind::Const => Simple::Const(symbol),
                     LexemeKind::Num => Simple::Num(lexeme.text.parse().unwrap()),
                     _ => unreachable!(),
                 }
             }
         }
-    }
-}
-
-impl LexemeKind {
-    pub fn assert_simple_operator(&self) {
-        assert!(matches!(self.rule_kind(), RuleKind::Operator));
-        assert!(!matches!(
-            self,
-            LexemeKind::Semicolon | LexemeKind::Assign | LexemeKind::Comma
-        ))
     }
 }
