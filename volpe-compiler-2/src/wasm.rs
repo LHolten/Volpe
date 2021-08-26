@@ -115,6 +115,7 @@ impl<'a> FuncCompiler<'a> {
                 self.number(signature)
             }
             Simple::Ident(index) => {
+                // this should only happen inside strict functions
                 self.function
                     .instruction(Instruction::LocalGet(*index as u32));
                 self.number(signature)

@@ -84,4 +84,20 @@ mod tests {
         let result = main.call(&[]).unwrap();
         assert_eq!(result[0], wasmer::Value::I32(10));
     }
+
+    #[test]
+    fn recursion() {
+        let mut file = File::default();
+        file.patch(
+            Offset::default(),
+            Offset::default(),
+            "f.(x.(f (x x)) x.(f (x x))) rec.unique.((A.(rec B), B.1, ()) unique) A".to_string(),
+        )
+        .unwrap();
+
+        let instance = compile(&file).unwrap();
+        let main = instance.exports.get_function("main").unwrap();
+        let result = main.call(&[]).unwrap();
+        assert_eq!(result[0], wasmer::Value::I32(1));
+    }
 }

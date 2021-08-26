@@ -41,6 +41,7 @@ impl Simple {
                 Ordering::Equal => val.clone(),
                 Ordering::Greater => Simple::Ident(index - 1),
             },
+            Simple::Case(symbol, body) => Simple::Case(*symbol, body.replace(depth, val).into()),
             _ => self.clone(),
         }
     }
@@ -87,11 +88,12 @@ impl ASTBuilder {
                                 _ => todo!(),
                             };
                             let strict = operator.text == ":";
-                            let second = self.convert(env.push(&ident), &operands[1]).into();
 
                             if constant {
+                                let second = self.convert(env, &operands[1]).into();
                                 Simple::Case(ident, second)
                             } else {
+                                let second = self.convert(env.push(&ident), &operands[1]).into();
                                 Simple::Abs(strict, second)
                             }
                         }
