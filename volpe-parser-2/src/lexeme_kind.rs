@@ -37,6 +37,7 @@ pub enum LexemeKind {
     #[regex("[0-9]+")]
     Num,
 
+    #[regex("//.*")]
     #[error]
     Error,
 
