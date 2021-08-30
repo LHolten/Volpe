@@ -71,28 +71,9 @@ impl SemanticTokensBuilder {
 pub fn lexeme_to_type(kind: &LexemeKind) -> Option<SemanticTokenType> {
     match kind {
         LexemeKind::Assign
-        | LexemeKind::Abs
-        | LexemeKind::AbsStrict
-        | LexemeKind::Or
-        | LexemeKind::And
-        | LexemeKind::Equals
-        | LexemeKind::UnEquals
-        | LexemeKind::Less
-        | LexemeKind::Greater
-        | LexemeKind::LessEqual
-        | LexemeKind::GreaterEqual
-        | LexemeKind::BitOr
-        | LexemeKind::BitAnd
-        | LexemeKind::BitXor
-        | LexemeKind::BitShl
-        | LexemeKind::BitShr
-        | LexemeKind::Plus
-        | LexemeKind::Minus
-        | LexemeKind::Mul
-        | LexemeKind::Div
-        | LexemeKind::Mod => Some(SemanticTokenType::OPERATOR),
+        | LexemeKind::Abs => Some(SemanticTokenType::OPERATOR),
         LexemeKind::Ident => Some(SemanticTokenType::VARIABLE),
-        LexemeKind::Const => Some(SemanticTokenType::KEYWORD),
+        LexemeKind::Const => Some(SemanticTokenType::PROPERTY),
         LexemeKind::Num => Some(SemanticTokenType::NUMBER),
         _ => None,
     }

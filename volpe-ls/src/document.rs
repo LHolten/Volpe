@@ -63,10 +63,14 @@ impl Document {
     // TEMP
     pub fn compile_and_run(&self) -> Option<String> {
         if self.file.rule().iter_errs().next().is_none() {
-            let instance = compile(&self.file).ok()?;
-            let main = instance.exports.get_function("main").ok()?;
-            let result = main.call(&[]).ok()?;
-            return Some(format!("{:?}", result[0]));
+            if let Ok(output) = std::panic::catch_unwind(|| {
+                let instance = compile(&self.file).ok().unwrap();
+                let main = instance.exports.get_function("main").ok().unwrap();
+                let result = main.call(&[]).ok().unwrap();
+                format!("{:?}", result[0])
+            }) {
+                return Some(output);
+            }
         }
         None
     }
