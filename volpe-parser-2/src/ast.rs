@@ -75,7 +75,30 @@ impl ASTBuilder {
                             self.convert(env, &operands[0]).into(),
                             self.convert(env, &operands[1]).into(),
                         ]),
-                        LexemeKind::Assign => todo!(),
+                        LexemeKind::Assign => {
+                            let ident = match operands[0].as_ref() {
+                                Syntax::Terminal(Ok(Lexeme { text, .. })) => {
+                                    self.interner.get_or_intern(text)
+                                }
+                                _ => todo!(),
+                            };
+
+                            match operands[1].as_ref() {
+                                Syntax::Operator { operator, operands } => {
+                                    assert_eq!(operator.unwrap().kind, LexemeKind::Semicolon);
+
+                                    let func = Simple::Abs(
+                                        false,
+                                        self.convert(env.push(&ident), &operands[1]).into(),
+                                    );
+                                    Simple::App([
+                                        func.into(),
+                                        self.convert(env, &operands[0]).into(),
+                                    ])
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
                         LexemeKind::Abs => {
                             let mut constant = false;
                             let ident = match operands[0].as_ref() {

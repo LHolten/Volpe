@@ -2,8 +2,8 @@ use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum LexemeKind {
-    #[regex(r";")]
-    #[regex(r",")]
+    #[regex(";")]
+    #[regex(",")]
     Semicolon,
 
     #[token("=")]
@@ -28,6 +28,8 @@ pub enum LexemeKind {
     #[regex("[_a-z][_a-zA-Z0-9]*")]
     Ident,
 
+    // #[regex(r#"#{([^"}]|("([^"\\]|\\.)*"))*}"#)]
+    // Wasm,
     #[regex("[A-Z][_a-zA-Z0-9]*")]
     #[regex(r"[#-&*-/<=>@\\^|~]+")]
     Const,

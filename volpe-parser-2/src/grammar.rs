@@ -14,7 +14,7 @@ impl LexemeKind {
     pub fn priority(&self) -> usize {
         match self {
             LexemeKind::Semicolon => 0,
-            LexemeKind::Assign => 1,
+            LexemeKind::Assign => 0,
             LexemeKind::App => 2,
             LexemeKind::Abs => 9,
             _ => unreachable!(),

@@ -100,4 +100,37 @@ mod tests {
         let result = main.call(&[]).unwrap();
         assert_eq!(result[0], wasmer::Value::I32(1));
     }
+
+    #[test]
+    fn assign() {
+        let mut file = File::default();
+        file.patch(
+            Offset::default(),
+            Offset::default(),
+            "
+            with = assign.inner.outer.(
+                inner unique.expr.(
+                    value = (
+                        assign,
+                        unique.(outer unique {})
+                    ) unique;
+                    expr value
+                )
+            );
+            
+            with Alpha.10 (
+                with Beta.5 {
+                    Alpha x.x
+                }
+            ) ()
+            "
+            .to_string(),
+        )
+        .unwrap();
+
+        let instance = compile(&file).unwrap();
+        let main = instance.exports.get_function("main").unwrap();
+        let result = main.call(&[]).unwrap();
+        assert_eq!(result[0], wasmer::Value::I32(10));
+    }
 }
