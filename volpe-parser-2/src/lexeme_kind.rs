@@ -27,16 +27,17 @@ pub enum LexemeKind {
     #[token("}")]
     RCurlyBracket,
 
-    #[regex("[_a-z][_a-zA-Z0-9]*")]
+    #[regex("[_[:lower:]][_[:alnum:]]*")]
     Ident,
 
-    // #[regex(r#"#{([^"}]|("([^"\\]|\\.)*"))*}"#)]
-    // Wasm,
-    #[regex("[A-Z][_a-zA-Z0-9]*")]
+    #[regex(r#"#[[:digit:]]\{([^"}]|("([^"\\]|\\.)*"))*}"#)]
+    Wasm,
+
+    #[regex("[[:upper:]][_[:alnum:]]*")]
     #[regex(r"[#-&*+\-/<=>@\\^|~]+")]
     Unique,
 
-    #[regex("[0-9]+")]
+    #[regex("[[:digit:]]+")]
     Num,
 
     #[regex("//.*")]

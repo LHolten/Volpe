@@ -54,28 +54,12 @@ mod tests {
     use volpe_parser_2::{file::File, offset::Offset};
 
     #[test]
-    fn strict_func() {
-        let mut file = File::default();
-        file.patch(
-            Offset::default(),
-            Offset::default(),
-            "a:(a + 2) 3".to_string(),
-        )
-        .unwrap();
-
-        let instance = compile(&file).unwrap();
-        let main = instance.exports.get_function("main").unwrap();
-        let result = main.call(&[]).unwrap();
-        assert_eq!(result[0], wasmer::Value::I32(5));
-    }
-
-    #[test]
     fn conditional() {
         let mut file = File::default();
         file.patch(
             Offset::default(),
             Offset::default(),
-            "(Test.5, Beta.10, ()) Beta".to_string(),
+            "(Test: 5, Beta: 10, ()) Beta".to_string(),
         )
         .unwrap();
 
@@ -91,7 +75,7 @@ mod tests {
         file.patch(
             Offset::default(),
             Offset::default(),
-            "f.(x.(f (x x)) x.(f (x x))) rec.unique.((A.(rec B), B.1, ()) unique) A".to_string(),
+            "f.(x.(f (x x)) x.(f (x x))) rec.unique.((A: (rec B), B: 1, ()) unique) A".to_string(),
         )
         .unwrap();
 
@@ -126,5 +110,64 @@ mod tests {
         let main = instance.exports.get_function("main").unwrap();
         let result = main.call(&[]).unwrap();
         assert_eq!(result[0], wasmer::Value::I32(10));
+    }
+
+    #[test]
+    fn test_wasm() {
+        let mut file = File::default();
+        file.patch(
+            Offset::default(),
+            Offset::default(),
+            "
+            #2{(i32.add)} 1 2
+            "
+            .to_string(),
+        )
+        .unwrap();
+
+        let instance = compile(&file).unwrap();
+        let main = instance.exports.get_function("main").unwrap();
+        let result = main.call(&[]).unwrap();
+        assert_eq!(result[0], wasmer::Value::I32(3));
+    }
+
+    #[test]
+    fn test_wasm_2() {
+        let mut file = File::default();
+        file.patch(
+            Offset::default(),
+            Offset::default(),
+            "
+            strict = #0{(return_call 0)};
+            strict 10
+            "
+            .to_string(),
+        )
+        .unwrap();
+
+        let instance = compile(&file).unwrap();
+        let main = instance.exports.get_function("main").unwrap();
+        let result = main.call(&[]).unwrap();
+        assert_eq!(result[0], wasmer::Value::I32(10));
+    }
+
+    #[test]
+    fn test_wasm_3() {
+        let mut file = File::default();
+        file.patch(
+            Offset::default(),
+            Offset::default(),
+            "
+            bool = #1{if (result i32) (return_call 0) else (return_call 1) end} 1 0;
+            bool 10
+            "
+            .to_string(),
+        )
+        .unwrap();
+
+        let instance = compile(&file).unwrap();
+        let main = instance.exports.get_function("main").unwrap();
+        let result = main.call(&[]).unwrap();
+        assert_eq!(result[0], wasmer::Value::I32(1));
     }
 }

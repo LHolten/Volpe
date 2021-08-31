@@ -31,6 +31,7 @@ impl LexemeKind {
             LexemeKind::Ident => RuleKind::Terminal,
             LexemeKind::Unique => RuleKind::Terminal,
             LexemeKind::Num => RuleKind::Terminal,
+            LexemeKind::Wasm => RuleKind::Terminal,
             LexemeKind::Error => RuleKind::ClosingBracket,
             _ => RuleKind::Operator,
         }

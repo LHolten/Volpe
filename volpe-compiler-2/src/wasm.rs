@@ -1,6 +1,10 @@
 use string_interner::DefaultSymbol;
 use volpe_parser_2::ast::Simple;
 use wasm_encoder::{Function, Instruction, ValType};
+use wast::{
+    parser::{self, ParseBuffer},
+    Encode, Expression,
+};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Signature {
@@ -64,39 +68,14 @@ impl Compiler {
 impl<'a> FuncCompiler<'a> {
     pub fn build(&mut self, signature: &Signature) -> Kind {
         match &signature.expression {
-            Simple::Abs(strict, new_func) => {
+            Simple::Abs(new_func) => {
                 let mut arg_stack = signature.arg_stack.clone();
                 let arg = arg_stack.pop().unwrap();
-                if *strict {
-                    let signature = Signature {
-                        expression: new_func.as_ref().clone(),
-                        arg_stack,
-                    };
 
-                    let f_index = self
-                        .compiler
-                        .0
-                        .iter()
-                        .position(|entry| entry.signature == signature)
-                        .unwrap_or_else(|| self.compiler.compile_new(&signature));
-
-                    // calculate and push last argument
-                    self.build(&Signature {
-                        expression: arg,
-                        arg_stack: vec![],
-                    });
-                    // push the rest of the arguments to the stack
-                    for i in 0..new_func.strict_len() - 1 {
-                        self.function.instruction(Instruction::LocalGet(i as u32));
-                    }
-                    self.function.instruction(Instruction::Call(f_index as u32)); // need to replace this with tail call
-                    Kind::Num
-                } else {
-                    self.build(&Signature {
-                        expression: new_func.replace(0, &arg),
-                        arg_stack,
-                    })
-                }
+                self.build(&Signature {
+                    expression: new_func.replace(0, &arg),
+                    arg_stack,
+                })
             }
             Simple::App([new_func, arg]) => {
                 let mut arg_stack = signature.arg_stack.clone();
@@ -112,13 +91,13 @@ impl<'a> FuncCompiler<'a> {
             }
             Simple::Num(val) => {
                 self.function.instruction(Instruction::I32Const(*val));
-                self.number(signature)
+                Kind::Num
             }
             Simple::Ident(index) => {
                 // this should only happen inside strict functions
                 self.function
                     .instruction(Instruction::LocalGet(*index as u32));
-                self.number(signature)
+                Kind::Num
             }
             Simple::Case([c, body]) => {
                 let mut arg_stack = signature.arg_stack.clone();
@@ -145,27 +124,98 @@ impl<'a> FuncCompiler<'a> {
                     })
                 }
             }
+            Simple::Wasm(wat) => {
+                let wasm_count = wat[1..2].parse::<usize>().unwrap();
+                let wat = ParseBuffer::new(&wat[3..wat.len() - 1]).unwrap();
+                let expr = parser::parse::<Expression>(&wat).unwrap();
+
+                let branch_count = expr
+                    .instrs
+                    .iter()
+                    .filter_map(|instr| {
+                        if let wast::Instruction::ReturnCall(index) = instr {
+                            if let wast::Index::Num(num, _) = index.0.unwrap_index() {
+                                Some(*num + 1)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .max()
+                    .unwrap_or(0);
+
+                let mut args = signature.arg_stack.clone();
+                let branches = args.split_off(args.len() - branch_count as usize);
+                let wasm_args = args.split_off(args.len() - wasm_count);
+
+                let arg_stack = (0..wasm_args.len())
+                    .map(Simple::Ident)
+                    .rev()
+                    .collect::<Vec<_>>();
+
+                // push wasm args to the stack for usage by inline wasm
+                // these are inner last
+                for arg in wasm_args {
+                    assert!(self
+                        .build(&Signature {
+                            expression: arg,
+                            arg_stack: vec![],
+                        })
+                        .is_num());
+                }
+
+                expr.instrs.iter().for_each(|instr| {
+                    if let wast::Instruction::ReturnCall(index) = instr {
+                        if let wast::Index::Num(num, _) = index.0.unwrap_index() {
+                            let value = &branches[branches.len() - 1 - *num as usize];
+
+                            // greedy evaluation of all new arguments, inner first
+                            for arg in args.iter().rev() {
+                                assert!(self
+                                    .build(&Signature {
+                                        expression: arg.clone(),
+                                        arg_stack: vec![],
+                                    })
+                                    .is_num());
+                            }
+
+                            // push the previous arguments to the stack
+                            for i in 0..value.strict_len() - args.len() {
+                                self.function.instruction(Instruction::LocalGet(i as u32));
+                            }
+
+                            let signature = Signature {
+                                expression: value.clone(),
+                                arg_stack: arg_stack.clone(),
+                            };
+
+                            let f_index = self
+                                .compiler
+                                .0
+                                .iter()
+                                .position(|entry| entry.signature == signature)
+                                .unwrap_or_else(|| self.compiler.compile_new(&signature));
+
+                            let call_string = format!("call {}", f_index);
+                            let call_buf = ParseBuffer::new(&call_string).unwrap();
+                            let call = parser::parse::<wast::Instruction>(&call_buf).unwrap();
+
+                            let mut buf = vec![];
+                            call.encode(&mut buf);
+                            self.function.raw(buf);
+                        }
+                    } else {
+                        let mut buf = vec![];
+                        instr.encode(&mut buf);
+                        self.function.raw(buf);
+                    }
+                });
+
+                Kind::Num
+            }
             Simple::Bot => panic!("evaluated bottom"),
         }
-    }
-
-    pub fn number(&mut self, signature: &Signature) -> Kind {
-        let mut arg_stack = signature.arg_stack.clone();
-        while let Some(op) = arg_stack.pop() {
-            let _op = self
-                .build(&Signature {
-                    expression: op,
-                    arg_stack: vec![],
-                })
-                .as_const();
-            assert!(self
-                .build(&Signature {
-                    expression: arg_stack.pop().unwrap(),
-                    arg_stack: vec![],
-                })
-                .is_num());
-            self.function.instruction(Instruction::I32Add);
-        }
-        Kind::Num
     }
 }

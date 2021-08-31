@@ -10,3 +10,4 @@ volpe-parser-2 = { path = "../volpe-parser-2" }
 wasm-encoder = "0.5.0"
 string-interner = "0.12.2"
 wasmer = "2.0.0"
+wast = { git = "https://github.com/LHolten/wasm-tools" }
