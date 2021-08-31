@@ -90,6 +90,7 @@ impl<'a> FuncCompiler<'a> {
                 Kind::Const(*val)
             }
             Simple::Num(val) => {
+                assert!(signature.arg_stack.is_empty());
                 self.function.instruction(Instruction::I32Const(*val));
                 Kind::Num
             }
@@ -150,14 +151,11 @@ impl<'a> FuncCompiler<'a> {
                 let branches = args.split_off(args.len() - branch_count as usize);
                 let wasm_args = args.split_off(args.len() - wasm_count);
 
-                let arg_stack = (0..wasm_args.len())
-                    .map(Simple::Ident)
-                    .rev()
-                    .collect::<Vec<_>>();
+                let arg_stack = (0..args.len()).map(Simple::Ident).rev().collect::<Vec<_>>();
 
                 // push wasm args to the stack for usage by inline wasm
-                // these are inner last
-                for arg in wasm_args {
+                // these are inner first
+                for arg in wasm_args.into_iter().rev() {
                     assert!(self
                         .build(&Signature {
                             expression: arg,

@@ -158,8 +158,10 @@ mod tests {
             Offset::default(),
             Offset::default(),
             "
-            bool = #1{if (result i32) (return_call 0) else (return_call 1) end} 1 0;
-            bool 10
+            bool = expr.(
+                #1{if (result i32) (return_call 0) else (return_call 1) end} (expr True) (expr False)
+            );
+            bool (True:1; False:0; ()) 1000
             "
             .to_string(),
         )
