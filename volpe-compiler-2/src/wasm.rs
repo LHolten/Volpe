@@ -106,7 +106,7 @@ impl<'a> FuncCompiler<'a> {
                     arg_stack,
                 })
             }
-            Simple::Const(val) => {
+            Simple::Unique(val) => {
                 assert!(signature.arg_stack.is_empty());
                 Kind::Const(*val)
             }
@@ -120,18 +120,19 @@ impl<'a> FuncCompiler<'a> {
                     .instruction(Instruction::LocalGet(*index as u32));
                 self.number(signature)
             }
-            Simple::Case(c, body) => {
+            Simple::Case([c, body]) => {
                 let mut arg_stack = signature.arg_stack.clone();
                 let alternative = arg_stack.pop().unwrap();
                 let value = arg_stack.pop().unwrap();
-                if &self
-                    .build(&Signature {
-                        expression: value.clone(),
-                        arg_stack: vec![],
-                    })
-                    .as_const()
-                    == c
-                {
+                let c = self.build(&Signature {
+                    expression: c.as_ref().clone(),
+                    arg_stack: vec![],
+                });
+                let value_res = self.build(&Signature {
+                    expression: value.clone(),
+                    arg_stack: vec![],
+                });
+                if value_res.as_const() == c.as_const() {
                     self.build(&Signature {
                         expression: body.as_ref().clone(),
                         arg_stack,

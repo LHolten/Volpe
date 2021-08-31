@@ -10,8 +10,10 @@ pub enum LexemeKind {
     Assign,
 
     #[token(".")]
-    #[token(":")]
     Abs,
+
+    #[token(":")]
+    Case,
 
     #[token("(")]
     LRoundBracket,
@@ -32,7 +34,7 @@ pub enum LexemeKind {
     // Wasm,
     #[regex("[A-Z][_a-zA-Z0-9]*")]
     #[regex(r"[#-&*+\-/<=>@\\^|~]+")]
-    Const,
+    Unique,
 
     #[regex("[0-9]+")]
     Num,

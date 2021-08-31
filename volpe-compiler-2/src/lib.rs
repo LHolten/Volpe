@@ -109,17 +109,11 @@ mod tests {
             Offset::default(),
             "
             with = assign.inner.outer.(
-                inner unique.expr.(
-                    value = (
-                        assign,
-                        unique.(outer unique {})
-                    ) unique;
-                    expr value
-                )
+                inner (assign, outer)
             );
             
-            with Alpha.10 (
-                with Beta.5 {
+            with Alpha:{10} (
+                with Beta:{5} {
                     Alpha x.x
                 }
             ) ()

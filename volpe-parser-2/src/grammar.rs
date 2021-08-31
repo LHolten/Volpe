@@ -17,6 +17,7 @@ impl LexemeKind {
             LexemeKind::Assign => 0,
             LexemeKind::App => 2,
             LexemeKind::Abs => 9,
+            LexemeKind::Case => 9,
             _ => unreachable!(),
         }
     }
@@ -28,7 +29,7 @@ impl LexemeKind {
             LexemeKind::LCurlyBracket => RuleKind::OpeningBracket,
             LexemeKind::RCurlyBracket => RuleKind::ClosingBracket,
             LexemeKind::Ident => RuleKind::Terminal,
-            LexemeKind::Const => RuleKind::Terminal,
+            LexemeKind::Unique => RuleKind::Terminal,
             LexemeKind::Num => RuleKind::Terminal,
             LexemeKind::Error => RuleKind::ClosingBracket,
             _ => RuleKind::Operator,

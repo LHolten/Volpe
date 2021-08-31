@@ -14,10 +14,10 @@ use crate::{
 pub enum Simple {
     Abs(bool, Rc<Simple>), //strict
     App([Rc<Simple>; 2]),
-    Const(DefaultSymbol),
+    Unique(DefaultSymbol),
     Ident(usize),
     Num(i32),
-    Case(DefaultSymbol, Rc<Simple>),
+    Case([Rc<Simple>; 2]),
     Bot,
 }
 
@@ -41,7 +41,10 @@ impl Simple {
                 Ordering::Equal => val.clone(),
                 Ordering::Greater => Simple::Ident(index - 1),
             },
-            Simple::Case(symbol, body) => Simple::Case(*symbol, body.replace(depth, val).into()),
+            Simple::Case([symbol, body]) => Simple::Case([
+                symbol.replace(depth, val).into(),
+                body.replace(depth, val).into(),
+            ]),
             _ => self.clone(),
         }
     }
@@ -100,26 +103,19 @@ impl ASTBuilder {
                             }
                         }
                         LexemeKind::Abs => {
-                            let mut constant = false;
                             let ident = match operands[0].as_ref() {
-                                Syntax::Terminal(Ok(Lexeme { text, kind, .. })) => {
-                                    if kind == &LexemeKind::Const {
-                                        constant = true;
-                                    }
+                                Syntax::Terminal(Ok(Lexeme { text, .. })) => {
                                     self.interner.get_or_intern(text)
                                 }
                                 _ => todo!(),
                             };
-                            let strict = operator.text == ":";
-
-                            if constant {
-                                let second = self.convert(env, &operands[1]).into();
-                                Simple::Case(ident, second)
-                            } else {
-                                let second = self.convert(env.push(&ident), &operands[1]).into();
-                                Simple::Abs(strict, second)
-                            }
+                            let second = self.convert(env.push(&ident), &operands[1]).into();
+                            Simple::Abs(false, second)
                         }
+                        LexemeKind::Case => Simple::Case([
+                            self.convert(env, &operands[0]).into(),
+                            self.convert(env, &operands[1]).into(),
+                        ]),
                         _ => unreachable!(),
                     }
                 } else {
@@ -161,7 +157,7 @@ impl ASTBuilder {
                 let symbol = self.interner.get_or_intern(lexeme.text);
                 match lexeme.kind {
                     LexemeKind::Ident => Simple::Ident(env.find(&symbol).unwrap()),
-                    LexemeKind::Const => Simple::Const(symbol),
+                    LexemeKind::Unique => Simple::Unique(symbol),
                     LexemeKind::Num => Simple::Num(lexeme.text.parse().unwrap()),
                     _ => unreachable!(),
                 }
