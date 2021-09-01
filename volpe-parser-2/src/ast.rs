@@ -16,6 +16,7 @@ pub enum Simple {
     App([Rc<Simple>; 2]),
     Unique(DefaultSymbol),
     Ident(usize),
+    Strict(usize),
     Num(i32),
     Case([Rc<Simple>; 2]),
     Wasm(String),
@@ -40,7 +41,7 @@ impl Simple {
             Simple::Ident(index) => match index.cmp(&depth) {
                 Ordering::Less => self.clone(),
                 Ordering::Equal => val.clone(),
-                Ordering::Greater => Simple::Ident(index - 1),
+                Ordering::Greater => unreachable!(),
             },
             Simple::Case([symbol, body]) => Simple::Case([
                 symbol.replace(depth, val).into(),
@@ -52,9 +53,9 @@ impl Simple {
 
     pub fn strict_len(&self) -> usize {
         match self {
-            Simple::Abs(func) => func.strict_len().saturating_sub(1),
+            Simple::Abs(func) => func.strict_len(),
             Simple::App([func, arg]) => func.strict_len().max(arg.strict_len()),
-            Simple::Ident(i) => i + 1,
+            Simple::Strict(i) => i + 1,
             _ => 0,
         }
     }

@@ -26,7 +26,7 @@ pub fn compile(file: &File) -> Result<Instance, Box<dyn std::error::Error>> {
     let mut functions = FunctionSection::new();
     let mut codes = CodeSection::new();
     for (t, entry) in compiler.0.iter().enumerate() {
-        let strict_len = entry.signature.expression.strict_len();
+        let strict_len = entry.signature.expression.strict_len() + entry.signature.arg_stack.len();
         types.function((0..strict_len).map(|_| ValType::I32), vec![ValType::I32]);
         functions.function(t as u32);
         codes.function(entry.function.as_ref().ok_or("")?);
@@ -171,5 +171,58 @@ mod tests {
         let main = instance.exports.get_function("main").unwrap();
         let result = main.call(&[]).unwrap();
         assert_eq!(result[0], wasmer::Value::I32(1));
+    }
+
+    #[test]
+    fn test_factorial() {
+        let mut file = File::default();
+        file.patch(
+            Offset::default(),
+            Offset::default(),
+            "
+            fix = f.(x.(f (x x)) x.(f (x x)));
+
+            int = fix int.x.(
+                Eval: x;
+                -:   y.(int (#2{i32.sub} x y) );
+                *:   y.(int (#2{i32.mul} x y) );
+                ==:  y.(int (#2{i32.eq} x y) );
+                ()
+            );
+
+            if = cond.then.else.(
+                #1{if (result i32) (return_call 0) else (return_call 1) end} then else cond
+            );
+
+            strict = #0{(return_call 0)};
+
+            loop = fix loop.expr.(
+                expr (
+                    Continue: (strict (loop expr));
+                    Break: {};
+                    ()
+                )
+            );
+
+            factorial = n.(
+                {1 n};
+                loop ret.a.n.(
+                    if (int n == 1 Eval) (ret Break a);
+                    a = int a * n Eval;
+                    n = int n - 1 Eval;
+                    (ret Continue a n)
+                )
+            );
+
+            factorial 10
+            "
+            .to_string(),
+        )
+        .unwrap();
+
+        let instance = compile(&file).unwrap();
+        let main = instance.exports.get_function("main").unwrap();
+        let result = main.call(&[]).unwrap();
+        assert_eq!(result[0], wasmer::Value::I32(3628800));
     }
 }

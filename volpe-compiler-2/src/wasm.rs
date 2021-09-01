@@ -52,7 +52,7 @@ impl Compiler {
             function: None,
         });
 
-        let strict_len = signature.expression.strict_len();
+        let strict_len = signature.expression.strict_len() + signature.arg_stack.len();
         let mut func_compiler = FuncCompiler {
             compiler: self,
             function: Function::new((0..strict_len).map(|x| (x as u32, ValType::I32))),
@@ -94,12 +94,13 @@ impl<'a> FuncCompiler<'a> {
                 self.function.instruction(Instruction::I32Const(*val));
                 Kind::Num
             }
-            Simple::Ident(index) => {
+            Simple::Strict(index) => {
                 // this should only happen inside strict functions
                 self.function
                     .instruction(Instruction::LocalGet(*index as u32));
                 Kind::Num
             }
+            Simple::Ident(_) => unreachable!(),
             Simple::Case([c, body]) => {
                 let mut arg_stack = signature.arg_stack.clone();
                 let alternative = arg_stack.pop().unwrap();
@@ -151,8 +152,6 @@ impl<'a> FuncCompiler<'a> {
                 let branches = args.split_off(args.len() - branch_count as usize);
                 let wasm_args = args.split_off(args.len() - wasm_count);
 
-                let arg_stack = (0..args.len()).map(Simple::Ident).rev().collect::<Vec<_>>();
-
                 // push wasm args to the stack for usage by inline wasm
                 // these are inner first
                 for arg in wasm_args.into_iter().rev() {
@@ -168,9 +167,19 @@ impl<'a> FuncCompiler<'a> {
                     if let wast::Instruction::ReturnCall(index) = instr {
                         if let wast::Index::Num(num, _) = index.0.unwrap_index() {
                             let value = &branches[branches.len() - 1 - *num as usize];
+                            let strict_len = value.strict_len();
+
+                            let arg_stack = (strict_len..strict_len + args.len())
+                                .map(Simple::Strict)
+                                .collect::<Vec<_>>();
+
+                            // push the previous arguments to the stack
+                            for i in 0..strict_len {
+                                self.function.instruction(Instruction::LocalGet(i as u32));
+                            }
 
                             // greedy evaluation of all new arguments, inner first
-                            for arg in args.iter().rev() {
+                            for arg in args.iter() {
                                 assert!(self
                                     .build(&Signature {
                                         expression: arg.clone(),
@@ -179,14 +188,9 @@ impl<'a> FuncCompiler<'a> {
                                     .is_num());
                             }
 
-                            // push the previous arguments to the stack
-                            for i in 0..value.strict_len() - args.len() {
-                                self.function.instruction(Instruction::LocalGet(i as u32));
-                            }
-
                             let signature = Signature {
                                 expression: value.clone(),
-                                arg_stack: arg_stack.clone(),
+                                arg_stack,
                             };
 
                             let f_index = self
