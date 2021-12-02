@@ -1,0 +1,43 @@
+fix = f.(x.(f (x x)) x.(f (x x)));
+
+int = fix int.x.(
+    Eval: x;
+    +:   y.(int (#2{(i32.add)} x y) );
+    -:   y.(int (#2{(i32.sub)} x y) );
+    *:   y.(int (#2{(i32.mul)} x y) );
+    /:   y.(int (#2{(i32.div_s)} x y) );
+    %:   y.(int (#2{(i32.rem_s)} x y) );
+    =/=: y.(int (#2{(i32.ne)} x y) );
+    ==:  y.(int (#2{(i32.eq)} x y) );
+    >:   y.(int (#2{(i32.gt_s)} x y) );
+    <:   y.(int (#2{(i32.lt_s)} x y) );
+    >=:  y.(int (#2{(i32.ge_s)} x y) );
+    <=:  y.(int (#2{(i32.le_s)} x y) );
+    ()
+);
+
+if = cond.then.else.(
+    #1{if (result i32) (return_call 0) else (return_call 1) end} then else cond
+);
+
+strict = #0{(return_call 0)};
+
+loop = fix loop.expr.cont.(
+    expr (
+        Continue: (strict (loop expr cont));
+        Break: cont;
+        ()
+    )
+);
+
+factorial = n.(
+    {1 n};
+    loop a.n.(
+        if (int n == 1 Eval) {Break a};
+        a = int a * n Eval;
+        n = int n - 1 Eval;
+        {Continue a n}
+    ) {}
+);
+
+factorial 1

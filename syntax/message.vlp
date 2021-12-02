@@ -1,0 +1,54 @@
+# this is nice
+range 10 filter {% 2 == 0} each {print}
+range 10 map {x. x * x} each {print}
+
+
+
+
+
+int 10 + 20 / 30 alpha.
+
+
+u32 20 - (u32 5) [total]
+range (total)
+  map {[x] x * (x)}
+  each {print}
+
+
+# one way to get rid of brackets in assigment
+
+
+
+total. 20 - 5
+each {print} map {x * (x) x.} range (total)
+
+
+
+{ [attr]
+    { [value]
+        value [attr]
+        struct
+    }
+} [struct]
+
+
+struct
+    alpha (u32 0)
+    beta (u32 1)
+[ab_obj]
+
+
+
+
+range: (
+    each: (
+
+    )
+)
+
+
+
+
+`{}` and `()` have to start with a unique
+the difference is that the content of `{}` is to an argument
+while the content of `()` is applied to the scope
