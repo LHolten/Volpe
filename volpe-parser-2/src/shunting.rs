@@ -5,94 +5,71 @@ use crate::{
     grammar::RuleKind,
     lexeme_kind::LexemeKind,
     offset::Offset,
-    syntax::{Lexeme, Syntax},
+    syntax::{Contained, Lexeme, Semicolon},
 };
 
 pub struct Yard<'a> {
-    terminals: Vec<Syntax<'a, ()>>,
-    stack: Vec<Option<Lexeme<'a>>>, // holds the operators that still need to be executed
+    terminals: Vec<Vec<Contained<'a, ()>>>,
+    stack: Vec<Lexeme<'a>>, // holds the operators that still need to be executed
     last_kind: RuleKind,
 }
 
 impl<'a> Yard<'a> {
-    fn stack_can_hold(&self, lexeme_kind: &LexemeKind) -> bool {
+    fn stack_is_semi(&self) -> bool {
         if let Some(op) = self.stack.last() {
-            if let Some(op) = op {
-                op.kind.stack_can_hold(lexeme_kind)
-            } else {
-                LexemeKind::App.stack_can_hold(lexeme_kind)
-            }
+            matches!(op.kind, LexemeKind::Semicolon)
         } else {
-            true
+            false
         }
     }
 
     fn new() -> Self {
         Self {
-            terminals: Vec::new(),
-            stack: Vec::new(),
-            last_kind: RuleKind::Operator,
+            terminals: vec![vec![]],
+            stack: vec![],
+            last_kind: RuleKind::Semicolon,
         }
     }
 
-    fn pop_terminal(&mut self) -> Syntax<'a, ()> {
-        self.terminals.pop().unwrap()
+    // this pops of all semicolon operators and returns the result
+    fn reduce(&mut self) -> Semicolon<'a, ()> {
+        let mut result = Semicolon::Syntax(self.terminals.pop().unwrap());
+        while self.stack_is_semi() {
+            result = Semicolon::Semi {
+                left: self.terminals.pop().unwrap(),
+                semi: self.stack.pop().unwrap(),
+                right: result.into(),
+            };
+        }
+        result
     }
 
-    fn begin_terminal(&mut self) {
-        if matches!(
-            self.last_kind,
-            RuleKind::Terminal | RuleKind::ClosingBracket
-        ) {
-            self.begin_operator(&LexemeKind::App);
-            self.stack.push(None);
-        }
-    }
-
-    fn begin_operator(&mut self, lexeme_kind: &LexemeKind) {
-        if matches!(
-            self.last_kind,
-            RuleKind::Operator | RuleKind::OpeningBracket
-        ) {
-            self.terminals.push(Syntax::Terminal(Err(())));
-        }
-
-        while !self.stack_can_hold(lexeme_kind) {
-            let second = self.pop_terminal().into(); // needed to get the correct operand order
-            let first = self.pop_terminal().into();
-            self.terminals.push(Syntax::Operator {
-                operator: self.stack.pop().unwrap(),
-                operands: [first, second],
-            });
-        }
+    fn add_terminal(&mut self, terminal: Contained<'a, ()>) {
+        // find where the terminal needs to be inserted
+        // if it is on a newline then it is inserted at the start
+        // if it is on the same line it is inserted just after the last item of that line
+        let list = self.terminals.last_mut().unwrap();
+        let prev_index = list.iter().rposition(|item| item.end() == terminal.start());
+        let index = prev_index.map(|i| i + 1).unwrap_or(0);
+        list.insert(index, terminal);
     }
 
     fn shunt(&mut self, lexeme: Lexeme<'a>) {
         let rule_kind = lexeme.kind.rule_kind();
         match rule_kind {
-            RuleKind::OpeningBracket => {
-                self.begin_terminal();
-                self.stack.push(Some(lexeme));
-            }
+            RuleKind::OpeningBracket => self.stack.push(lexeme),
             RuleKind::ClosingBracket => {
-                self.begin_operator(&lexeme.kind);
-                let open = self.stack.pop().map(Option::unwrap).ok_or(());
-                let inner = match self.pop_terminal() {
-                    Syntax::Terminal(Err(())) => None,
-                    val => Some(val.into()),
-                };
-                self.terminals.push(Syntax::Brackets {
-                    inner,
+                let inner = self.reduce();
+                let open = self.stack.pop().ok_or(());
+                self.add_terminal(Contained::Brackets {
+                    inner: inner.into(),
                     brackets: [open, Ok(lexeme)],
                 });
             }
-            RuleKind::Terminal => {
-                self.begin_terminal();
-                self.terminals.push(Syntax::Terminal(Ok(lexeme)))
-            }
-            RuleKind::Operator => {
-                self.begin_operator(&lexeme.kind);
-                self.stack.push(Some(lexeme))
+            RuleKind::Terminal => self.add_terminal(Contained::Terminal(lexeme)),
+            RuleKind::Semicolon => {
+                self.terminals.push(vec![]); // start a new list of terminal
+                self.stack.push(lexeme)
             }
         }
         self.last_kind = rule_kind
@@ -100,7 +77,7 @@ impl<'a> Yard<'a> {
 }
 
 impl File {
-    pub fn rule(&self) -> Syntax<()> {
+    pub fn rule(&self) -> Semicolon<()> {
         let mut yard = Yard::new();
 
         for (line_num, line) in self.lines.iter().enumerate() {
@@ -123,22 +100,16 @@ impl File {
             }
         }
 
-        while let Some(lexeme) = {
-            yard.begin_operator(&LexemeKind::RRoundBracket);
-            yard.stack.pop()
-        } {
-            let inner = match yard.pop_terminal() {
-                Syntax::Terminal(Err(())) => None,
-                val => Some(val.into()),
-            };
-            yard.terminals.push(Syntax::Brackets {
-                inner,
-                brackets: [Ok(lexeme.unwrap()), Err(())],
+        let mut result = yard.reduce();
+        while let Some(lexeme) = yard.stack.pop() {
+            yard.add_terminal(Contained::Brackets {
+                inner: result.into(),
+                brackets: [Ok(lexeme), Err(())],
             });
-            yard.last_kind = RuleKind::ClosingBracket;
+            result = yard.reduce();
         }
 
-        assert_eq!(yard.terminals.len(), 1);
-        yard.pop_terminal()
+        assert_eq!(yard.terminals.len(), 0);
+        result
     }
 }

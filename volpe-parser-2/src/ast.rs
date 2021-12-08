@@ -1,26 +1,21 @@
-use std::{cmp::Ordering, rc::Rc};
+use std::ops::ControlFlow;
 
-use string_interner::{DefaultSymbol, StringInterner};
+use string_interner::{StringInterner, Symbol};
 use void::{ResultVoidExt, Void};
 
 use crate::{
     lexeme_kind::LexemeKind,
-    stack_list::StackList,
-    syntax::{Lexeme, Syntax},
+    syntax::{Contained, Semicolon},
 };
 
 // this type can only hold the desugared version of the source code
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Simple {
-    Abs(Rc<Simple>),
-    App([Rc<Simple>; 2]),
-    Unique(DefaultSymbol),
+    Push(Vec<Simple>),
+    Pop(Vec<usize>),
     Ident(usize),
-    Strict(usize),
     Num(i32),
-    Case([Rc<Simple>; 2]),
-    Wasm(String),
-    Bot,
+    Raw(String),
 }
 
 impl Simple {
@@ -31,32 +26,29 @@ impl Simple {
         }
     }
 
-    pub fn replace(&self, depth: usize, val: &Simple) -> Self {
+    pub fn replace(&mut self, name: usize, val: &Simple) -> ControlFlow<()> {
         match self {
-            Simple::Abs(func) => Simple::Abs(func.replace(depth + 1, val).into()),
-            Simple::App([func, arg]) => Simple::App([
-                func.replace(depth, val).into(),
-                arg.replace(depth, val).into(),
-            ]),
-            Simple::Ident(index) => match index.cmp(&depth) {
-                Ordering::Less => self.clone(),
-                Ordering::Equal => val.clone(),
-                Ordering::Greater => unreachable!(),
-            },
-            Simple::Case([symbol, body]) => Simple::Case([
-                symbol.replace(depth, val).into(),
-                body.replace(depth, val).into(),
-            ]),
-            _ => self.clone(),
-        }
-    }
-
-    pub fn strict_len(&self) -> usize {
-        match self {
-            Simple::Abs(func) => func.strict_len(),
-            Simple::App([func, arg]) => func.strict_len().max(arg.strict_len()),
-            Simple::Strict(i) => i + 1,
-            _ => 0,
+            Simple::Push(inner) => {
+                inner
+                    .iter_mut()
+                    .rev()
+                    .try_for_each(|item| item.replace(name, val));
+                ControlFlow::Continue(())
+            }
+            Simple::Pop(names) => {
+                if names.contains(&name) {
+                    ControlFlow::Break(())
+                } else {
+                    ControlFlow::Continue(())
+                }
+            }
+            Simple::Ident(id) => {
+                if *id == name {
+                    *self = val.clone()
+                }
+                ControlFlow::Continue(())
+            }
+            _ => ControlFlow::Continue(()),
         }
     }
 }
@@ -67,103 +59,61 @@ pub struct ASTBuilder {
 }
 
 impl ASTBuilder {
-    pub fn convert<'a>(
-        &mut self,
-        env: StackList<DefaultSymbol>,
-        syntax: impl AsRef<Syntax<'a, Void>>,
-    ) -> Simple {
-        match syntax.as_ref() {
-            Syntax::Operator { operator, operands } => {
-                if let Some(operator) = operator {
-                    match operator.kind {
-                        LexemeKind::Semicolon => Simple::App([
-                            self.convert(env, &operands[0]).into(),
-                            self.convert(env, &operands[1]).into(),
-                        ]),
-                        LexemeKind::Assign => {
-                            let ident = match operands[0].as_ref() {
-                                Syntax::Terminal(Ok(Lexeme { text, .. })) => {
-                                    self.interner.get_or_intern(text)
-                                }
-                                _ => todo!(),
-                            };
-
-                            match operands[1].as_ref() {
-                                Syntax::Operator { operator, operands } => {
-                                    assert_eq!(operator.unwrap().kind, LexemeKind::Semicolon);
-
-                                    let func = Simple::Abs(
-                                        self.convert(env.push(&ident), &operands[1]).into(),
-                                    );
-                                    Simple::App([
-                                        func.into(),
-                                        self.convert(env, &operands[0]).into(),
-                                    ])
-                                }
-                                _ => unreachable!(),
-                            }
-                        }
-                        LexemeKind::Abs => {
-                            let ident = match operands[0].as_ref() {
-                                Syntax::Terminal(Ok(Lexeme { text, .. })) => {
-                                    self.interner.get_or_intern(text)
-                                }
-                                _ => todo!(),
-                            };
-                            let second = self.convert(env.push(&ident), &operands[1]).into();
-                            Simple::Abs(second)
-                        }
-                        LexemeKind::Case => Simple::Case([
-                            self.convert(env, &operands[0]).into(),
-                            self.convert(env, &operands[1]).into(),
-                        ]),
-                        _ => unreachable!(),
-                    }
-                } else {
-                    let item = self.convert(env, &operands[0]).into();
-                    Simple::App([item, self.convert(env, &operands[1]).into()])
+    pub fn convert_contained<'a>(&mut self, syntax: &Contained<'a, Void>) -> Simple {
+        match syntax {
+            Contained::Brackets { brackets, inner } => match brackets[0].void_unwrap().kind {
+                LexemeKind::LRoundBracket => Simple::Push(self.convert_semicolon(inner)),
+                LexemeKind::LCurlyBracket => {
+                    let mut result = self.convert_semicolon(inner);
+                    result.push(Simple::Pop(vec![0]));
+                    result.insert(0, Simple::Ident(0));
+                    Simple::Push(result)
                 }
-            }
-            Syntax::Brackets { brackets, inner } => match brackets[0].void_unwrap().kind {
-                LexemeKind::LRoundBracket => inner
-                    .as_ref()
-                    .map(|inner| self.convert(env, inner))
-                    .unwrap_or_else(|| Simple::Bot),
-                LexemeKind::LCurlyBracket => Simple::Abs({
-                    // this is just to increment the env local count
-                    let ident = self.interner.get_or_intern_static("$");
-                    let env = env.push(&ident);
-
-                    let mut func_call = Simple::Ident(0);
-                    if let Some(mut item) = inner.as_ref() {
-                        while let Syntax::Operator {
-                            operator: None,
-                            operands,
-                        } = item.as_ref()
-                        {
-                            func_call = Simple::App([
-                                func_call.into(),
-                                self.convert(env, &operands[0]).into(),
-                            ]);
-                            item = &operands[1]
-                        }
-                        func_call = Simple::App([func_call.into(), self.convert(env, item).into()]);
-                    }
-                    func_call.into()
-                }),
+                LexemeKind::LSquareBracket => Simple::Pop(
+                    self.convert_semicolon(inner)
+                        .iter()
+                        .map(Simple::as_ident)
+                        .collect(),
+                ),
                 _ => unreachable!(),
             },
-            Syntax::Terminal(l) => {
-                let lexeme = l.void_unwrap();
+            Contained::Terminal(lexeme) => {
                 let symbol = self.interner.get_or_intern(lexeme.text);
                 match lexeme.kind {
-                    LexemeKind::Ident => Simple::Ident(env.find(&symbol).unwrap()),
-                    LexemeKind::Unique => Simple::Unique(symbol),
+                    LexemeKind::Ident => Simple::Ident(symbol.to_usize()),
+                    LexemeKind::Operator => Simple::Push(vec![Simple::Ident(symbol.to_usize())]),
                     LexemeKind::Num => Simple::Num(lexeme.text.parse().unwrap()),
-                    LexemeKind::Wasm => Simple::Wasm(lexeme.text.to_string()),
+                    LexemeKind::Wasm => Simple::Raw(lexeme.text.to_string()),
                     _ => unreachable!(),
                 }
             }
+        }
+    }
+
+    pub fn convert_semicolon<'a>(
+        &mut self,
+        syntax: impl AsRef<Semicolon<'a, Void>>,
+    ) -> Vec<Simple> {
+        match syntax.as_ref() {
+            Semicolon::Semi {
+                left,
+                semi: operator,
+                right,
+            } => {
+                let prev_index = left
+                    .iter()
+                    .rposition(|item| item.end() == Some(operator.start));
+                let index = prev_index.map(|i| i + 1).unwrap_or(0);
+
+                let mut result = left
+                    .iter()
+                    .map(|c| self.convert_contained(c))
+                    .collect::<Vec<_>>();
+
+                result.insert(index, Simple::Push(self.convert_semicolon(right)));
+                result
+            }
+            Semicolon::Syntax(syntax) => syntax.iter().map(|c| self.convert_contained(c)).collect(),
         }
     }
 }

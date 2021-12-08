@@ -3,17 +3,7 @@ use logos::Logos;
 #[derive(Logos, Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum LexemeKind {
     #[regex(";")]
-    #[regex(",")]
     Semicolon,
-
-    #[token("=")]
-    Assign,
-
-    #[token(".")]
-    Abs,
-
-    #[token(":")]
-    Case,
 
     #[token("(")]
     LRoundBracket,
@@ -27,15 +17,20 @@ pub enum LexemeKind {
     #[token("}")]
     RCurlyBracket,
 
-    #[regex("[_[:lower:]][_[:alnum:]]*")]
+    #[token("[")]
+    LSquareBracket,
+
+    #[token("]")]
+    RSquareBracket,
+
+    #[regex("[_[:alpha:]][_[:alnum:]]*")]
     Ident,
 
     #[regex(r#"#[[:digit:]]\{([^"}]|("([^"\\]|\\.)*"))*}"#)]
     Wasm,
 
-    #[regex("[[:upper:]][_[:alnum:]]*")]
     #[regex(r"[#-&*+\-/<=>@\\^|~]+")]
-    Unique,
+    Operator,
 
     #[regex("[[:digit:]]+")]
     Num,

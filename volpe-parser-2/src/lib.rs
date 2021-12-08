@@ -10,7 +10,6 @@ mod grammar;
 pub mod lexeme_kind;
 pub mod offset;
 mod shunting;
-pub mod stack_list;
 pub mod syntax;
 pub mod validate;
 
