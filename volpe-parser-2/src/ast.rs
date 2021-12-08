@@ -102,7 +102,7 @@ impl ASTBuilder {
             } => {
                 let prev_index = left
                     .iter()
-                    .rposition(|item| item.end() == Some(operator.start));
+                    .rposition(|item| item.end().map(|o| o.line) == Some(operator.start.line));
                 let index = prev_index.map(|i| i + 1).unwrap_or(0);
 
                 let mut result = left

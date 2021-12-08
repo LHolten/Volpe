@@ -49,7 +49,9 @@ impl<'a> Yard<'a> {
         // if it is on a newline then it is inserted at the start
         // if it is on the same line it is inserted just after the last item of that line
         let list = self.terminals.last_mut().unwrap();
-        let prev_index = list.iter().rposition(|item| item.end() == terminal.start());
+        let prev_index = list
+            .iter()
+            .rposition(|item| item.end().map(|o| o.line) == terminal.start().map(|o| o.line));
         let index = prev_index.map(|i| i + 1).unwrap_or(0);
         list.insert(index, terminal);
     }
