@@ -57,7 +57,10 @@ impl<'a> Yard<'a> {
     fn shunt(&mut self, lexeme: Lexeme<'a>) {
         let rule_kind = lexeme.kind.rule_kind();
         match rule_kind {
-            RuleKind::OpeningBracket => self.stack.push(lexeme),
+            RuleKind::OpeningBracket => {
+                self.terminals.push(vec![]); // start a new list of terminal
+                self.stack.push(lexeme)
+            }
             RuleKind::ClosingBracket => {
                 let inner = self.reduce();
                 let open = self.stack.pop().ok_or(());

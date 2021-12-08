@@ -29,8 +29,10 @@ impl LexemeKind {
         match self {
             LexemeKind::LCurlyBracket => LexemeKind::RCurlyBracket,
             LexemeKind::LRoundBracket => LexemeKind::RRoundBracket,
+            LexemeKind::LSquareBracket => LexemeKind::RSquareBracket,
             LexemeKind::RCurlyBracket => LexemeKind::LCurlyBracket,
             LexemeKind::RRoundBracket => LexemeKind::LRoundBracket,
+            LexemeKind::RSquareBracket => LexemeKind::LSquareBracket,
             _ => unreachable!(),
         }
     }
