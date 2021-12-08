@@ -10,10 +10,11 @@ pub type PatchResult = Result<(), PatchError>;
 impl File {
     pub fn patch(&mut self, offset: Offset, length: Offset, mut text: String) -> PatchResult {
         let end = offset + length;
-        if offset.line >= self.lines.len() || offset.char > self.lines[offset.line].len() {
+        if offset.line >= self.lines.len() || !self.lines[offset.line].is_char_boundary(offset.char)
+        {
             return Err(PatchError::OffsetOutOfRange);
         }
-        if end.line >= self.lines.len() || end.char > self.lines[end.line].len() {
+        if end.line >= self.lines.len() || !self.lines[end.line].is_char_boundary(end.char) {
             return Err(PatchError::LengthOutOfRange);
         }
 

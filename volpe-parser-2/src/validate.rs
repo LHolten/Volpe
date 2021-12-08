@@ -53,7 +53,7 @@ impl<'a> Semicolon<'a, ()> {
                     Err(mut errors) => {
                         // check if there are more errors in the right hand side
                         errors.extend(right.collect().err().into_iter().flatten());
-                        Result::Err(errors)
+                        Err(errors)
                     }
                     Ok(left) => Ok(Semicolon::Semi {
                         left,

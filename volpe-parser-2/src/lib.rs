@@ -30,7 +30,7 @@ mod test {
         let mut file = File::default();
         file.patch(Offset::char(0), Offset::char(0), "+ (1) 1".to_string())
             .unwrap();
-        dbg!(file.rule());
+        file.rule();
     }
 
     #[test]
@@ -45,7 +45,9 @@ mod test {
     fn fuzz_incr_edits_001() -> PatchResult {
         let mut file = File::default();
         file.patch(Offset::default(), Offset::default(), "ȃ".to_string())?;
-        file.patch(Offset::char(1), Offset::char(0), "".to_string())?;
+        assert!(file
+            .patch(Offset::char(1), Offset::char(0), "".to_string())
+            .is_err());
         file.rule();
         Ok(())
     }
