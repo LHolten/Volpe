@@ -26,8 +26,8 @@ pub enum LexemeKind {
     #[regex("[_[:alpha:]][_[:alnum:]]*")]
     Ident,
 
-    #[regex(r#"#[[:digit:]]\{([^"}]|("([^"\\]|\\.)*"))*}"#)]
-    Wasm,
+    #[regex(r#"#\{([^"}]|("([^"\\]|\\.)*"))*}"#)]
+    Raw,
 
     #[regex(r"[#-&*+\-/<=>@\\^|~]+")]
     Operator,

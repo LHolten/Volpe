@@ -5,6 +5,7 @@ extern crate void;
 pub mod ast;
 mod display;
 pub mod error;
+pub mod eval;
 pub mod file;
 mod grammar;
 pub mod lexeme_kind;
@@ -16,6 +17,8 @@ pub mod validate;
 #[cfg(test)]
 mod test {
     use crate::{
+        ast::ASTBuilder,
+        eval::Evaluator,
         file::{File, PatchResult},
         offset::Offset,
     };
@@ -57,6 +60,30 @@ mod test {
         let mut file = File::default();
         file.patch(Offset::default(), Offset::default(), "%=>".to_string())?;
         file.rule();
+        Ok(())
+    }
+
+    #[test]
+    fn test_eval() -> PatchResult {
+        let mut file = File::default();
+        file.patch(
+            Offset::default(),
+            Offset::default(),
+            "
+            [i32] ( [n]
+                #{(i32.const }
+                n
+                #{)}
+            )
+            [add] (#{(i32.add)})
+
+            add i32(1) i32(2) 
+            "
+            .to_string(),
+        )?;
+        let syntax = dbg!(file.rule().collect().unwrap());
+        let ast = dbg!(ASTBuilder::default().convert_semicolon(&syntax));
+        dbg!(Evaluator::eval(ast));
         Ok(())
     }
 }

@@ -1,5 +1,3 @@
-use std::ops::ControlFlow;
-
 use string_interner::{StringInterner, Symbol};
 use void::{ResultVoidExt, Void};
 
@@ -14,8 +12,26 @@ pub enum Simple {
     Push(Vec<Simple>),
     Pop(Vec<usize>),
     Ident(usize),
-    Num(i32),
     Raw(String),
+}
+
+pub fn replace_simple(list: &mut Vec<Simple>, name: usize, val: &[Simple]) {
+    for i in (0..list.len()).rev() {
+        match &mut list[i] {
+            Simple::Push(inner) => replace_simple(inner, name, val),
+            Simple::Pop(names) => {
+                if names.contains(&name) {
+                    return;
+                }
+            }
+            Simple::Ident(n) => {
+                if *n == name {
+                    list.splice(i..i + 1, val.iter().cloned());
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 impl Simple {
@@ -23,32 +39,6 @@ impl Simple {
         match self {
             Simple::Ident(val) => *val,
             _ => unreachable!(),
-        }
-    }
-
-    pub fn replace(&mut self, name: usize, val: &Simple) -> ControlFlow<()> {
-        match self {
-            Simple::Push(inner) => {
-                inner
-                    .iter_mut()
-                    .rev()
-                    .try_for_each(|item| item.replace(name, val));
-                ControlFlow::Continue(())
-            }
-            Simple::Pop(names) => {
-                if names.contains(&name) {
-                    ControlFlow::Break(())
-                } else {
-                    ControlFlow::Continue(())
-                }
-            }
-            Simple::Ident(id) => {
-                if *id == name {
-                    *self = val.clone()
-                }
-                ControlFlow::Continue(())
-            }
-            _ => ControlFlow::Continue(()),
         }
     }
 }
@@ -59,7 +49,7 @@ pub struct ASTBuilder {
 }
 
 impl ASTBuilder {
-    pub fn convert_contained<'a>(&mut self, syntax: &Contained<'a, Void>) -> Simple {
+    pub fn convert_contained(&mut self, syntax: &Contained<'_, Void>) -> Simple {
         match syntax {
             Contained::Brackets { brackets, inner } => match brackets[0].void_unwrap().kind {
                 LexemeKind::LRoundBracket => Simple::Push(self.convert_semicolon(inner)),
@@ -82,19 +72,18 @@ impl ASTBuilder {
                 match lexeme.kind {
                     LexemeKind::Ident => Simple::Ident(symbol.to_usize()),
                     LexemeKind::Operator => Simple::Push(vec![Simple::Ident(symbol.to_usize())]),
-                    LexemeKind::Num => Simple::Num(lexeme.text.parse().unwrap()),
-                    LexemeKind::Wasm => Simple::Raw(lexeme.text.to_string()),
+                    LexemeKind::Num => Simple::Raw(lexeme.text.to_string()),
+                    LexemeKind::Raw => {
+                        Simple::Raw(lexeme.text[2..lexeme.text.len() - 1].to_string())
+                    }
                     _ => unreachable!(),
                 }
             }
         }
     }
 
-    pub fn convert_semicolon<'a>(
-        &mut self,
-        syntax: impl AsRef<Semicolon<'a, Void>>,
-    ) -> Vec<Simple> {
-        match syntax.as_ref() {
+    pub fn convert_semicolon(&mut self, syntax: &Semicolon<'_, Void>) -> Vec<Simple> {
+        match syntax {
             Semicolon::Semi {
                 left,
                 semi: operator,
