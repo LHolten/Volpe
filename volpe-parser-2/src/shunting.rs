@@ -65,7 +65,7 @@ impl<'a> Yard<'a> {
             }
             RuleKind::ClosingBracket => {
                 let inner = self.reduce();
-                let open = self.stack.pop().ok_or(());
+                let open = self.stack.pop().ok_or_else(|| self.terminals.push(vec![]));
                 self.add_terminal(Contained::Brackets {
                     inner: inner.into(),
                     brackets: [open, Ok(lexeme)],
