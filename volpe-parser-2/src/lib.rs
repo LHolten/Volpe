@@ -80,6 +80,16 @@ mod test {
     }
 
     #[test]
+    fn fuzz_incr_edits_005() -> PatchResult {
+        let mut file = File::default();
+        file.patch(Offset::default(), Offset::default(), "[1]".to_string())?;
+        if let Ok(syntax) = file.rule().collect() {
+            ASTBuilder::default().convert_semicolon(&syntax);
+        }
+        Ok(())
+    }
+
+    #[test]
     fn test_eval() -> PatchResult {
         let mut file = File::default();
         file.patch(
