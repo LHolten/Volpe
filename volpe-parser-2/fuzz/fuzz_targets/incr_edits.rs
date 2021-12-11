@@ -1,6 +1,6 @@
 #![no_main]
 use libfuzzer_sys::{arbitrary::Arbitrary, fuzz_target};
-use volpe_parser_2::{file::File, offset::Offset};
+use volpe_parser_2::{file::File, offset::Offset, ast::ASTBuilder};
 
 #[derive(Debug, Arbitrary)]
 struct Edit {
@@ -20,12 +20,14 @@ fuzz_target!(|edits: Vec<Edit>| {
             if !s.chars().all(|c| c.is_ascii()) { return; }
             let offset = to_offset(edit.offset);
             let length = to_offset(edit.length);
-            if let Err(_) = file.patch(offset, length, s.to_string()) {
+            if file.patch(offset, length, s.to_string()).is_err() {
                 return;
             }
         } else {
             return;
         }
     }
-    file.rule();
+    if let Ok(syntax) = file.rule().collect() {
+        ASTBuilder::default().convert_semicolon(&syntax);
+    }
 });
