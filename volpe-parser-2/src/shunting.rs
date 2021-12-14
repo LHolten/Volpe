@@ -4,7 +4,7 @@ use crate::{
     file::File,
     grammar::RuleKind,
     lexeme_kind::LexemeKind,
-    offset::Offset,
+    offset::{Offset, Range},
     syntax::{Contained, Lexeme, Semicolon},
 };
 
@@ -95,10 +95,12 @@ impl File {
                 let span = lexemes.span();
 
                 let lexeme = Lexeme {
-                    start: Offset::new(line_num, span.start),
-                    end: Offset::new(line_num, span.end),
                     kind,
-                    text: &line[span.start..span.end],
+                    range: Range {
+                        start: Offset::new(line_num, span.start),
+                        end: Offset::new(line_num, span.end),
+                        text: &line[span.start..span.end],
+                    },
                 };
 
                 yard.shunt(lexeme);

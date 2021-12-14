@@ -2,7 +2,6 @@ extern crate logos;
 extern crate string_interner;
 extern crate void;
 
-pub mod ast;
 mod display;
 pub mod error;
 pub mod eval;
@@ -11,13 +10,13 @@ mod grammar;
 pub mod lexeme_kind;
 pub mod offset;
 mod shunting;
+pub mod simple;
 pub mod syntax;
 pub mod validate;
 
 #[cfg(test)]
 mod test {
     use crate::{
-        ast::ASTBuilder,
         eval::Evaluator,
         file::{File, PatchResult},
         offset::Offset,
@@ -84,7 +83,7 @@ mod test {
         let mut file = File::default();
         file.patch(Offset::default(), Offset::default(), "[1]".to_string())?;
         if let Ok(syntax) = file.rule().collect() {
-            ASTBuilder::default().convert_semicolon(&syntax);
+            syntax.convert();
         }
         Ok(())
     }
@@ -108,7 +107,7 @@ mod test {
             .to_string(),
         )?;
         let syntax = dbg!(file.rule().collect().unwrap());
-        let ast = dbg!(ASTBuilder::default().convert_semicolon(&syntax));
+        let ast = dbg!(syntax.convert());
         dbg!(Evaluator::eval(ast));
         Ok(())
     }

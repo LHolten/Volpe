@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::offset::Offset;
+use crate::offset::Range;
 use crate::syntax::Lexeme;
 
 #[derive(Debug)]
@@ -32,10 +32,10 @@ pub enum SyntaxError<'a> {
 }
 
 impl<'a> SyntaxError<'a> {
-    pub fn get_range(&self) -> (Offset, Offset) {
+    pub fn get_range(&self) -> Range<'a> {
         match self {
-            SyntaxError::UnmatchedBracket(lexeme) => (lexeme.start, lexeme.end),
-            SyntaxError::MismatchedBracket(lexeme) => (lexeme.start, lexeme.end),
+            SyntaxError::UnmatchedBracket(lexeme) => lexeme.range,
+            SyntaxError::MismatchedBracket(lexeme) => lexeme.range,
         }
     }
 }

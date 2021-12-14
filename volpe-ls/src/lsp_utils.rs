@@ -18,9 +18,9 @@ pub fn to_position(offset: Offset) -> Position {
     Position::new(offset.line as u32, offset.char as u32)
 }
 
-pub fn range(start: Offset, end: Offset) -> Range {
+pub fn range(range: volpe_parser_2::offset::Range) -> Range {
     Range {
-        start: to_position(start),
-        end: to_position(end),
+        start: to_position(range.start),
+        end: to_position(range.end),
     }
 }

@@ -1,6 +1,6 @@
 use crate::lsp_utils::range;
 use lsp_types::{Diagnostic, DiagnosticSeverity};
-use volpe_parser_2::{ast::ASTBuilder, eval::Evaluator, file::File, offset::Offset};
+use volpe_parser_2::{eval::Evaluator, file::File, offset::Offset};
 
 pub struct Document {
     pub version: i32,
@@ -49,15 +49,12 @@ impl Document {
     pub fn get_diagnostics(&self) -> Vec<Diagnostic> {
         if let Err(errs) = self.file.rule().collect() {
             errs.into_iter()
-                .map(|error| {
-                    let (start, end) = error.get_range();
-                    Diagnostic {
-                        range: range(start, end),
-                        severity: Some(DiagnosticSeverity::Error),
-                        source: Some("Volpe Language Server".to_string()),
-                        message: format!("{}", error),
-                        ..Default::default()
-                    }
+                .map(|error| Diagnostic {
+                    range: range(error.get_range()),
+                    severity: Some(DiagnosticSeverity::Error),
+                    source: Some("Volpe Language Server".to_string()),
+                    message: format!("{}", error),
+                    ..Default::default()
                 })
                 .collect()
         } else {
@@ -68,10 +65,7 @@ impl Document {
     // TEMP
     pub fn compile_and_run(&self) -> Option<String> {
         if let Ok(syntax) = self.file.rule().collect() {
-            if let Ok(output) = std::panic::catch_unwind(|| {
-                let ast = ASTBuilder::default().convert_semicolon(&syntax);
-                Evaluator::eval(ast)
-            }) {
+            if let Ok(output) = std::panic::catch_unwind(|| Evaluator::eval(syntax.convert())) {
                 return Some(output);
             }
         }

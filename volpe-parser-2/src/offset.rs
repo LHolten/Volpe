@@ -59,3 +59,24 @@ impl Sub for Offset {
         }
     }
 }
+
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Range<'a> {
+    pub start: Offset,
+    pub end: Offset,
+    pub text: &'a str,
+}
+
+impl<'a> Range<'a> {
+    pub fn raw_inner(self) -> Self {
+        Self {
+            start: self.start + Offset::char(2),
+            end: self.end - Offset::char(1),
+            text: &self.text[2..self.text.len() - 1],
+        }
+    }
+
+    pub fn length(self) -> Offset {
+        self.end - self.start
+    }
+}

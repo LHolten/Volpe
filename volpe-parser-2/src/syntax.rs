@@ -1,4 +1,7 @@
-use crate::{lexeme_kind::LexemeKind, offset::Offset};
+use crate::{
+    lexeme_kind::LexemeKind,
+    offset::{Offset, Range},
+};
 
 // the syntax tree type in this file is meant for use with code highlighting.
 // it will also be used as the first step to compilations.
@@ -7,10 +10,8 @@ use crate::{lexeme_kind::LexemeKind, offset::Offset};
 // this is a reference to the source text
 #[derive(Debug, Clone, Copy)]
 pub struct Lexeme<'a> {
-    pub start: Offset,
-    pub end: Offset,
     pub kind: LexemeKind,
-    pub text: &'a str,
+    pub range: Range<'a>,
 }
 
 // the data-structure is as simple as possible but allows code highlighting
@@ -40,15 +41,17 @@ impl<'a, E> Contained<'a, E> {
     pub fn start(&self) -> Option<Offset> {
         match self {
             Contained::Brackets { brackets, inner: _ } => {
-                brackets[0].as_ref().map(|l| l.start).ok()
+                brackets[0].as_ref().map(|l| l.range.start).ok()
             }
-            Contained::Terminal(l) => Some(l.start),
+            Contained::Terminal(l) => Some(l.range.start),
         }
     }
     pub fn end(&self) -> Option<Offset> {
         match self {
-            Contained::Brackets { brackets, inner: _ } => brackets[1].as_ref().map(|l| l.end).ok(),
-            Contained::Terminal(l) => Some(l.end),
+            Contained::Brackets { brackets, inner: _ } => {
+                brackets[1].as_ref().map(|l| l.range.end).ok()
+            }
+            Contained::Terminal(l) => Some(l.range.end),
         }
     }
 }

@@ -127,16 +127,16 @@ pub fn semantic_tokens_full(
         doc.file.rule().collect().ok().map(|syntax| {
             let mut builder = SemanticTokensBuilder::new();
             let mut lexemes = get_lexemes(syntax);
-            lexemes.sort_by_key(|lexeme| lexeme.start);
+            lexemes.sort_by_key(|lexeme| lexeme.range.start);
             let mut pos = Offset::default();
             for lexeme in lexemes {
-                builder.skip(lexeme.start - pos);
+                builder.skip(lexeme.range.start - pos);
                 if let Some(token_type) = lexeme_to_type(&lexeme.kind) {
-                    builder.push(lexeme.end - lexeme.start, type_index(token_type), 0);
+                    builder.push(lexeme.range.length(), type_index(token_type), 0);
                 } else {
-                    builder.skip(lexeme.end - lexeme.start);
+                    builder.skip(lexeme.range.length());
                 }
-                pos = lexeme.end;
+                pos = lexeme.range.end;
             }
             SemanticTokensResult::Tokens(builder.build())
         })
