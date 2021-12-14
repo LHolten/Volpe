@@ -1,7 +1,6 @@
 use crate::lsp_utils::range;
 use lsp_types::{Diagnostic, DiagnosticSeverity};
-use volpe_parser_2::{error::SyntaxError, file::File, offset::Offset};
-use volpe_compiler_2::compile;
+use volpe_parser_2::{file::File, offset::Offset, ast::ASTBuilder, eval::Evaluator};
 
 pub struct Document {
     pub version: i32,
@@ -39,15 +38,17 @@ impl Document {
     }
 
     pub fn get_info(&self) -> String {
-        format!("version: {}\nresult: {}\n{:#}", self.version, self.compile_and_run().unwrap_or_else(|| "...".to_string()), self.file.rule())
+        format!(
+            "version: {}\n\nresult: {}\n\nast:{:#?}",
+            self.version,
+            self.compile_and_run().unwrap_or_else(|| "...".to_string()),
+            self.file.rule().collect()
+        )
     }
 
     pub fn get_diagnostics(&self) -> Vec<Diagnostic> {
-        self.file
-            .rule()
-            .iter_errs()
-            .filter(SyntaxError::should_show)
-            .map(|error| {
+        if let Err(errs) = self.file.rule().collect() {
+            errs.into_iter().map(|error| {
                 let (start, end) = error.get_range();
                 Diagnostic {
                     range: range(start, end),
@@ -56,18 +57,18 @@ impl Document {
                     message: format!("{}", error),
                     ..Default::default()
                 }
-            })
-            .collect()
+            }).collect()
+        } else {
+            Vec::with_capacity(0)
+        }
     }
 
     // TEMP
     pub fn compile_and_run(&self) -> Option<String> {
-        if self.file.rule().iter_errs().next().is_none() {
+        if let Ok(syntax) = self.file.rule().collect() {
             if let Ok(output) = std::panic::catch_unwind(|| {
-                let instance = compile(&self.file).ok().unwrap();
-                let main = instance.exports.get_function("main").ok().unwrap();
-                let result = main.call(&[]).ok().unwrap();
-                format!("{:?}", result[0])
+                let ast = ASTBuilder::default().convert_semicolon(&syntax);
+                Evaluator::eval(ast)
             }) {
                 return Some(output);
             }

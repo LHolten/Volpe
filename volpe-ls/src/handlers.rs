@@ -17,7 +17,7 @@ fn write_tree_to_file(doc: &Document, document_uri: &Url) -> Result<(), String> 
         .map_err(|_| "can't convert file uri to file path")?
         .parent()
         .ok_or("couldn't get parent")?
-        .join("volpe_parse_tree.txt");
+        .join("volpe_ls_output.txt");
     let mut file = File::create(path).map_err(|why| format!("couldn't open file: {}", why))?;
     file.write_all(doc.get_info().as_bytes())
         .map_err(|why| format!("couldn't write to file: {}", why))
