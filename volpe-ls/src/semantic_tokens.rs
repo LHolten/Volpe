@@ -74,6 +74,6 @@ pub fn lexeme_to_type(kind: &LexemeKind) -> Option<SemanticTokenType> {
         LexemeKind::Num => Some(SemanticTokenType::NUMBER),
         LexemeKind::Operator => Some(SemanticTokenType::OPERATOR),
         LexemeKind::Raw => Some(SemanticTokenType::STRING),
-        _ => None
+        _ => None,
     }
 }

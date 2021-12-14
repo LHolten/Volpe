@@ -1,6 +1,6 @@
 use crate::lsp_utils::range;
 use lsp_types::{Diagnostic, DiagnosticSeverity};
-use volpe_parser_2::{file::File, offset::Offset, ast::ASTBuilder, eval::Evaluator};
+use volpe_parser_2::{ast::ASTBuilder, eval::Evaluator, file::File, offset::Offset};
 
 pub struct Document {
     pub version: i32,
@@ -48,16 +48,18 @@ impl Document {
 
     pub fn get_diagnostics(&self) -> Vec<Diagnostic> {
         if let Err(errs) = self.file.rule().collect() {
-            errs.into_iter().map(|error| {
-                let (start, end) = error.get_range();
-                Diagnostic {
-                    range: range(start, end),
-                    severity: Some(DiagnosticSeverity::Error),
-                    source: Some("Volpe Language Server".to_string()),
-                    message: format!("{}", error),
-                    ..Default::default()
-                }
-            }).collect()
+            errs.into_iter()
+                .map(|error| {
+                    let (start, end) = error.get_range();
+                    Diagnostic {
+                        range: range(start, end),
+                        severity: Some(DiagnosticSeverity::Error),
+                        source: Some("Volpe Language Server".to_string()),
+                        message: format!("{}", error),
+                        ..Default::default()
+                    }
+                })
+                .collect()
         } else {
             Vec::with_capacity(0)
         }

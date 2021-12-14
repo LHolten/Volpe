@@ -3,13 +3,12 @@ use std::io::Write;
 
 use lsp_server::ErrorCode;
 use lsp_types::*;
+use volpe_parser_2::offset::Offset;
+use volpe_parser_2::syntax::{Contained, Lexeme, Semicolon};
 
 use crate::document::Document;
+use crate::semantic_tokens::{lexeme_to_type, type_index, SemanticTokensBuilder};
 use crate::server::Server;
-
-//
-// Notifications
-//
 
 fn write_tree_to_file(doc: &Document, document_uri: &Url) -> Result<(), String> {
     let path = document_uri
@@ -37,6 +36,35 @@ fn with_doc<T, F: FnOnce(&mut Document) -> T>(
     }
 }
 
+fn get_lexemes<E>(semicolon: Semicolon<'_, E>) -> Vec<Lexeme<'_>> {
+    match semicolon {
+        Semicolon::Semi { left, semi, right } => {
+            let mut lexemes: Vec<Lexeme> =
+                left.into_iter().flat_map(get_lexemes_contained).collect();
+            lexemes.push(semi);
+            lexemes.extend(get_lexemes(*right));
+            lexemes
+        }
+        Semicolon::Syntax(vec) => vec.into_iter().flat_map(get_lexemes_contained).collect(),
+    }
+}
+
+fn get_lexemes_contained<E>(contained: Contained<E>) -> Vec<Lexeme<'_>> {
+    match contained {
+        Contained::Brackets {
+            brackets: [left, right],
+            inner,
+        } => {
+            let mut lexemes = Vec::new();
+            lexemes.extend(left);
+            lexemes.extend(get_lexemes(*inner));
+            lexemes.extend(right);
+            lexemes
+        }
+        Contained::Terminal(lexeme) => vec![lexeme],
+    }
+}
+
 fn diagnostics(this: &mut Server, uri: Url) {
     if let Some((diagnostics, version)) = with_doc(this, uri.to_string(), |doc| {
         (doc.get_diagnostics(), doc.version)
@@ -48,6 +76,10 @@ fn diagnostics(this: &mut Server, uri: Url) {
         })
     }
 }
+
+//
+// Notifications
+//
 
 pub fn did_open_text_document_notification(this: &mut Server, params: DidOpenTextDocumentParams) {
     let doc = Document::new(&params);
@@ -88,11 +120,28 @@ pub fn hover(_this: &mut Server, _params: HoverParams) -> RequestResult<Option<H
 }
 
 pub fn semantic_tokens_full(
-    _this: &mut Server,
-    _params: SemanticTokensParams,
+    this: &mut Server,
+    params: SemanticTokensParams,
 ) -> RequestResult<Option<SemanticTokensResult>> {
-    // TODO
-    Ok(None)
+    Ok(with_doc(this, params.text_document.uri.to_string(), |doc| {
+        doc.file.rule().collect().ok().map(|syntax| {
+            let mut builder = SemanticTokensBuilder::new();
+            let mut lexemes = get_lexemes(syntax);
+            lexemes.sort_by_key(|lexeme| lexeme.start);
+            let mut pos = Offset::default();
+            for lexeme in lexemes {
+                builder.skip(lexeme.start - pos);
+                if let Some(token_type) = lexeme_to_type(&lexeme.kind) {
+                    builder.push(lexeme.end - lexeme.start, type_index(token_type), 0);
+                } else {
+                    builder.skip(lexeme.end - lexeme.start);
+                }
+                pos = lexeme.end;
+            }
+            SemanticTokensResult::Tokens(builder.build())
+        })
+    })
+    .flatten())
 }
 
 pub fn semantic_tokens_range(
