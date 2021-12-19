@@ -8,7 +8,7 @@ use crate::{
 // using an empty error type guarantees a valid syntax tree.
 
 // this is a reference to the source text
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct Lexeme<'a> {
     pub kind: LexemeKind,
     pub range: Range<'a>,
@@ -16,7 +16,6 @@ pub struct Lexeme<'a> {
 
 // the data-structure is as simple as possible but allows code highlighting
 // the error type is for missing brackets
-#[derive(Debug)]
 pub enum Semicolon<'a, E> {
     Semi {
         left: Vec<Contained<'a, E>>,
@@ -26,7 +25,6 @@ pub enum Semicolon<'a, E> {
     Syntax(Vec<Contained<'a, E>>),
 }
 
-#[derive(Debug)]
 pub enum Contained<'a, E> {
     // this annotates a node to be inside brackets
     Brackets {
