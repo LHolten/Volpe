@@ -11,7 +11,7 @@ pub struct Evaluator<'a> {
 }
 
 impl<'a> Evaluator<'a> {
-    pub fn eval(ast: Vec<Simple>) -> String {
+    pub fn eval(ast: Vec<Simple>) -> Result<String, String> {
         let mut eval = Evaluator {
             buffer: String::new(),
             args: vec![],
@@ -19,30 +19,29 @@ impl<'a> Evaluator<'a> {
             refs: vec![],
         };
         while let Some(ast) = eval.prog.pop() {
-            eval.eval_single(ast);
+            eval.eval_single(ast)?;
         }
-        eval.buffer
+        Ok(eval.buffer)
     }
 
-    pub fn eval_single(&mut self, ast: Simple<'a>) {
+    pub fn eval_single(&mut self, ast: Simple<'a>) -> Result<(), String> {
         match ast {
             Simple::Push(inner) => self.args.push(*inner),
             Simple::Pop(name) => {
                 let val = self.args.pop().unwrap();
-                replace_simple(&mut self.prog, name, &val);
+                self.refs.extend(replace_simple(&mut self.prog, name, &val))
             }
-            Simple::Ident(name) => {
-                panic!("undefined {}", name.text)
-            }
+            Simple::Ident(name) => return Err(name.text.to_string()),
             Simple::Raw(raw) => self.buffer.push_str(raw.text),
             Simple::Scope(inner) => {
                 let temp = replace(&mut self.prog, inner);
                 while let Some(ast) = self.prog.pop() {
-                    self.eval_single(ast);
+                    self.eval_single(ast)?;
                 }
                 self.prog = temp;
             }
         }
+        Ok(())
     }
 }
 

@@ -127,7 +127,7 @@ mod test {
         )?;
         let syntax = file.rule().collect().unwrap();
         let ast = syntax.convert();
-        assert_eq!(&Evaluator::eval(ast), "ok");
+        assert_eq!(&Evaluator::eval(ast).unwrap(), "ok");
         Ok(())
     }
 }

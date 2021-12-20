@@ -39,9 +39,9 @@ impl Document {
 
     pub fn get_info(&self) -> String {
         format!(
-            "version: {}\n\nresult: {}\n\nast:{:#?}",
+            "version: {}\n\nresult: {:?}\n\nast:{:#?}",
             self.version,
-            self.compile_and_run().unwrap_or_else(|| "...".to_string()),
+            self.compile_and_run(),
             self.file.rule().collect()
         )
     }
@@ -63,12 +63,10 @@ impl Document {
     }
 
     // TEMP
-    pub fn compile_and_run(&self) -> Option<String> {
+    pub fn compile_and_run(&self) -> Result<String, String> {
         if let Ok(syntax) = self.file.rule().collect() {
-            if let Ok(output) = std::panic::catch_unwind(|| Evaluator::eval(syntax.convert())) {
-                return Some(output);
-            }
+            return Evaluator::eval(syntax.convert());
         }
-        None
+        Err("...".to_string())
     }
 }
