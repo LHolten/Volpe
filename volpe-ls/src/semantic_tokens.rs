@@ -70,7 +70,7 @@ impl SemanticTokensBuilder {
 
 pub fn lexeme_to_type(kind: &LexemeKind) -> Option<SemanticTokenType> {
     match kind {
-        LexemeKind::Ident => Some(SemanticTokenType::VARIABLE),
+        LexemeKind::Ident => Some(SemanticTokenType::PARAMETER),
         LexemeKind::Num => Some(SemanticTokenType::NUMBER),
         LexemeKind::Operator => Some(SemanticTokenType::OPERATOR),
         LexemeKind::Raw => Some(SemanticTokenType::STRING),
