@@ -111,4 +111,23 @@ mod test {
         dbg!(Evaluator::eval(ast));
         Ok(())
     }
+
+    #[test]
+    fn test_object() -> PatchResult {
+        let mut file = File::default();
+        file.patch(
+            Offset::default(),
+            Offset::default(),
+            "
+            {
+                [test] (#{ok})
+            } (test)
+            "
+            .to_string(),
+        )?;
+        let syntax = file.rule().collect().unwrap();
+        let ast = syntax.convert();
+        assert_eq!(&Evaluator::eval(ast), "ok");
+        Ok(())
+    }
 }

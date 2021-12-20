@@ -25,11 +25,9 @@ impl<'a> Evaluator<'a> {
     pub fn eval_single(&mut self, ast: Simple<'a>) {
         match ast {
             Simple::Push(inner) => self.args.push(inner),
-            Simple::Pop(names) => {
-                for name in names {
-                    let val = self.args.pop().unwrap();
-                    replace_simple(&mut self.prog, name, &val);
-                }
+            Simple::Pop(name) => {
+                let val = self.args.pop().unwrap();
+                replace_simple(&mut self.prog, name, &val);
             }
             Simple::Ident(name) => {
                 panic!("undefined {}", name.text)
@@ -53,8 +51,8 @@ pub fn replace_simple<'a>(
     for i in (0..list.len()).rev() {
         match &mut list[i] {
             Simple::Push(inner) => refs.extend(replace_simple(inner, name, val)),
-            Simple::Pop(names) => {
-                if names.iter().any(|n| n.text == name.text) {
+            Simple::Pop(n) => {
+                if n.text == name.text {
                     return refs;
                 }
             }
