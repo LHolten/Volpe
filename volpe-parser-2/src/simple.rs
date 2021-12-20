@@ -20,6 +20,7 @@ impl<'a> Simple<'a> {
     fn as_ident(&self) -> Range<'a> {
         match self {
             Simple::Ident(range) => *range,
+            Simple::Push(x) => x.as_ident(),
             _ => todo!(),
         }
     }
