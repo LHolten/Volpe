@@ -37,7 +37,7 @@ impl<'a> Contained<'a, Void> {
                     let mut result = inner.convert();
                     result.push(Simple::Pop(Default::default()));
                     result.insert(0, Simple::Ident(Default::default()));
-                    vec![Simple::Scope(result)]
+                    vec![Simple::Push(Simple::Scope(result).into())]
                 }
                 LexemeKind::LSquareBracket => inner
                     .convert()
@@ -51,7 +51,7 @@ impl<'a> Contained<'a, Void> {
             Contained::Terminal(lexeme) => match lexeme.kind {
                 LexemeKind::Ident => vec![Simple::Ident(lexeme.range)],
                 LexemeKind::Operator => vec![Simple::Push(Simple::Ident(lexeme.range).into())],
-                LexemeKind::Num => vec![Simple::Raw(lexeme.range)],
+                LexemeKind::Num => vec![Simple::Push(Simple::Raw(lexeme.range).into())],
                 LexemeKind::Raw => vec![Simple::Raw(lexeme.range.raw_inner())],
                 _ => unreachable!(),
             },
