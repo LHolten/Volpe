@@ -28,7 +28,8 @@ impl<'a> Evaluator<'a> {
         match ast {
             Simple::Push(inner) => self.args.push(*inner),
             Simple::Pop(name) => {
-                let val = self.args.pop().unwrap();
+                let err = format!("no arg for: {}", name.text);
+                let val = self.args.pop().ok_or(err)?;
                 self.refs.extend(replace_simple(&mut self.prog, name, &val))
             }
             Simple::Ident(name) => return Err(name.text.to_string()),
@@ -82,4 +83,153 @@ pub fn replace_simple<'a>(
         }
     }
     refs
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{eval::Evaluator, file::File, offset::Offset};
+
+    fn check(input: &str, output: Result<String, String>) {
+        let mut file = File::default();
+        file.patch(Offset::default(), Offset::default(), input.to_string())
+            .unwrap();
+        let syntax = file.rule().collect().unwrap();
+        let result = Evaluator::eval(syntax.convert());
+        assert_eq!(result, output);
+    }
+
+    #[test]
+    fn resolution1() {
+        check(
+            "
+            [a] (b)
+            [b] (1)
+            a",
+            Ok("1".to_string()),
+        )
+    }
+    #[test]
+    fn resolution2() {
+        check(
+            "
+            [b] (1)
+            [a] (b)
+            a",
+            Ok("1".to_string()),
+        )
+    }
+    #[test]
+    fn resolution3() {
+        check(
+            "
+            [f] (
+                [a] (1)
+                {}
+            )
+            f(a)",
+            Err("a".to_string()),
+        )
+    }
+
+    #[test]
+    fn resolution4() {
+        check(
+            "
+            [a] (1)
+            [a] (2)
+            a",
+            Ok("2".to_string()),
+        )
+    }
+
+    #[test]
+    fn resolution5() {
+        check(
+            "
+            {} ([a] (1))
+            a",
+            Err("a".to_string()),
+        )
+    }
+
+    #[test]
+    fn other() {
+        check(
+            r##"
+        [module] ( [main]
+            #{(module}
+                #{(func (export "main") (result }
+                    main(type)
+                #{)}
+                main(locals)
+                main(body)
+                #{)}
+            #{)}
+        )
+        
+        [i32] ( [lit]
+            {
+                [type] (#{i32})
+                [body] (
+                    #{(i32.const }
+                        lit
+                    #{)}
+                )
+                [locals] ()
+                [is_i32] ()
+            }
+        )
+        
+        [add_i32] ( [a b]
+            a (is_i32)
+            b (is_i32)
+            {
+                [type] (#{i32})
+                [body] (#{(i32.add)} a(body) b(body))
+                [locals] (a(locals) b(locals))
+                [is_i32] ()
+            }
+        )
+        
+        [var] ( [expr]
+            [ident] (#{$0})
+            [cont]
+            [res] (
+                cont ({
+                    [type] (expr(type))
+                    [locals] (expr(locals))
+                    [body] (
+                        #{(get_local }
+                            ident
+                        #{)}
+                    )
+                })
+            )
+            {} ( [v]
+                [type] (res(type))
+                [body] (
+                    #{(set_local } expr(body)
+                        ident
+                    #{)}
+                    res(body)
+                )
+                [locals] (
+                    res(locals)
+                    #{(local }
+                        ident
+                    #{ }
+                        expr(type)
+                    #{)}
+                )
+                res(v)
+            )
+        )
+        // add_i32(i32(1))(i32(1))
+        module (
+            var(i32(1)); [total]
+            total
+        )"##,
+            Ok(Default::default()),
+        );
+    }
 }
