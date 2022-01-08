@@ -1,9 +1,11 @@
+use std::rc::Rc;
+
 use crate::{offset::Range, simple::Simple};
 
 #[derive(Debug, Clone)]
 struct Scope<'a> {
     val: Vec<Simple<'a>>,
-    env: Vec<(Range<'a>, Scope<'a>)>,
+    env: Vec<(Range<'a>, Rc<Scope<'a>>)>,
 }
 
 #[derive(Default)]
@@ -44,14 +46,14 @@ impl<'a> Evaluator<'a> {
             Simple::Pop(name) => {
                 let err = format!("no arg for: {}", name.text);
                 let val = self.args.pop().ok_or(err)?;
-                scope.env.push((name, val));
+                scope.env.push((name, val.into()));
             }
             Simple::Ident(name) => {
                 let mut rest = vec![];
                 for (n, s) in scope.env.iter().rev() {
                     if n.text == name.text {
                         // TODO add to refs
-                        let mut inner = s.clone();
+                        let mut inner = s.as_ref().clone();
                         // inner.env.splice(0..0, scope.env.clone());
                         inner.env.extend(rest.into_iter().rev());
                         self.eval_single(inner)?;
