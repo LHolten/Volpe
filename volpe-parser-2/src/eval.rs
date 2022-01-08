@@ -47,15 +47,17 @@ impl<'a> Evaluator<'a> {
                 scope.env.push((name, val));
             }
             Simple::Ident(name) => {
+                let mut rest = vec![];
                 for (n, s) in scope.env.iter().rev() {
                     if n.text == name.text {
                         // TODO add to refs
                         let mut inner = s.clone();
                         // inner.env.splice(0..0, scope.env.clone());
-                        inner.env.extend(scope.env.clone());
+                        inner.env.extend(rest.into_iter().rev());
                         self.eval_single(inner)?;
                         return self.eval_single(scope);
                     }
+                    rest.push((*n, s.clone()));
                 }
                 return Err(name.text.to_string());
             }
