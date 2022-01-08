@@ -19,7 +19,7 @@ impl<'a> Simple<'a> {
     fn as_ident(&self) -> Range<'a> {
         match self {
             Simple::Ident(range) => *range,
-            _ => todo!(),
+            _ => todo!("{:?}", self),
         }
     }
 }
@@ -47,7 +47,7 @@ impl<'a> Contained<'a, Void> {
             },
             Contained::Terminal(lexeme) => match lexeme.kind {
                 LexemeKind::Ident => vec![Simple::Ident(lexeme.range)],
-                LexemeKind::Operator => vec![Simple::Push(vec![Simple::Ident(lexeme.range)])],
+                LexemeKind::Operator => vec![Simple::Ident(lexeme.range)],
                 LexemeKind::Num => vec![Simple::Push(vec![Simple::Raw(lexeme.range)])],
                 LexemeKind::Raw => vec![Simple::Raw(lexeme.range.raw_inner())],
                 _ => unreachable!(),
