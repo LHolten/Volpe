@@ -1,48 +1,42 @@
-use std::mem::replace;
-
 use crate::{offset::Range, simple::Simple};
 
 #[derive(Default)]
 pub struct Evaluator<'a> {
     buffer: String,
     args: Vec<Simple<'a>>,
-    prog: Vec<Simple<'a>>,
     pub refs: Vec<Reference<'a>>,
 }
 
 impl<'a> Evaluator<'a> {
-    pub fn eval(ast: Vec<Simple>) -> Result<String, String> {
+    pub fn eval(mut ast: Vec<Simple>) -> Result<String, String> {
         let mut eval = Evaluator {
             buffer: String::new(),
             args: vec![],
-            prog: ast,
             refs: vec![],
         };
-        while let Some(ast) = eval.prog.pop() {
-            eval.eval_single(ast)?;
-        }
+        eval.eval_single(&mut ast)?;
         Ok(eval.buffer)
     }
 
-    pub fn eval_single(&mut self, ast: Simple<'a>) -> Result<(), String> {
-        match ast {
+    pub fn eval_single(&mut self, ast: &mut Vec<Simple<'a>>) -> Result<(), String> {
+        let last = match ast.pop() {
+            Some(ast) => ast,
+            None => return Ok(()),
+        };
+        match last {
             Simple::Push(inner) => self.args.push(*inner),
             Simple::Pop(name) => {
                 let err = format!("no arg for: {}", name.text);
                 let val = self.args.pop().ok_or(err)?;
-                self.refs.extend(replace_simple(&mut self.prog, name, &val))
+                self.refs.extend(replace_simple(ast, name, &val))
             }
             Simple::Ident(name) => return Err(name.text.to_string()),
             Simple::Raw(raw) => self.buffer.push_str(raw.text),
-            Simple::Scope(inner) => {
-                let temp = replace(&mut self.prog, inner);
-                while let Some(ast) = self.prog.pop() {
-                    self.eval_single(ast)?;
-                }
-                self.prog = temp;
+            Simple::Scope(mut inner) => {
+                self.eval_single(&mut inner)?;
             }
         }
-        Ok(())
+        self.eval_single(ast)
     }
 }
 
@@ -94,7 +88,7 @@ mod tests {
         file.patch(Offset::default(), Offset::default(), input.to_string())
             .unwrap();
         let syntax = file.rule().collect().unwrap();
-        let result = Evaluator::eval(syntax.convert());
+        let result = Evaluator::eval(syntax.convert(None));
         assert_eq!(result, output);
     }
 
@@ -156,80 +150,18 @@ mod tests {
     fn other() {
         check(
             r##"
-        [module] ( [main]
-            #{(module}
-                #{(func (export "main") (result }
-                    main(type)
-                #{)}
-                main(locals)
-                main(body)
-                #{)}
-            #{)}
+        [new] ( [arg]
+            arg((attr))
         )
-        
-        [i32] ( [lit]
-            {
-                [type] (#{i32})
-                [body] (
-                    #{(i32.const }
-                        lit
-                    #{)}
-                )
-                [locals] ()
-                [is_i32] ()
-            }
-        )
-        
-        [add_i32] ( [a b]
-            a (is_i32)
-            b (is_i32)
-            {
-                [type] (#{i32})
-                [body] (#{(i32.add)} a(body) b(body))
-                [locals] (a(locals) b(locals))
-                [is_i32] ()
-            }
-        )
-        
-        [var] ( [expr]
-            [ident] (#{$0})
-            [cont]
-            [res] (
-                cont ({
-                    [type] (expr(type))
-                    [locals] (expr(locals))
-                    [body] (
-                        #{(get_local }
-                            ident
-                        #{)}
-                    )
-                })
-            )
-            {} ( [v]
-                [type] (res(type))
-                [body] (
-                    #{(set_local } expr(body)
-                        ident
-                    #{)}
-                    res(body)
-                )
-                [locals] (
-                    res(locals)
-                    #{(local }
-                        ident
-                    #{ }
-                        expr(type)
-                    #{)}
-                )
-                res(v)
-            )
-        )
-        // add_i32(i32(1))(i32(1))
-        module (
-            var(i32(1)); [total]
-            total
-        )"##,
-            Ok(Default::default()),
+
+        [obj] new {
+            [attr] 2
+        }
+
+        [attr] 1
+        obj
+        "##,
+            Ok("2".to_string()),
         );
     }
 }

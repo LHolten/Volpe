@@ -39,7 +39,7 @@ impl<'a, E> Contained<'a, E> {
     pub fn start(&self) -> Option<Offset> {
         match self {
             Contained::Brackets { brackets, inner: _ } => {
-                brackets[0].as_ref().map(|l| l.range.start).ok()
+                Some(brackets[0].as_ref().ok()?.range.start)
             }
             Contained::Terminal(l) => Some(l.range.start),
         }
@@ -47,7 +47,7 @@ impl<'a, E> Contained<'a, E> {
     pub fn end(&self) -> Option<Offset> {
         match self {
             Contained::Brackets { brackets, inner: _ } => {
-                brackets[1].as_ref().map(|l| l.range.end).ok()
+                Some(brackets[1].as_ref().ok()?.range.end)
             }
             Contained::Terminal(l) => Some(l.range.end),
         }

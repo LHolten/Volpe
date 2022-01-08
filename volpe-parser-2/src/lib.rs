@@ -83,7 +83,7 @@ mod test {
         let mut file = File::default();
         file.patch(Offset::default(), Offset::default(), "[1]".to_string())?;
         if let Ok(syntax) = file.rule().collect() {
-            syntax.convert();
+            syntax.convert(None);
         }
         Ok(())
     }
@@ -107,27 +107,8 @@ mod test {
             .to_string(),
         )?;
         let syntax = dbg!(file.rule().collect().unwrap());
-        let ast = dbg!(syntax.convert());
-        dbg!(Evaluator::eval(ast));
-        Ok(())
-    }
-
-    #[test]
-    fn test_object() -> PatchResult {
-        let mut file = File::default();
-        file.patch(
-            Offset::default(),
-            Offset::default(),
-            "
-            {
-                [test] (#{ok})
-            } (test)
-            "
-            .to_string(),
-        )?;
-        let syntax = file.rule().collect().unwrap();
-        let ast = syntax.convert();
-        assert_eq!(&Evaluator::eval(ast).unwrap(), "ok");
+        let ast = dbg!(syntax.convert(None));
+        dbg!(Evaluator::eval(ast).unwrap());
         Ok(())
     }
 }

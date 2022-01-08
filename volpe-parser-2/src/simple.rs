@@ -31,16 +31,15 @@ impl<'a> Contained<'a, Void> {
         match self {
             Contained::Brackets { brackets, inner } => match brackets[0].void_unwrap().kind {
                 LexemeKind::LRoundBracket => {
-                    vec![Simple::Push(Simple::Scope(inner.convert()).into())]
+                    vec![Simple::Push(Simple::Scope(inner.convert(None)).into())]
                 }
                 LexemeKind::LCurlyBracket => {
-                    let mut result = inner.convert();
+                    let mut result = inner.convert(Some(Simple::Ident(Default::default())));
                     result.push(Simple::Pop(Default::default()));
-                    result.insert(0, Simple::Ident(Default::default()));
                     vec![Simple::Push(Simple::Scope(result).into())]
                 }
                 LexemeKind::LSquareBracket => inner
-                    .convert()
+                    .convert(None)
                     .iter()
                     .map(Simple::as_ident)
                     .map(Simple::Pop)
@@ -60,7 +59,7 @@ impl<'a> Contained<'a, Void> {
 }
 
 impl<'a> Semicolon<'a, Void> {
-    pub fn convert(&self) -> Vec<Simple<'a>> {
+    pub fn convert(&self, end: Option<Simple<'a>>) -> Vec<Simple<'a>> {
         match self {
             Semicolon::Semi {
                 left,
@@ -74,10 +73,36 @@ impl<'a> Semicolon<'a, Void> {
 
                 let mut result = left.iter().flat_map(Contained::convert).collect::<Vec<_>>();
 
-                result.insert(index, Simple::Push(Simple::Scope(right.convert()).into()));
+                result.insert(
+                    index,
+                    Simple::Push(Simple::Scope(right.convert(end)).into()),
+                );
                 result
             }
-            Semicolon::Syntax(syntax) => syntax.iter().flat_map(Contained::convert).collect(),
+            Semicolon::Syntax(syntax) => {
+                let mut res = end.into_iter().collect::<Vec<_>>();
+                res.extend(syntax.iter().flat_map(Contained::convert));
+                res
+            }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{file::File, offset::Offset};
+
+    fn print_simple(input: &str) {
+        let mut file = File::default();
+        file.patch(Offset::default(), Offset::default(), input.to_string())
+            .unwrap();
+        let syntax = file.rule().collect().unwrap();
+        println!("{:?}", syntax.convert(None));
+    }
+
+    #[test]
+    fn curly_semi() {
+        print_simple("(expr(v)[v])");
+        print_simple("{expr;}");
     }
 }
