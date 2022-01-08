@@ -9,8 +9,7 @@ use crate::{
 // this type can only hold the desugared version of the source code
 #[derive(Debug, Clone)]
 pub enum Simple<'a> {
-    Push(Box<Simple<'a>>),
-    Scope(Vec<Simple<'a>>),
+    Push(Vec<Simple<'a>>),
     Pop(Range<'a>),
     Ident(Range<'a>),
     Raw(Range<'a>),
@@ -20,7 +19,6 @@ impl<'a> Simple<'a> {
     fn as_ident(&self) -> Range<'a> {
         match self {
             Simple::Ident(range) => *range,
-            Simple::Push(x) => x.as_ident(),
             _ => todo!(),
         }
     }
@@ -31,12 +29,12 @@ impl<'a> Contained<'a, Void> {
         match self {
             Contained::Brackets { brackets, inner } => match brackets[0].void_unwrap().kind {
                 LexemeKind::LRoundBracket => {
-                    vec![Simple::Push(Simple::Scope(inner.convert(None)).into())]
+                    vec![Simple::Push(inner.convert(None))]
                 }
                 LexemeKind::LCurlyBracket => {
                     let mut result = inner.convert(Some(Simple::Ident(Default::default())));
                     result.push(Simple::Pop(Default::default()));
-                    vec![Simple::Push(Simple::Scope(result).into())]
+                    vec![Simple::Push(result)]
                 }
                 LexemeKind::LSquareBracket => inner
                     .convert(None)
@@ -49,8 +47,8 @@ impl<'a> Contained<'a, Void> {
             },
             Contained::Terminal(lexeme) => match lexeme.kind {
                 LexemeKind::Ident => vec![Simple::Ident(lexeme.range)],
-                LexemeKind::Operator => vec![Simple::Push(Simple::Ident(lexeme.range).into())],
-                LexemeKind::Num => vec![Simple::Push(Simple::Raw(lexeme.range).into())],
+                LexemeKind::Operator => vec![Simple::Push(vec![Simple::Ident(lexeme.range)])],
+                LexemeKind::Num => vec![Simple::Push(vec![Simple::Raw(lexeme.range)])],
                 LexemeKind::Raw => vec![Simple::Raw(lexeme.range.raw_inner())],
                 _ => unreachable!(),
             },
@@ -73,10 +71,7 @@ impl<'a> Semicolon<'a, Void> {
 
                 let mut result = left.iter().flat_map(Contained::convert).collect::<Vec<_>>();
 
-                result.insert(
-                    index,
-                    Simple::Push(Simple::Scope(right.convert(end)).into()),
-                );
+                result.insert(index, Simple::Push(right.convert(end)));
                 result
             }
             Semicolon::Syntax(syntax) => {

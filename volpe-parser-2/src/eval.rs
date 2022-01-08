@@ -1,42 +1,68 @@
 use crate::{offset::Range, simple::Simple};
 
+#[derive(Debug, Clone)]
+struct Scope<'a> {
+    val: Vec<Simple<'a>>,
+    env: Vec<(Range<'a>, Scope<'a>)>,
+}
+
 #[derive(Default)]
 pub struct Evaluator<'a> {
     buffer: String,
-    args: Vec<Simple<'a>>,
+    args: Vec<Scope<'a>>,
     pub refs: Vec<Reference<'a>>,
 }
 
 impl<'a> Evaluator<'a> {
-    pub fn eval(mut ast: Vec<Simple>) -> Result<String, String> {
+    pub fn eval(ast: Vec<Simple>) -> Result<String, String> {
         let mut eval = Evaluator {
             buffer: String::new(),
             args: vec![],
             refs: vec![],
         };
-        eval.eval_single(&mut ast)?;
+        eval.eval_single(Scope {
+            val: ast,
+            env: vec![],
+        })?;
+        if !eval.args.is_empty() {
+            let err = format!("too many args: {}", eval.args.len());
+            return Err(err);
+        }
         Ok(eval.buffer)
     }
 
-    pub fn eval_single(&mut self, ast: &mut Vec<Simple<'a>>) -> Result<(), String> {
-        let last = match ast.pop() {
+    fn eval_single(&mut self, mut scope: Scope<'a>) -> Result<(), String> {
+        let last = match scope.val.pop() {
             Some(ast) => ast,
             None => return Ok(()),
         };
         match last {
-            Simple::Push(inner) => self.args.push(*inner),
+            Simple::Push(inner) => self.args.push(Scope {
+                val: inner,
+                env: scope.env.clone(),
+            }),
             Simple::Pop(name) => {
                 let err = format!("no arg for: {}", name.text);
                 let val = self.args.pop().ok_or(err)?;
-                self.refs.extend(replace_simple(ast, name, &val))
+                scope.env.push((name, val));
             }
-            Simple::Ident(name) => return Err(name.text.to_string()),
+            Simple::Ident(name) => {
+                for (n, s) in scope.env.iter().rev() {
+                    if n.text == name.text {
+                        // TODO add to refs
+                        let mut inner = s.clone();
+                        // inner.env.splice(0..0, scope.env.clone());
+                        inner.env.extend(scope.env.clone());
+                        self.eval_single(inner)?;
+                        return self.eval_single(scope);
+                    }
+                }
+                return Err(name.text.to_string());
+            }
+
             Simple::Raw(raw) => self.buffer.push_str(raw.text),
-            Simple::Scope(mut inner) => {
-                self.eval_single(&mut inner)?;
-            }
         }
-        self.eval_single(ast)
+        self.eval_single(scope)
     }
 }
 
@@ -45,45 +71,12 @@ pub struct Reference<'a> {
     pub to: Range<'a>,
 }
 
-pub fn replace_simple<'a>(
-    list: &mut Vec<Simple<'a>>,
-    name: Range<'a>,
-    val: &Simple<'a>,
-) -> Vec<Reference<'a>> {
-    let mut refs = vec![];
-    for i in (0..list.len()).rev() {
-        let mut item = &mut list[i];
-        loop {
-            match item {
-                Simple::Push(inner) => {
-                    item = inner.as_mut();
-                    continue;
-                }
-                Simple::Pop(n) => {
-                    if n.text == name.text {
-                        return refs;
-                    }
-                }
-                Simple::Ident(n) => {
-                    if n.text == name.text {
-                        refs.push(Reference { from: *n, to: name });
-                        list[i] = val.clone()
-                    }
-                }
-                Simple::Scope(inner) => refs.extend(replace_simple(inner, name, val)),
-                Simple::Raw(_) => {}
-            }
-            break;
-        }
-    }
-    refs
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{eval::Evaluator, file::File, offset::Offset};
 
-    fn check(input: &str, output: Result<String, String>) {
+    fn check(input: &str, output: Result<&str, &str>) {
+        let output = output.map(str::to_string).map_err(str::to_string);
         let mut file = File::default();
         file.patch(Offset::default(), Offset::default(), input.to_string())
             .unwrap();
@@ -97,31 +90,33 @@ mod tests {
         check(
             "
             [a] (b)
-            [b] (1)
+            [b] 1
             a",
-            Ok("1".to_string()),
+            Ok("1"),
         )
     }
+
     #[test]
     fn resolution2() {
         check(
             "
-            [b] (1)
+            [b] 1
             [a] (b)
             a",
-            Ok("1".to_string()),
+            Ok("1"),
         )
     }
+
     #[test]
     fn resolution3() {
         check(
             "
             [f] (
-                [a] (1)
-                {}
+                [a] 1
+                v [v]
             )
             f(a)",
-            Err("a".to_string()),
+            Err("a"),
         )
     }
 
@@ -129,10 +124,10 @@ mod tests {
     fn resolution4() {
         check(
             "
-            [a] (1)
-            [a] (2)
+            [a] 1
+            [a] 2
             a",
-            Ok("2".to_string()),
+            Ok("2"),
         )
     }
 
@@ -140,9 +135,31 @@ mod tests {
     fn resolution5() {
         check(
             "
-            {} ([a] (1))
+            v [v] ([a] 1)
             a",
-            Err("a".to_string()),
+            Err("a"),
+        )
+    }
+
+    #[test]
+    fn resolution6() {
+        check(
+            "
+            [x] (y)
+            [v] { [x] 1 }
+            v (x)",
+            Ok("1"),
+        )
+    }
+
+    #[test]
+    fn resolution7() {
+        check(
+            "
+            [y] (x)
+            [v] { [x] 1 }
+            v (y)",
+            Ok("1"),
         )
     }
 
@@ -151,7 +168,7 @@ mod tests {
         check(
             r##"
         [new] ( [arg]
-            arg((attr))
+            (arg(attr))
         )
 
         [obj] new {
@@ -161,7 +178,7 @@ mod tests {
         [attr] 1
         obj
         "##,
-            Ok("2".to_string()),
+            Ok("2"),
         );
     }
 }
