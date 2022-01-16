@@ -11,7 +11,6 @@ use crate::{
 pub struct Yard<'a> {
     terminals: Vec<Vec<Contained<'a, ()>>>,
     stack: Vec<Lexeme<'a>>, // holds the operators that still need to be executed
-    last_kind: RuleKind,
 }
 
 impl<'a> Yard<'a> {
@@ -27,7 +26,6 @@ impl<'a> Yard<'a> {
         Self {
             terminals: vec![vec![]],
             stack: vec![],
-            last_kind: RuleKind::Semicolon,
         }
     }
 
@@ -77,7 +75,6 @@ impl<'a> Yard<'a> {
                 self.stack.push(lexeme)
             }
         }
-        self.last_kind = rule_kind
     }
 }
 
