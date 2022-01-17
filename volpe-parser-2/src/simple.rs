@@ -2,7 +2,11 @@ use std::mem::take;
 
 use void::{ResultVoidExt, Void};
 
-use crate::{lexeme_kind::LexemeKind, offset::Range, syntax::Contained};
+use crate::{
+    lexeme_kind::LexemeKind,
+    offset::Range,
+    syntax::{Contained, Semicolon},
+};
 
 // this type can only hold the desugared version of the source code
 #[derive(Clone)]
@@ -18,28 +22,28 @@ impl<'a> Contained<'a, Void> {
         match self {
             Contained::Brackets { brackets, inner } => match brackets[0].void_unwrap().kind {
                 LexemeKind::LRoundBracket => {
-                    let result = convert_semi(
-                        inner,
-                        vec![
-                            Simple::Ident(Default::default()),
-                            Simple::Pop(Default::default()),
-                        ],
-                    );
+                    let result = inner.convert(vec![
+                        Simple::Ident(Default::default()),
+                        Simple::Pop(Default::default()),
+                    ]);
                     vec![Simple::Push(result)]
                 }
                 LexemeKind::LCurlyBracket => {
-                    let mut result = convert_semi(inner, vec![Simple::Ident(Default::default())]);
+                    let mut result = inner.convert(vec![Simple::Ident(Default::default())]);
                     result.push(Simple::Pop(Default::default()));
                     vec![Simple::Push(result)]
                 }
-                LexemeKind::LSquareBracket => inner[0]
-                    .iter()
-                    .map(|c| match c {
-                        Contained::Brackets { .. } => panic!(),
-                        Contained::Terminal(lexeme) => Simple::Pop(lexeme.range),
-                    })
-                    .rev()
-                    .collect(),
+                LexemeKind::LSquareBracket => match inner {
+                    Semicolon::Semi { .. } => unreachable!(),
+                    Semicolon::Syntax(list) => list
+                        .iter()
+                        .map(|c| match c {
+                            Contained::Brackets { .. } => panic!(),
+                            Contained::Terminal(lexeme) => Simple::Pop(lexeme.range),
+                        })
+                        .rev()
+                        .collect(),
+                },
                 _ => unreachable!(),
             },
             Contained::Terminal(lexeme) => match lexeme.kind {
@@ -53,11 +57,15 @@ impl<'a> Contained<'a, Void> {
     }
 }
 
-pub fn convert_semi<'a>(
-    semi: &[Vec<Contained<'a, Void>>],
-    mut out: Vec<Simple<'a>>,
-) -> Vec<Simple<'a>> {
-    for line in semi {
+impl<'a> Semicolon<'a, Void> {
+    pub fn convert(&self, mut out: Vec<Simple<'a>>) -> Vec<Simple<'a>> {
+        let line = match self {
+            Semicolon::Semi { left, right, .. } => {
+                out = right.convert(out);
+                left
+            }
+            Semicolon::Syntax(line) => line,
+        };
         let mut line_args = vec![];
         for ast in line {
             let simple = ast.convert();
@@ -68,21 +76,21 @@ pub fn convert_semi<'a>(
                 out.push(s)
             }
         }
-        out.extend(line_args.into_iter().rev())
+        out.extend(line_args.into_iter().rev());
+        out
     }
-    out
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{file::File, offset::Offset, simple::convert_semi, validate::collect_semi};
+    use crate::{file::File, offset::Offset};
 
     fn print_simple(input: &str) {
         let mut file = File::default();
         file.patch(Offset::default(), Offset::default(), input.to_string())
             .unwrap();
-        let syntax = collect_semi(file.rule()).unwrap();
-        println!("{:?}", convert_semi(&syntax, vec![]));
+        let syntax = file.rule().collect().unwrap();
+        println!("{:?}", syntax.convert(vec![]));
     }
 
     #[test]

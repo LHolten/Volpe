@@ -30,11 +30,14 @@ impl<'a> Yard<'a> {
     }
 
     // this pops of all semicolon operators and returns the result
-    fn reduce(&mut self) -> Vec<Vec<Contained<'a, ()>>> {
-        let mut result = vec![self.terminals.pop().unwrap()];
+    fn reduce(&mut self) -> Semicolon<'a, ()> {
+        let mut result = Semicolon::Syntax(self.terminals.pop().unwrap());
         while self.stack_is_semi() {
-            result.push(self.terminals.pop().unwrap());
-            self.stack.pop().unwrap();
+            result = Semicolon::Semi {
+                left: self.terminals.pop().unwrap(),
+                semi: self.stack.pop().unwrap(),
+                right: result.into(),
+            }
         }
         result
     }

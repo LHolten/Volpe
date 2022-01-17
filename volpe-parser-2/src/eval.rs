@@ -79,17 +79,15 @@ pub struct Reference<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        eval::Evaluator, file::File, offset::Offset, simple::convert_semi, validate::collect_semi,
-    };
+    use crate::{eval::Evaluator, file::File, offset::Offset};
 
     fn check(input: &str, output: Result<&str, &str>) {
         let output = output.map(str::to_string).map_err(str::to_string);
         let mut file = File::default();
         file.patch(Offset::default(), Offset::default(), input.to_string())
             .unwrap();
-        let syntax = collect_semi(file.rule()).unwrap();
-        let result = Evaluator::eval(convert_semi(&syntax, vec![]));
+        let syntax = file.rule().collect().unwrap();
+        let result = Evaluator::eval(syntax.convert(vec![]));
         assert_eq!(result, output);
     }
 
