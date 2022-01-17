@@ -60,7 +60,7 @@ impl Sub for Offset {
     }
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default)]
 pub struct Range<'a> {
     pub start: Offset,
     pub end: Offset,

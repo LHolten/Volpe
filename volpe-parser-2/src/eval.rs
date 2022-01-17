@@ -50,23 +50,25 @@ impl<'a> Evaluator<'a> {
             }
             Simple::Ident(name) => {
                 let mut rest = vec![];
-                for (n, s) in scope.env.iter().rev() {
-                    if n.text == name.text {
-                        // TODO add to refs
-                        let mut inner = s.as_ref().clone();
-                        // inner.env.splice(0..0, scope.env.clone());
-                        inner.env.extend(rest.into_iter().rev());
-                        self.eval_single(inner)?;
-                        return self.eval_single(scope);
+                let mut iter = scope.env.iter().rev();
+                loop {
+                    if let Some((n, s)) = iter.next() {
+                        if n.text == name.text {
+                            self.refs.push(Reference { from: name, to: *n });
+                            assert!(scope.val.is_empty());
+                            scope = s.as_ref().clone();
+                            scope.env.extend(rest.into_iter().rev());
+                            break;
+                        }
+                        rest.push((*n, s.clone()));
+                    } else {
+                        return Err(name.text.to_string());
                     }
-                    rest.push((*n, s.clone()));
                 }
-                return Err(name.text.to_string());
             }
-
             Simple::Raw(raw) => self.buffer.push_str(raw.text),
         }
-        self.eval_single(scope)
+        self.eval_single(scope) // tail recursion probably
     }
 }
 
@@ -77,15 +79,17 @@ pub struct Reference<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{eval::Evaluator, file::File, offset::Offset};
+    use crate::{
+        eval::Evaluator, file::File, offset::Offset, simple::convert_semi, validate::collect_semi,
+    };
 
     fn check(input: &str, output: Result<&str, &str>) {
         let output = output.map(str::to_string).map_err(str::to_string);
         let mut file = File::default();
         file.patch(Offset::default(), Offset::default(), input.to_string())
             .unwrap();
-        let syntax = file.rule().collect().unwrap();
-        let result = Evaluator::eval(syntax.convert(None));
+        let syntax = collect_semi(file.rule()).unwrap();
+        let result = Evaluator::eval(convert_semi(&syntax, vec![]));
         assert_eq!(result, output);
     }
 
@@ -94,7 +98,7 @@ mod tests {
         check(
             "
             [a] (b)
-            [b] 1
+            [b] (1)
             a",
             Ok("1"),
         )
@@ -104,7 +108,7 @@ mod tests {
     fn resolution2() {
         check(
             "
-            [b] 1
+            [b] (1)
             [a] (b)
             a",
             Ok("1"),
@@ -116,7 +120,7 @@ mod tests {
         check(
             "
             [f] (
-                [a] 1
+                [a] (1)
                 v [v]
             )
             f(a)",
@@ -128,8 +132,8 @@ mod tests {
     fn resolution4() {
         check(
             "
-            [a] 1
-            [a] 2
+            [a] (1)
+            [a] (2)
             a",
             Ok("2"),
         )
@@ -139,7 +143,7 @@ mod tests {
     fn resolution5() {
         check(
             "
-            v [v] ([a] 1)
+            v [v] ([a] (1))
             a",
             Err("a"),
         )
@@ -150,7 +154,7 @@ mod tests {
         check(
             "
             [x] (y)
-            [v] { [x] 1 }
+            [v] { [x] (1) }
             v (x)",
             Ok("1"),
         )
@@ -161,7 +165,7 @@ mod tests {
         check(
             "
             [y] (x)
-            [v] { [x] 1 }
+            [v] { [x] (1) }
             v (y)",
             Ok("1"),
         )
@@ -172,14 +176,14 @@ mod tests {
         check(
             r##"
         [new] ( [arg]
-            (arg(attr))
+            {(arg(attr))}
         )
 
         [obj] new {
-            [attr] 2
+            [attr] (2)
         }
 
-        [attr] 1
+        [attr] (1)
         obj
         "##,
             Ok("2"),

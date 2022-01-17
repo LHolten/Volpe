@@ -30,33 +30,22 @@ impl<'a> Yard<'a> {
     }
 
     // this pops of all semicolon operators and returns the result
-    fn reduce(&mut self) -> Semicolon<'a, ()> {
-        let mut result = Semicolon::Syntax(self.terminals.pop().unwrap());
+    fn reduce(&mut self) -> Vec<Vec<Contained<'a, ()>>> {
+        let mut result = vec![self.terminals.pop().unwrap()];
         while self.stack_is_semi() {
-            result = Semicolon::Semi {
-                left: self.terminals.pop().unwrap(),
-                semi: self.stack.pop().unwrap(),
-                right: result.into(),
-            };
+            result.push(self.terminals.pop().unwrap());
+            self.stack.pop().unwrap();
         }
         result
     }
 
     fn add_terminal(&mut self, terminal: Contained<'a, ()>) {
-        // find where the terminal needs to be inserted
-        // if it is on a newline then it is inserted at the start
-        // if it is on the same line it is inserted just after the last item of that line
         let list = self.terminals.last_mut().unwrap();
-        let prev_index = list
-            .iter()
-            .rposition(|item| item.end().map(|o| o.line) == terminal.start().map(|o| o.line));
-        let index = prev_index.map(|i| i + 1).unwrap_or(0);
-        list.insert(index, terminal);
+        list.push(terminal);
     }
 
     fn shunt(&mut self, lexeme: Lexeme<'a>) {
-        let rule_kind = lexeme.kind.rule_kind();
-        match rule_kind {
+        match lexeme.kind.rule_kind() {
             RuleKind::OpeningBracket => {
                 self.terminals.push(vec![]); // start a new list of terminal
                 self.stack.push(lexeme)
@@ -65,7 +54,7 @@ impl<'a> Yard<'a> {
                 let inner = self.reduce();
                 let open = self.stack.pop().ok_or_else(|| self.terminals.push(vec![]));
                 self.add_terminal(Contained::Brackets {
-                    inner: inner.into(),
+                    inner,
                     brackets: [open, Ok(lexeme)],
                 });
             }
@@ -102,12 +91,20 @@ impl File {
 
                 yard.shunt(lexeme);
             }
+            yard.shunt(Lexeme {
+                kind: LexemeKind::Semicolon,
+                range: Range {
+                    start: Offset::new(line_num, line.chars().count()),
+                    end: Offset::new(line_num + 1, 0),
+                    text: "\n",
+                },
+            })
         }
 
         let mut result = yard.reduce();
         while let Some(lexeme) = yard.stack.pop() {
             yard.add_terminal(Contained::Brackets {
-                inner: result.into(),
+                inner: result,
                 brackets: [Ok(lexeme), Err(())],
             });
             result = yard.reduce();

@@ -1,15 +1,12 @@
 use void::Void;
 
-use crate::{
-    error::SyntaxError,
-    syntax::{Contained, Semicolon},
-};
+use crate::{error::SyntaxError, syntax::Contained};
 
 impl<'a> Contained<'a, ()> {
     pub fn collect(self) -> Result<Contained<'a, Void>, Vec<SyntaxError<'a>>> {
         match self {
             Contained::Brackets { brackets, inner } => Ok(Contained::Brackets {
-                inner: inner.collect()?.into(),
+                inner: collect_semi(inner)?,
                 brackets: match brackets {
                     [Err(()), Ok(lex)] => Err(vec![SyntaxError::UnmatchedBracket(lex)]),
                     [Ok(lex), Err(())] => Err(vec![SyntaxError::UnmatchedBracket(lex)]),
@@ -31,38 +28,20 @@ impl<'a> Contained<'a, ()> {
     }
 }
 
-fn collect_errors(
-    list: Vec<Contained<'_, ()>>,
-) -> Result<Vec<Contained<'_, Void>>, Vec<SyntaxError<'_>>> {
+pub fn collect_semi(
+    list: Vec<Vec<Contained<'_, ()>>>,
+) -> Result<Vec<Vec<Contained<'_, Void>>>, Vec<SyntaxError<'_>>> {
     let (mut result, mut errors) = (vec![], vec![]);
-    list.into_iter().for_each(|r| match r.collect() {
-        Ok(b) => result.push(b),
-        Err(e) => errors.extend(e),
+    list.into_iter().for_each(|r| {
+        let mut new = vec![];
+        r.into_iter().for_each(|r| match r.collect() {
+            Ok(b) => new.push(b),
+            Err(e) => errors.extend(e),
+        });
+        result.push(new)
     });
     if !errors.is_empty() {
         return Err(errors);
     }
     Ok(result)
-}
-
-impl<'a> Semicolon<'a, ()> {
-    pub fn collect(self) -> Result<Semicolon<'a, Void>, Vec<SyntaxError<'a>>> {
-        match self {
-            Semicolon::Semi { left, semi, right } => {
-                match collect_errors(left) {
-                    Err(mut errors) => {
-                        // check if there are more errors in the right hand side
-                        errors.extend(right.collect().err().into_iter().flatten());
-                        Err(errors)
-                    }
-                    Ok(left) => Ok(Semicolon::Semi {
-                        left,
-                        semi,
-                        right: right.collect()?.into(),
-                    }),
-                }
-            }
-            Semicolon::Syntax(syntax) => Ok(Semicolon::Syntax(collect_errors(syntax)?)),
-        }
-    }
 }

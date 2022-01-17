@@ -14,22 +14,15 @@ pub struct Lexeme<'a> {
     pub range: Range<'a>,
 }
 
+pub type Semicolon<'a, E> = Vec<Vec<Contained<'a, E>>>;
+
 // the data-structure is as simple as possible but allows code highlighting
 // the error type is for missing brackets
-pub enum Semicolon<'a, E> {
-    Semi {
-        left: Vec<Contained<'a, E>>,
-        semi: Lexeme<'a>,
-        right: Box<Semicolon<'a, E>>,
-    },
-    Syntax(Vec<Contained<'a, E>>),
-}
-
 pub enum Contained<'a, E> {
     // this annotates a node to be inside brackets
     Brackets {
         brackets: [Result<Lexeme<'a>, E>; 2],
-        inner: Box<Semicolon<'a, E>>,
+        inner: Semicolon<'a, E>,
     },
     // terminal is a list of lexeme's
     Terminal(Lexeme<'a>),

@@ -20,6 +20,8 @@ mod test {
         eval::Evaluator,
         file::{File, PatchResult},
         offset::Offset,
+        simple::convert_semi,
+        validate::collect_semi,
     };
 
     #[test]
@@ -82,8 +84,8 @@ mod test {
     fn fuzz_incr_edits_005() -> PatchResult {
         let mut file = File::default();
         file.patch(Offset::default(), Offset::default(), "[1]".to_string())?;
-        if let Ok(syntax) = file.rule().collect() {
-            syntax.convert(None);
+        if let Ok(syntax) = collect_semi(file.rule()) {
+            convert_semi(&syntax, vec![]);
         }
         Ok(())
     }
@@ -102,12 +104,12 @@ mod test {
             )
             [add] (#{(i32.add)})
 
-            add i32(1) i32(2) 
+            add i32(1) i32(2)
             "
             .to_string(),
         )?;
-        let syntax = dbg!(file.rule().collect().unwrap());
-        let ast = dbg!(syntax.convert(None));
+        let syntax = dbg!(collect_semi(file.rule()).unwrap());
+        let ast = dbg!(convert_semi(&syntax, vec![]));
         dbg!(Evaluator::eval(ast).unwrap());
         Ok(())
     }
