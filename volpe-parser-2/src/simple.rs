@@ -21,18 +21,8 @@ impl<'a> Contained<'a, Void> {
     pub fn convert(&self) -> Vec<Simple<'a>> {
         match self {
             Contained::Brackets { brackets, inner } => match brackets[0].void_unwrap().kind {
-                LexemeKind::LRoundBracket => {
-                    let result = inner.convert(vec![
-                        Simple::Ident(Default::default()),
-                        Simple::Pop(Default::default()),
-                    ]);
-                    vec![Simple::Push(result)]
-                }
-                LexemeKind::LCurlyBracket => {
-                    let mut result = inner.convert(vec![Simple::Ident(Default::default())]);
-                    result.push(Simple::Pop(Default::default()));
-                    vec![Simple::Push(result)]
-                }
+                LexemeKind::LRoundBracket => vec![Simple::Push(inner.convert())],
+                LexemeKind::LCurlyBracket => vec![Simple::Push(inner.convert())],
                 LexemeKind::LSquareBracket => match inner {
                     Semicolon::Semi { .. } => unreachable!(),
                     Semicolon::Syntax(list) => list
@@ -58,15 +48,20 @@ impl<'a> Contained<'a, Void> {
 }
 
 impl<'a> Semicolon<'a, Void> {
-    pub fn convert(&self, mut out: Vec<Simple<'a>>) -> Vec<Simple<'a>> {
+    pub fn convert(&self) -> Vec<Simple<'a>> {
+        let mut out = vec![];
+        let mut line_args = vec![];
         let line = match self {
             Semicolon::Semi { left, right, .. } => {
-                out = right.convert(out);
+                out = right.convert();
                 left
             }
-            Semicolon::Syntax(line) => line,
+            Semicolon::Syntax(line) => {
+                out.push(Simple::Ident(Default::default()));
+                line_args.push(Simple::Pop(Default::default()));
+                line
+            }
         };
-        let mut line_args = vec![];
         for ast in line {
             let simple = ast.convert();
             for s in simple {
@@ -90,7 +85,7 @@ mod tests {
         file.patch(Offset::default(), Offset::default(), input.to_string())
             .unwrap();
         let syntax = file.rule().collect().unwrap();
-        println!("{:?}", syntax.convert(vec![]));
+        println!("{:?}", syntax.convert());
     }
 
     #[test]

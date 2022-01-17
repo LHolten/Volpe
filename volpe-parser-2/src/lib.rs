@@ -83,7 +83,7 @@ mod test {
         let mut file = File::default();
         file.patch(Offset::default(), Offset::default(), "[1]".to_string())?;
         if let Ok(syntax) = file.rule().collect() {
-            syntax.convert(vec![]);
+            syntax.convert();
         }
         Ok(())
     }
@@ -96,18 +96,18 @@ mod test {
             Offset::default(),
             "
             [i32] ( [n]
-                #{(i32.const }
-                n
+                #{(i32.const };
+                n;
                 #{)}
-            )
-            [add] (#{(i32.add)})
+            );
+            [add] (#{(i32.add)});
 
             add i32(1) i32(2)
             "
             .to_string(),
         )?;
         let syntax = dbg!(file.rule().collect().unwrap());
-        let ast = dbg!(syntax.convert(vec![]));
+        let ast = dbg!(syntax.convert());
         dbg!(Evaluator::eval(ast).unwrap());
         Ok(())
     }

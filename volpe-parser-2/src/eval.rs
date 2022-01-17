@@ -19,7 +19,10 @@ impl<'a> Evaluator<'a> {
     pub fn eval(ast: Vec<Simple>) -> Result<String, String> {
         let mut eval = Evaluator {
             buffer: String::new(),
-            args: vec![],
+            args: vec![Scope {
+                val: vec![],
+                env: vec![],
+            }],
             refs: vec![],
         };
         eval.eval_single(Scope {
@@ -87,7 +90,7 @@ mod tests {
         file.patch(Offset::default(), Offset::default(), input.to_string())
             .unwrap();
         let syntax = file.rule().collect().unwrap();
-        let result = Evaluator::eval(syntax.convert(vec![]));
+        let result = Evaluator::eval(syntax.convert());
         assert_eq!(result, output);
     }
 
@@ -95,8 +98,8 @@ mod tests {
     fn resolution1() {
         check(
             "
-            [a] (b)
-            [b] (1)
+            [a] (b);
+            [b] (1);
             a",
             Ok("1"),
         )
@@ -106,8 +109,8 @@ mod tests {
     fn resolution2() {
         check(
             "
-            [b] (1)
-            [a] (b)
+            [b] (1);
+            [a] (b);
             a",
             Ok("1"),
         )
@@ -118,9 +121,8 @@ mod tests {
         check(
             "
             [f] (
-                [a] (1)
-                v [v]
-            )
+                [a] (1);
+            );
             f(a)",
             Err("a"),
         )
@@ -130,8 +132,8 @@ mod tests {
     fn resolution4() {
         check(
             "
-            [a] (1)
-            [a] (2)
+            [a] (1);
+            [a] (2);
             a",
             Ok("2"),
         )
@@ -141,7 +143,7 @@ mod tests {
     fn resolution5() {
         check(
             "
-            v [v] ([a] (1))
+            v [v] ([a] (1););
             a",
             Err("a"),
         )
@@ -151,8 +153,8 @@ mod tests {
     fn resolution6() {
         check(
             "
-            [x] (y)
-            [v] { [x] (1) }
+            [x] (y);
+            [v] { [x] (1) };
             v (x)",
             Ok("1"),
         )
@@ -162,8 +164,8 @@ mod tests {
     fn resolution7() {
         check(
             "
-            [y] (x)
-            [v] { [x] (1) }
+            [y] (x);
+            [v] { [x] (1) };
             v (y)",
             Ok("1"),
         )
@@ -173,15 +175,15 @@ mod tests {
     fn other() {
         check(
             r##"
-        [new] ( [arg]
-            {(arg(attr))}
-        )
+        [new] ( [arg];
+            (arg(attr))
+        );
 
         [obj] new {
             [attr] (2)
-        }
+        };
 
-        [attr] (1)
+        [attr] (1);
         obj
         "##,
             Ok("2"),

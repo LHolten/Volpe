@@ -94,14 +94,6 @@ impl File {
 
                 yard.shunt(lexeme);
             }
-            yard.shunt(Lexeme {
-                kind: LexemeKind::Semicolon,
-                range: Range {
-                    start: Offset::new(line_num, line.chars().count()),
-                    end: Offset::new(line_num + 1, 0),
-                    text: "\n",
-                },
-            })
         }
 
         let mut result = yard.reduce();
