@@ -65,7 +65,7 @@ impl Document {
     // TEMP
     pub fn compile_and_run(&self) -> Result<String, String> {
         if let Ok(syntax) = self.file.rule().collect() {
-            return Evaluator::eval(syntax.convert(None));
+            return Evaluator::eval(syntax.convert(vec![]));
         }
         Err("...".to_string())
     }

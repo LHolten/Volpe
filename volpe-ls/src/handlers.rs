@@ -57,7 +57,7 @@ fn get_lexemes_contained<E>(contained: Contained<E>) -> Vec<Lexeme<'_>> {
         } => {
             let mut lexemes = Vec::new();
             lexemes.extend(left);
-            lexemes.extend(get_lexemes(*inner));
+            lexemes.extend(get_lexemes(inner));
             lexemes.extend(right);
             lexemes
         }
